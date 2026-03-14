@@ -250,6 +250,9 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
   metricBoxes.push([m.isSubCap ? "Subordinated LTV - Last Dollar" : "Subordinated Last $ LTV", m.isSubCap ? formatPercent(m.autoLtv) : "N/A"]);
   metricBoxes.push(["Total Capital", formatCurrencyInput(String(m.totalCap || 0))]);
   metricBoxes.push(["Equity %", formatPercent(m.equityPct)]);
+  if (parseCurrency(asset.currentNetIncome) > 0 && parseCurrency(asset.propertyValue) > 0) {
+  metricBoxes.push(["Cap Rate", formatPercent((parseCurrency(asset.currentNetIncome) / parseCurrency(asset.propertyValue)) * 100)]);
+}
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Ownership Status</label><Select value={asset.ownershipStatus} onValueChange={(v) => upd("ownershipStatus", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
