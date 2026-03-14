@@ -1095,11 +1095,11 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
         const arv           = parseCurrency(asset.propertyValue || "");
         // Total project cost minus equity contributions
         const totalProjectCost = purchasePrice + hardCosts + softCosts + closingCosts + carryCosts;
-        const netCost          = totalProjectCost - addlEquity;
-        const suggestedLoan    = Math.max(0, netCost);
+        const netCost          = Math.max(0, totalProjectCost - addlEquity);
+        const suggestedLoan    = netCost;
         const curLoanAmt       = parseCurrency(asset.loanAmount || "");
-        // LTC = New Loan / (Purchase Price + Hard + Soft + Closing + Carry - Additional Equity)
-        const ltc = netCost > 0 && curLoanAmt > 0 ? (curLoanAmt / netCost) * 100 : 0;
+        // LTC = (Total Costs − Equity) ÷ Total Costs
+        const ltc = totalProjectCost > 0 ? (netCost / totalProjectCost) * 100 : 0;
         const ltv = arv > 0 && curLoanAmt > 0 ? (curLoanAmt / arv) * 100 : 0;
         const curEquity = curPropVal > 0 ? curPropVal - curLoan : null;
 
@@ -1109,7 +1109,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
 
             <div className="grid gap-3 md:grid-cols-2">
               <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Price</label><Input value={asset.purchasePrice} onChange={(e) => upd("purchasePrice", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
-              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Year</label><Input value={asset.purchaseYear || ""} onChange={(e) => upd("purchaseYear", e.target.value)} placeholder="e.g. 2021" className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Year</label><Input value={asset.purchaseYear || ""} onChange={(e) => upd("purchaseYear", e.target.value)} placeholder="Optional" className={inputClass} /></div>
             </div>
 
             <div>
@@ -1198,9 +1198,9 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                   Use This Amount ↓
                 </button>
                 {/* LTC / LTV */}
-                {curLoanAmt > 0 && (
+                {totalProjectCost > 0 && (
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
-                    {ltc > 0 && <div className="rounded-lg bg-gray-50 p-2 text-center"><div className="text-xs text-gray-400 mb-0.5">LTC</div><div className="text-sm font-bold text-[#0a1f44]">{ltc.toFixed(1)}%</div><div className="text-xs text-gray-400">Loan ÷ (Costs − Equity)</div></div>}
+                    {ltc > 0 && <div className="rounded-lg bg-gray-50 p-2 text-center"><div className="text-xs text-gray-400 mb-0.5">LTC</div><div className="text-sm font-bold text-[#0a1f44]">{ltc.toFixed(1)}%</div><div className="text-xs text-gray-400">(Costs − Equity) ÷ Costs</div></div>}
                     {ltv > 0 && <div className="rounded-lg bg-gray-50 p-2 text-center"><div className="text-xs text-gray-400 mb-0.5">LTV (on ARV)</div><div className="text-sm font-bold text-[#0a1f44]">{ltv.toFixed(1)}%</div></div>}
                   </div>
                 )}
@@ -1221,7 +1221,8 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
         const totalProjectCost = purchasePrice + hardCosts + softCosts + closingCosts + carryCosts;
         const netCost          = Math.max(0, totalProjectCost - addlEquity);
         const curLoanAmt       = parseCurrency(asset.loanAmount || "");
-        const ltc = netCost > 0 && curLoanAmt > 0 ? (curLoanAmt / netCost) * 100 : 0;
+        // LTC = (Total Costs − Equity) ÷ Total Costs
+        const ltc = totalProjectCost > 0 ? (netCost / totalProjectCost) * 100 : 0;
         const ltv = arv > 0 && curLoanAmt > 0 ? (curLoanAmt / arv) * 100 : 0;
         const suggestedLoan = netCost;
 
@@ -1231,7 +1232,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
 
             <div className="grid gap-3 md:grid-cols-2">
               <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Price</label><Input value={asset.purchasePrice} onChange={(e) => upd("purchasePrice", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
-              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Year</label><Input value={asset.purchaseYear || String(new Date().getFullYear())} onChange={(e) => upd("purchaseYear", e.target.value)} placeholder={String(new Date().getFullYear())} className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Year</label><Input value={asset.purchaseYear ?? String(new Date().getFullYear())} onChange={(e) => upd("purchaseYear", e.target.value)} placeholder={String(new Date().getFullYear())} className={inputClass} /></div>
             </div>
 
             <div>
@@ -1295,9 +1296,9 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                   className="w-full py-2 text-xs font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 mb-3">
                   Use This Amount ↓
                 </button>
-                {curLoanAmt > 0 && (
+                {totalProjectCost > 0 && (
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
-                    {ltc > 0 && <div className="rounded-lg bg-gray-50 p-2 text-center"><div className="text-xs text-gray-400 mb-0.5">LTC</div><div className="text-sm font-bold text-[#0a1f44]">{ltc.toFixed(1)}%</div><div className="text-xs text-gray-400">Loan ÷ (Costs − Equity)</div></div>}
+                    {ltc > 0 && <div className="rounded-lg bg-gray-50 p-2 text-center"><div className="text-xs text-gray-400 mb-0.5">LTC</div><div className="text-sm font-bold text-[#0a1f44]">{ltc.toFixed(1)}%</div><div className="text-xs text-gray-400">(Costs − Equity) ÷ Costs</div></div>}
                     {ltv > 0 && <div className="rounded-lg bg-gray-50 p-2 text-center"><div className="text-xs text-gray-400 mb-0.5">LTV (on ARV)</div><div className="text-sm font-bold text-[#0a1f44]">{ltv.toFixed(1)}%</div></div>}
                   </div>
                 )}
