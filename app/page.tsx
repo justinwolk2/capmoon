@@ -41,7 +41,7 @@ type TeamMember = {
 };
 type AppUser = {
   id: number; username: string; password: string; role: "admin" | "advisor" | "capital-seeker";
-  name: string; blockedLenderIds: number[]; teamMemberId?: number;
+  name: string; blockedLenderIds: number[]; teamMemberId?: number; phone?: string; email?: string;
 };
 type SubmittedDeal = {
   id: number; submittedAt: string; seekerName: string;
@@ -1607,27 +1607,63 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
 
 // ─── Login Wall ───────────────────────────────────────────────────────────────
 
-function LoginWall({ onLogin, users }: { onLogin: (session: AuthSession) => void; users: AppUser[] }) {
-  const [mode, setMode] = useState<"" | "client" | "capital">(""); 
+function LoginWall({ onLogin, users, onRegisterCapitalSeeker }: { onLogin: (session: AuthSession) => void; users: AppUser[]; onRegisterCapitalSeeker: (user: AppUser) => void }) {
+  const [mode, setMode] = useState<"" | "client" | "capital-choice" | "capital-register" | "capital-verify" | "capital-login">(""); 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
+  const [showPass2, setShowPass2] = useState(false);
   const [error, setError] = useState("");
+  // Registration fields
+  const [regName, setRegName] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPhone, setRegPhone] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regPassword2, setRegPassword2] = useState("");
+  // Verification
+  const [verifyCode, setVerifyCode] = useState("");
+  const [generatedCode, setGeneratedCode] = useState("");
+  const [pendingUser, setPendingUser] = useState<AppUser | null>(null);
 
-  function handleLogin() {
+  function handleClientLogin() {
     const user = users.find((u) => u.username.toLowerCase() === username.toLowerCase());
     if (!user) { setError("Username not found."); return; }
     if (user.password !== password) { setError("Incorrect password. If you forgot it, please contact your admin."); return; }
     setError(""); onLogin({ user });
   }
 
-  function handleCapitalSeeker() {
-    const guestUser: AppUser = { id: 9999, username: "guest", password: "", role: "capital-seeker", name: "Capital Seeker", blockedLenderIds: [] };
-    onLogin({ user: guestUser });
+  function handleCapitalLogin() {
+    const user = users.find((u) => u.role === "capital-seeker" && u.username.toLowerCase() === username.toLowerCase());
+    if (!user) { setError("Account not found. Please register first."); return; }
+    if (user.password !== password) { setError("Incorrect password."); return; }
+    setError(""); onLogin({ user });
   }
+
+  function handleRegisterSubmit() {
+    if (!regName.trim() || !regEmail.trim() || !regPhone.trim() || !regPassword.trim()) { setError("Please fill in all fields."); return; }
+    if (regPassword !== regPassword2) { setError("Passwords do not match."); return; }
+    if (users.find((u) => u.username.toLowerCase() === regEmail.toLowerCase())) { setError("An account with this email already exists. Please log in."); return; }
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const newUser: AppUser = { id: Date.now(), username: regEmail, password: regPassword, role: "capital-seeker", name: regName, blockedLenderIds: [], phone: regPhone, email: regEmail };
+    setGeneratedCode(code);
+    setPendingUser(newUser);
+    setError("");
+    setMode("capital-verify");
+  }
+
+  function handleVerifySubmit() {
+    if (verifyCode.trim() !== generatedCode) { setError("Incorrect code. Please try again."); return; }
+    if (!pendingUser) return;
+    onRegisterCapitalSeeker(pendingUser);
+    setError("");
+    onLogin({ user: pendingUser });
+  }
+
+  const sidebarNav = [["Overview", Gauge], ["Lender Programs", Landmark], ["Add Lender", Plus], ["Deal Matcher", Filter], ["Deal Team", Users], ["Upload Center", FileSpreadsheet]];
 
   return (
     <div className="min-h-screen bg-[#f0f2f5] flex">
+      {/* Locked sidebar preview */}
       <div className="hidden lg:flex flex-col w-[260px] bg-[#0a1f44] border-r border-[#c9a84c]/10 relative flex-shrink-0">
         <div className="px-6 py-8 border-b border-[#c9a84c]/20">
           <div className="flex items-center gap-3 mb-2">
@@ -1637,7 +1673,7 @@ function LoginWall({ onLogin, users }: { onLogin: (session: AuthSession) => void
           <div className="text-xs uppercase tracking-[0.35em] text-[#c9a84c] font-bold mt-3">Investment Banking</div>
         </div>
         <nav className="space-y-1 p-4 flex-1 opacity-40 pointer-events-none select-none">
-          {[["Overview", Gauge], ["Lender Programs", Landmark], ["Add Lender", Plus], ["Deal Matcher", Filter], ["Deal Team", Users], ["Upload Center", FileSpreadsheet]].map(([label, Icon]: any) => (
+          {sidebarNav.map(([label, Icon]: any) => (
             <div key={String(label)} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-gray-300 border border-transparent">
               <Icon className="h-4 w-4 flex-shrink-0" /><span className="text-sm font-medium tracking-wide">{label}</span>
             </div>
@@ -1653,6 +1689,8 @@ function LoginWall({ onLogin, users }: { onLogin: (session: AuthSession) => void
           <div className="text-center"><Lock className="h-8 w-8 text-[#c9a84c] mx-auto mb-2" /><div className="text-xs text-gray-300 font-medium">Login Required</div></div>
         </div>
       </div>
+
+      {/* Right panel */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
@@ -1660,28 +1698,112 @@ function LoginWall({ onLogin, users }: { onLogin: (session: AuthSession) => void
             <div className="font-display text-4xl font-bold text-[#0a1f44] mb-1">CapMoon</div>
             <div className="text-sm text-gray-500">Premier Capital Search Platform</div>
           </div>
+
+          {/* Main choice */}
           {mode === "" && (
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
               <button onClick={() => setMode("client")} className="w-full p-6 rounded-2xl border-2 border-[#0a1f44] bg-[#0a1f44] text-white text-left hover:bg-[#0a1f44]/90 transition-all group">
                 <div className="flex items-center justify-between"><div><div className="text-lg font-bold mb-1">CapMoon Client Login</div><div className="text-sm text-gray-300">Access the full lender intelligence dashboard</div></div><ChevronRight className="h-5 w-5 text-[#c9a84c] group-hover:translate-x-1 transition-transform" /></div>
               </button>
-              <button onClick={handleCapitalSeeker} className="w-full p-6 rounded-2xl border-2 border-[#c9a84c]/30 bg-white text-left hover:border-[#c9a84c] transition-all group">
+              <button onClick={() => setMode("capital-choice")} className="w-full p-6 rounded-2xl border-2 border-[#c9a84c]/30 bg-white text-left hover:border-[#c9a84c] transition-all group">
                 <div className="flex items-center justify-between"><div><div className="text-lg font-bold text-[#0a1f44] mb-1">I Am Looking for Capital</div><div className="text-sm text-gray-500">Submit your deal for lender matching</div></div><ChevronRight className="h-5 w-5 text-[#c9a84c] group-hover:translate-x-1 transition-transform" /></div>
               </button>
             </motion.div>
           )}
+
+          {/* Client login */}
           {mode === "client" && (
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
               <button onClick={() => { setMode(""); setError(""); }} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-6"><ChevronLeft className="h-3 w-3" /> Back</button>
               <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Secure Access</div>
               <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-6">Client Login</h2>
               <div className="space-y-4">
-                <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Username / Email</label><Input value={username} onChange={(e) => setUsername(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()} placeholder="your@email.com" className="bg-white border-gray-300 text-gray-800 rounded-xl" /></div>
+                <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Username / Email</label><Input value={username} onChange={(e) => setUsername(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleClientLogin()} placeholder="your@email.com" className="bg-white border-gray-300 text-gray-800 rounded-xl" /></div>
                 <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Password</label>
-                  <div className="relative"><Input type={showPass ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()} placeholder="••••••••" className="bg-white border-gray-300 text-gray-800 rounded-xl pr-10" /><button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">{showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
+                  <div className="relative"><Input type={showPass ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleClientLogin()} placeholder="••••••••" className="bg-white border-gray-300 text-gray-800 rounded-xl pr-10" /><button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">{showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
                 </div>
                 {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
-                <button onClick={handleLogin} className="w-full py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Sign In</button>
+                <button onClick={handleClientLogin} className="w-full py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Sign In</button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Capital seeker — register or login choice */}
+          {mode === "capital-choice" && (
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+              <button onClick={() => { setMode(""); setError(""); }} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-6"><ChevronLeft className="h-3 w-3" /> Back</button>
+              <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Capital Search Portal</div>
+              <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-2">Looking for Capital?</h2>
+              <p className="text-sm text-gray-500 mb-6">Create an account to submit your deal and track its progress.</p>
+              <div className="space-y-3">
+                <button onClick={() => { setMode("capital-register"); setError(""); }} className="w-full py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Create New Account</button>
+                <button onClick={() => { setMode("capital-login"); setError(""); setUsername(""); setPassword(""); }} className="w-full py-3 text-sm font-medium border-2 border-gray-200 text-gray-600 rounded-xl hover:border-[#0a1f44]/30 hover:text-[#0a1f44]">I Already Have an Account</button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Capital seeker — login */}
+          {mode === "capital-login" && (
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+              <button onClick={() => { setMode("capital-choice"); setError(""); }} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-6"><ChevronLeft className="h-3 w-3" /> Back</button>
+              <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Capital Search Portal</div>
+              <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-6">Sign In</h2>
+              <div className="space-y-4">
+                <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Email Address</label><Input value={username} onChange={(e) => setUsername(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCapitalLogin()} placeholder="your@email.com" className="bg-white border-gray-300 text-gray-800 rounded-xl" /></div>
+                <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Password</label>
+                  <div className="relative"><Input type={showPass ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCapitalLogin()} placeholder="••••••••" className="bg-white border-gray-300 text-gray-800 rounded-xl pr-10" /><button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">{showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
+                </div>
+                {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
+                <button onClick={handleCapitalLogin} className="w-full py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Sign In</button>
+                <button onClick={() => { setMode("capital-register"); setError(""); }} className="w-full text-xs text-gray-400 hover:text-[#0a1f44] text-center">Don't have an account? Register here</button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Capital seeker — register */}
+          {mode === "capital-register" && (
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+              <button onClick={() => { setMode("capital-choice"); setError(""); }} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-6"><ChevronLeft className="h-3 w-3" /> Back</button>
+              <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Create Account</div>
+              <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-6">Register</h2>
+              <div className="space-y-4">
+                <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Full Name</label><Input value={regName} onChange={(e) => setRegName(e.target.value)} placeholder="John Smith" className="bg-white border-gray-300 text-gray-800 rounded-xl" /></div>
+                <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Email Address</label><Input value={regEmail} onChange={(e) => setRegEmail(e.target.value)} placeholder="john@example.com" className="bg-white border-gray-300 text-gray-800 rounded-xl" /></div>
+                <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Phone Number</label><Input value={regPhone} onChange={(e) => setRegPhone(e.target.value)} placeholder="(305) 000-0000" className="bg-white border-gray-300 text-gray-800 rounded-xl" /></div>
+                <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Password</label>
+                  <div className="relative"><Input type={showPass ? "text" : "password"} value={regPassword} onChange={(e) => setRegPassword(e.target.value)} placeholder="••••••••" className="bg-white border-gray-300 text-gray-800 rounded-xl pr-10" /><button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">{showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
+                </div>
+                <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Confirm Password</label>
+                  <div className="relative"><Input type={showPass2 ? "text" : "password"} value={regPassword2} onChange={(e) => setRegPassword2(e.target.value)} placeholder="••••••••" className="bg-white border-gray-300 text-gray-800 rounded-xl pr-10" /><button type="button" onClick={() => setShowPass2(!showPass2)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">{showPass2 ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
+                </div>
+                {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
+                <button onClick={handleRegisterSubmit} className="w-full py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Create Account & Verify</button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Verification */}
+          {mode === "capital-verify" && (
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+              <div className="text-center mb-6">
+                <div className="w-14 h-14 rounded-full bg-[#0a1f44]/10 flex items-center justify-center mx-auto mb-4">
+                  <ShieldCheck className="h-7 w-7 text-[#0a1f44]" />
+                </div>
+                <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Verification</div>
+                <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-2">Check Your Email</h2>
+                <p className="text-sm text-gray-500">We've sent a 6-digit verification code to <span className="font-semibold text-[#0a1f44]">{regEmail}</span></p>
+              </div>
+              {/* Simulated code display */}
+              <div className="rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/5 p-4 mb-5 text-center">
+                <div className="text-xs text-gray-500 mb-1">📧 Simulated email code:</div>
+                <div className="font-display text-3xl font-bold text-[#0a1f44] tracking-[0.4em]">{generatedCode}</div>
+                <div className="text-xs text-gray-400 mt-1">(In production this would be sent to your email)</div>
+              </div>
+              <div className="space-y-4">
+                <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Enter 6-Digit Code</label><Input value={verifyCode} onChange={(e) => setVerifyCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleVerifySubmit()} placeholder="000000" maxLength={6} className="bg-white border-gray-300 text-gray-800 rounded-xl text-center text-lg tracking-[0.3em] font-bold" /></div>
+                {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
+                <button onClick={handleVerifySubmit} className="w-full py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Verify & Enter Portal</button>
+                <button onClick={() => { setMode("capital-register"); setError(""); setVerifyCode(""); }} className="w-full text-xs text-gray-400 hover:text-gray-600 text-center">Go back and try again</button>
               </div>
             </motion.div>
           )}
@@ -1693,11 +1815,12 @@ function LoginWall({ onLogin, users }: { onLogin: (session: AuthSession) => void
 
 // ─── Capital Seeker Portal ────────────────────────────────────────────────────
 
-function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, teamMembers }: { lenderRecords: LenderRecord[]; onLogout: () => void; onSubmitDeal: (deal: SubmittedDeal) => void; session: AuthSession; teamMembers: TeamMember[] }) {
+function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, teamMembers, submittedDeals }: { lenderRecords: LenderRecord[]; onLogout: () => void; onSubmitDeal: (deal: SubmittedDeal) => void; session: AuthSession; teamMembers: TeamMember[]; submittedDeals: SubmittedDeal[] }) {
   const [activeTab, setActiveTab] = useState("matcher");
   const inputClass = "bg-white border-gray-300 text-gray-800 placeholder:text-gray-400 rounded-xl focus:border-[#0a1f44] focus:ring-0";
   const selectTriggerClass = "bg-white border-gray-300 text-gray-800 rounded-xl focus:border-[#0a1f44]";
   const cardClass = "rounded-2xl border border-gray-200 bg-white shadow-sm";
+  const myDeals = submittedDeals.filter((d) => d.seekerName === session?.user.name);
 
   function handleSubmit(assets: AssetData[], capitalType: string, assetMode: string, collateralMode: string) {
     const advisors = assignAdvisors(capitalType, teamMembers);
@@ -1718,7 +1841,7 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
               <div className="text-xs uppercase tracking-[0.35em] text-[#c9a84c] font-bold mt-3">Find Capital</div>
             </div>
             <nav className="space-y-1 p-4 flex-1">
-              {([["matcher", "Deal Matcher", Filter], ["uploads", "Upload Center", FileSpreadsheet]] as [string, string, any][]).map(([key, label, Icon]) => (
+              {([["matcher", "Deal Matcher", Filter], ["my-deals", "My Deals", FileSpreadsheet], ["uploads", "Upload Center", Upload]] as [string, string, any][]).map(([key, label, Icon]) => (
                 <button key={key} onClick={() => setActiveTab(key)} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-all ${activeTab === key ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/30" : "text-gray-300 hover:bg-white/5 hover:text-white border border-transparent"}`}>
                   <Icon className="h-4 w-4" /><span className="text-sm font-medium">{label}</span>
                   {activeTab === key && <div className="ml-auto w-1 h-4 bg-[#c9a84c] rounded-full" />}
@@ -1741,6 +1864,45 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
                 <p className="mt-1 text-sm text-gray-500">CapMoon's Premier Capital Search Dashboard</p>
               </div>
               {activeTab === "matcher" && <DealMatcher lenderRecords={lenderRecords} capitalSeekerMode={true} onSubmitDeal={handleSubmit} seekerName={session?.user.name} teamMembers={teamMembers} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />}
+              {activeTab === "my-deals" && (
+                <div className={cardClass + " p-6"}>
+                  <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Your History</div>
+                  <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">My Deals</h2>
+                  {myDeals.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center">
+                      <div className="text-sm font-bold text-[#0a1f44] mb-1">No deals submitted yet</div>
+                      <div className="text-xs text-gray-400 mb-4">Submit a deal in the Deal Matcher tab to get started.</div>
+                      <button onClick={() => setActiveTab("matcher")} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Go to Deal Matcher</button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {myDeals.map((deal) => (
+                        <div key={deal.id} className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Deal #{deal.id}</div>
+                              <div className="text-xs text-gray-500">Submitted: {deal.submittedAt}</div>
+                            </div>
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${deal.status === "pending" ? "bg-amber-50 text-amber-600 border border-amber-200" : deal.status === "assigned" ? "bg-blue-50 text-blue-600 border border-blue-200" : "bg-emerald-50 text-emerald-600 border border-emerald-200"}`}>
+                              {deal.status.charAt(0).toUpperCase() + deal.status.slice(1)}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+                            {[["Capital Type", deal.capitalType], ["Assets", `${deal.assets.length} asset${deal.assets.length > 1 ? "s" : ""}`], ["Loan Amount", deal.assets[0]?.loanAmount || "—"]].map(([label, val]) => (
+                              <div key={String(label)} className="rounded-lg bg-white border border-gray-200 p-2.5">
+                                <div className="text-xs text-gray-400 mb-0.5">{label}</div>
+                                <div className="text-sm font-bold text-[#0a1f44]">{val}</div>
+                              </div>
+                            ))}
+                          </div>
+                          {deal.assets[0]?.address?.city && <div className="text-xs text-gray-500 mb-3">{deal.assets[0].address.city}, {deal.assets[0].address.state}</div>}
+                          <div className="text-xs text-gray-500 mt-2">A CapMoon advisor will be in touch with you shortly regarding this deal.</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               {activeTab === "uploads" && (
                 <div className={cardClass + " p-6"}>
                   <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Documents</div>
@@ -2305,10 +2467,11 @@ export default function Home() {
 
   function handleSubmitDeal(deal: SubmittedDeal) { setSubmittedDeals((prev) => [...prev, deal]); }
   function handleLogout() { setSession(null); }
+  function handleRegisterCapitalSeeker(newUser: AppUser) { setUsers((prev) => [...prev, newUser]); }
 
-  if (!session) return <LoginWall onLogin={setSession} users={users} />;
+  if (!session) return <LoginWall onLogin={setSession} users={users} onRegisterCapitalSeeker={handleRegisterCapitalSeeker} />;
   if (session.user.role === "capital-seeker") {
-    return <CapitalSeekerPortal lenderRecords={seedLenders} onLogout={handleLogout} onSubmitDeal={handleSubmitDeal} session={session} teamMembers={teamMembers} />;
+    return <CapitalSeekerPortal lenderRecords={seedLenders} onLogout={handleLogout} onSubmitDeal={handleSubmitDeal} session={session} teamMembers={teamMembers} submittedDeals={submittedDeals} />;
   }
   return <MainPortal session={session} onLogout={handleLogout} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals} users={users} setUsers={setUsers} teamMembers={teamMembers} setTeamMembers={setTeamMembers} deleteRequests={deleteRequests} setDeleteRequests={setDeleteRequests} />;
 }
