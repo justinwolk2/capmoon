@@ -223,9 +223,13 @@ export default function Home() {
 
           <aside className="border-r border-[#c9a84c]/10 bg-[#080d1a] flex flex-col">
             <div className="px-6 py-8 border-b border-[#c9a84c]/10">
-              <div className="text-xs uppercase tracking-[0.35em] text-[#c9a84c]/60 font-medium mb-1">Capital Advisory</div>
-              <div className="font-display text-3xl font-bold gold-gradient">CapMoon</div>
-              <div className="mt-2 text-xs text-gray-500 tracking-wide">Lender Intelligence Platform</div>
+             <div className="flex items-center gap-3">
+  <img src="/logo1.jpeg" alt="CapMoon" className="h-12 w-12 object-contain rounded-full" />
+  <div>
+    <div className="font-display text-2xl font-bold gold-gradient">CapMoon</div>
+    <div className="text-xs text-gray-500 tracking-wide">Lender Intelligence Platform</div>
+  </div>
+</div>
             </div>
             <nav className="space-y-1 p-4 flex-1">
               {navItems.map(([key, label, Icon]) => (
