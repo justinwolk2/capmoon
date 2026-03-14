@@ -864,7 +864,7 @@ function matchLabel(score: number): { label: string; color: string; bg: string; 
 function normalizeRecourse(v: string) { return v === "SELECTIVE" || !v ? "CASE BY CASE" : v; }
 function blankAddress(): AssetAddress { return { street: "", unit: "", city: "", state: "", zip: "" }; }
 function blankAsset(id: number): AssetData {
-  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "Apartments", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dscr: "", currentRate: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
+  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "Apartments", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dscr: "", currentRate: "", purchaseYear: String(new Date().getFullYear()), fullyEntitled: undefined, currentPropertyValue: "", additionalEquity: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
 }
 function blankLenderForm(): NewLenderForm {
   return { programName: "", contactPerson: "", email: "", phone: "", website: "", typeOfLenders: [], typeOfLoans: [], programTypes: [], propertyTypes: [], loanTerms: [], notes: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalTypes: [], capitalTypePrograms: [], status: "Active" };
@@ -1209,6 +1209,104 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
           </div>
         );
       })()}
+      {/* New Development + Acquisition extra fields */}
+      {m.isAcquisition && asset.dealType === "New Development" && (() => {
+        const purchasePrice = parseCurrency(asset.purchasePrice);
+        const hardCosts     = parseCurrency(asset.hardCosts || "");
+        const softCosts     = parseCurrency(asset.softCosts || "");
+        const closingCosts  = parseCurrency(asset.originationClosingCosts || "");
+        const carryCosts    = parseCurrency(asset.carryingCosts || "");
+        const addlEquity    = parseCurrency(asset.additionalEquity || "");
+        const arv           = parseCurrency(asset.propertyValue || "");
+        const totalProjectCost = purchasePrice + hardCosts + softCosts + closingCosts + carryCosts;
+        const netCost          = Math.max(0, totalProjectCost - addlEquity);
+        const curLoanAmt       = parseCurrency(asset.loanAmount || "");
+        const ltc = netCost > 0 && curLoanAmt > 0 ? (curLoanAmt / netCost) * 100 : 0;
+        const ltv = arv > 0 && curLoanAmt > 0 ? (curLoanAmt / arv) * 100 : 0;
+        const suggestedLoan = netCost;
+
+        return (
+          <div className="md:col-span-2 rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/5 p-5 space-y-4">
+            <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold">New Development — Project Details</div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Price</label><Input value={asset.purchasePrice} onChange={(e) => upd("purchasePrice", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Year</label><Input value={asset.purchaseYear || String(new Date().getFullYear())} onChange={(e) => upd("purchaseYear", e.target.value)} placeholder={String(new Date().getFullYear())} className={inputClass} /></div>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Are all units fully entitled?</label>
+              <div className="grid grid-cols-2 gap-3">
+                {(["yes", "no"] as const).map((opt) => (
+                  <button key={opt} type="button" onClick={() => upd("fullyEntitled", opt)}
+                    className={`p-3 rounded-xl border-2 text-center font-bold text-sm transition-all ${asset.fullyEntitled === opt ? (opt === "yes" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-red-400 bg-red-50 text-red-600") : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30"}`}>
+                    {opt === "yes" ? "✓ Yes" : "✕ No"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              {([
+                ["Total Hard Costs", "hardCosts"],
+                ["Total Soft Costs", "softCosts"],
+                ["Total Closing Costs", "originationClosingCosts"],
+                ["Total Carry Costs", "carryingCosts"],
+              ] as [string, keyof AssetData][]).map(([label, field]) => (
+                <div key={field}><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">{label}</label><Input value={String(asset[field] || "")} onChange={(e) => upd(field, formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+              ))}
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Additional Equity Contributions</label>
+              <Input value={asset.additionalEquity || ""} onChange={(e) => upd("additionalEquity", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} />
+              <div className="text-xs text-gray-400 mt-1">Subtracted from total project cost</div>
+            </div>
+
+            {/* Cost breakdown + suggested loan */}
+            {totalProjectCost > 0 && (
+              <div className="rounded-xl border-2 border-[#0a1f44]/20 bg-white p-4">
+                <div className="text-xs font-bold uppercase tracking-wide text-[#c9a84c] mb-3">Total New Development Loan Calculation</div>
+                <div className="space-y-1.5 mb-3">
+                  {[
+                    ["Purchase Price", purchasePrice],
+                    ["Total Hard Costs", hardCosts],
+                    ["Total Soft Costs", softCosts],
+                    ["Total Closing Costs", closingCosts],
+                    ["Total Carry Costs", carryCosts],
+                  ].filter(([, v]) => (v as number) > 0).map(([label, val]) => (
+                    <div key={String(label)} className="flex justify-between text-xs">
+                      <span className="text-gray-500">{label}</span>
+                      <span className="font-medium text-[#0a1f44]">+ {formatCurrencyInput(String(val))}</span>
+                    </div>
+                  ))}
+                  {addlEquity > 0 && (
+                    <div className="flex justify-between text-xs text-emerald-700">
+                      <span className="font-medium">Additional Equity (deducted)</span>
+                      <span className="font-bold">− {formatCurrencyInput(String(addlEquity))}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm font-bold text-[#0a1f44] pt-2 border-t border-gray-200">
+                    <span>Suggested Loan Amount</span>
+                    <span className="text-[#c9a84c]">{formatCurrencyInput(String(suggestedLoan))}</span>
+                  </div>
+                </div>
+                <button type="button" onClick={() => upd("loanAmount", formatCurrencyInput(String(suggestedLoan)))}
+                  className="w-full py-2 text-xs font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 mb-3">
+                  Use This Amount ↓
+                </button>
+                {curLoanAmt > 0 && (
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+                    {ltc > 0 && <div className="rounded-lg bg-gray-50 p-2 text-center"><div className="text-xs text-gray-400 mb-0.5">LTC</div><div className="text-sm font-bold text-[#0a1f44]">{ltc.toFixed(1)}%</div><div className="text-xs text-gray-400">Loan ÷ (Costs − Equity)</div></div>}
+                    {ltv > 0 && <div className="rounded-lg bg-gray-50 p-2 text-center"><div className="text-xs text-gray-400 mb-0.5">LTV (on ARV)</div><div className="text-sm font-bold text-[#0a1f44]">{ltv.toFixed(1)}%</div></div>}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {m.isConstruction && (
         <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-4">
           <div className="text-xs uppercase tracking-[0.2em] text-[#c9a84c] font-bold mb-3">Project Estimated Costs</div>
@@ -1222,10 +1320,10 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
       {!m.isSubCap && !(m.isConstruction && m.isAcquisition) && (
         <div className="md:col-span-2">
           <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">
-            {m.isRefinance && asset.dealType === "New Development" ? "Total New Development Loan" : m.isRefinance ? "New Loan Amount" : "Loan Amount"}
+            {asset.dealType === "New Development" ? "Total New Development Loan" : m.isRefinance ? "New Loan Amount" : "Loan Amount"}
           </label>
-          <Input value={asset.loanAmount} onChange={(e) => upd("loanAmount", formatCurrencyInput(e.target.value))} placeholder={m.isRefinance && asset.dealType === "New Development" ? "Auto-filled above or enter manually" : "$0"} className={inputClass} />
-          {m.isRefinance && asset.dealType === "New Development" && <div className="text-xs text-gray-400 mt-1">Pre-filled from calculation above — edit to override.</div>}
+          <Input value={asset.loanAmount} onChange={(e) => upd("loanAmount", formatCurrencyInput(e.target.value))} placeholder={asset.dealType === "New Development" ? "Auto-filled above or enter manually" : "$0"} className={inputClass} />
+          {asset.dealType === "New Development" && <div className="text-xs text-gray-400 mt-1">Pre-filled from calculation above — edit to override.</div>}
         </div>
       )}
       {m.isSubCap && (<><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Senior Loan Amount</label><Input value={asset.seniorLoanAmount} onChange={(e) => upd("seniorLoanAmount", formatCurrencyInput(e.target.value))} className={inputClass} /></div><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">{subordinateLabel(capitalType)}</label><Input value={asset.subordinateAmount} onChange={(e) => upd("subordinateAmount", formatCurrencyInput(e.target.value))} className={inputClass} /></div><div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500">Stack: Senior {asset.seniorLoanAmount || "$0"} + {subordinateLabel(capitalType)} {asset.subordinateAmount || "$0"}</div></>)}
@@ -3243,6 +3341,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                       d.id === deal.id ? { ...d, invitedUserIds: [...(d.invitedUserIds || []), uid] } : d
                     );
                     setSubmittedDeals(updated);
+                    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: updated }) }).catch(e => console.error(e));
                     setInviteUserId(""); setShowInvite(false);
                   }
 
@@ -3251,11 +3350,13 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                       d.id === deal.id ? { ...d, invitedUserIds: (d.invitedUserIds || []).filter(id => id !== uid) } : d
                     );
                     setSubmittedDeals(updated);
+                    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: updated }) }).catch(e => console.error(e));
                   }
 
                   function updateDealStatus(status: SubmittedDeal["status"]) {
                     const updated = submittedDeals.map((d) => d.id === deal.id ? { ...d, status } : d);
                     setSubmittedDeals(updated);
+                    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: updated }) }).catch(e => console.error(e));
                   }
 
                   return (
