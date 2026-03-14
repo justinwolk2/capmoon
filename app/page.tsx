@@ -2189,7 +2189,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     };
     const next = [...lenderChangeRequests, req];
     setLenderChangeRequests(next);
-    saveToDb("lender-changes", next);
+    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: next }) }).catch(e => console.error("Save failed:", e));
     alert(`Your edit request for "${lender.lender}" has been submitted for admin approval.`);
     setEditingLenderId(null);
   }
@@ -2228,7 +2228,9 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
         proposedData: newLender, requestedBy: session?.user.name || "Advisor",
         requestedById: session?.user.id || 0, requestedAt: new Date().toLocaleString(), status: "pending",
       };
-      setLenderChangeRequests([...lenderChangeRequests, req]);
+      const next = [...lenderChangeRequests, req];
+      setLenderChangeRequests(next);
+      fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: next }) }).catch(e => console.error(e));
       alert(`Your request to add "${newLender.lender}" has been submitted for admin approval.`);
       setActiveTab("lenders");
     }
@@ -2898,7 +2900,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                     }
                                     const updated = lenderChangeRequests.map((r) => r.id === req.id ? { ...r, status: "approved" as const } : r);
                                     setLenderChangeRequests(updated);
-                                    saveToDb("lender-changes", updated);
+                                    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: updated }) }).catch(e => console.error(e));
                                   }}
                                   className="px-4 py-2 text-xs font-semibold bg-emerald-500 text-white rounded-xl hover:bg-emerald-600"
                                 >
@@ -2906,9 +2908,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                 </button>
                                 <button
                                   onClick={() => {
-                                    // Revert local state if it was an edit
                                     if (req.changeType === "edit" && req.lenderId) {
-                                      // reload from DB to discard local edits
                                       fetch("/api/data?type=lenders").then(r => r.json()).then(dbL => {
                                         if (Array.isArray(dbL) && dbL.length > 0) {
                                           setLenderRecords([...seedLenders, ...dbL]);
@@ -2919,7 +2919,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                     }
                                     const updated = lenderChangeRequests.map((r) => r.id === req.id ? { ...r, status: "denied" as const } : r);
                                     setLenderChangeRequests(updated);
-                                    saveToDb("lender-changes", updated);
+                                    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: updated }) }).catch(e => console.error(e));
                                   }}
                                   className="px-4 py-2 text-xs border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"
                                 >
