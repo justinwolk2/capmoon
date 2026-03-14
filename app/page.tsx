@@ -6,12 +6,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { BarChart3, Building2, FileSpreadsheet, Filter, Gauge, Landmark, Plus, Search, ShieldCheck, Upload, Users, Trash2, ChevronRight, ChevronLeft, CheckCircle, Edit2, Sparkles, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
+type LenderContact = { id: number; name: string; phone: string; email: string; region: string; };
 type LenderRecord = {
   id: number; source: string; spreadsheetRow: string; program: string; lender: string;
   type: string; minLoan: string; maxLoan: string; maxLtv: string; minDscr: string;
   states: string[]; assets: string[]; status: string; email: string; phone: string; recourse: string;
   contactPerson?: string; website?: string; sponsorStates?: string[]; loanTerms?: string;
-  typeOfLoans?: string[]; programTypes?: string[]; typeOfLenders?: string[];
+  typeOfLoans?: string[]; programTypes?: string[]; typeOfLenders?: string[]; contacts?: LenderContact[];
 };
 type RetailUnit = { id: number; tenant: string; rent: string; sqft: string; };
 type AssetData = {
@@ -620,6 +621,58 @@ export default function Home() {
                           <StateSelector label="Target States" selected={lender.states || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, states: v } : l))} />
                           {/* Sponsor States */}
                           <StateSelector label="Sponsor States" selected={lender.sponsorStates || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, sponsorStates: v } : l))} />
+                          {/* Additional Contacts */}
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <div>
+                                <label className="text-xs text-gray-500 font-bold uppercase tracking-wide">Additional Contacts</label>
+                                <p className="text-xs text-gray-400 mt-0.5">Add multiple contacts with their geographic coverage</p>
+                              </div>
+                              <button
+                                onClick={() => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: [...(l.contacts || []), { id: Date.now(), name: "", phone: "", email: "", region: "" }] } : l))}
+                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-[#0a1f44] text-white rounded-lg hover:bg-[#0a1f44]/80 transition-all"
+                              >
+                                <Plus className="h-3 w-3" /> Add Contact
+                              </button>
+                            </div>
+                            {(!lender.contacts || lender.contacts.length === 0) ? (
+                              <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4 text-center text-xs text-gray-400">No additional contacts yet. Click "Add Contact" to add one.</div>
+                            ) : (
+                              <div className="space-y-3">
+                                {lender.contacts.map((contact, cidx) => (
+                                  <div key={contact.id} className="rounded-xl border border-gray-200 bg-white p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                      <span className="text-xs font-bold text-[#0a1f44]">Contact {cidx + 1}</span>
+                                      <button
+                                        onClick={() => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).filter((c) => c.id !== contact.id) } : l))}
+                                        className="text-red-400 hover:text-red-600 transition-colors"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                    <div className="grid gap-2 md:grid-cols-2">
+                                      <div>
+                                        <label className="text-xs text-gray-400 mb-1 block">Contact Name</label>
+                                        <Input value={contact.name} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, name: e.target.value } : c) } : l))} placeholder="Full name" className={inputClass} />
+                                      </div>
+                                      <div>
+                                        <label className="text-xs text-gray-400 mb-1 block">Phone Number</label>
+                                        <Input value={contact.phone} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, phone: e.target.value } : c) } : l))} placeholder="(555) 000-0000" className={inputClass} />
+                                      </div>
+                                      <div>
+                                        <label className="text-xs text-gray-400 mb-1 block">Email Address</label>
+                                        <Input value={contact.email} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, email: e.target.value } : c) } : l))} placeholder="email@example.com" className={inputClass} />
+                                      </div>
+                                      <div>
+                                        <label className="text-xs text-gray-400 mb-1 block">Geographic Region</label>
+                                        <Input value={contact.region} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, region: e.target.value } : c) } : l))} placeholder="e.g. Southeast, NY/NJ, Nationwide" className={inputClass} />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                           <div className="flex gap-3 pt-2 border-t border-gray-200">
                             <button onClick={() => setEditingLenderId(null)} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Done</button>
                             <button onClick={() => toggleLenderStatus(lender.id)} className="px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">{lender.status === "Inactive" ? "Activate" : "Deactivate"}</button>
