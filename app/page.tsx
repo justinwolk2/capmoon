@@ -844,11 +844,12 @@ function calcMetrics(asset: AssetData, capitalType: string) {
   const newLoanAmt = parseCurrency(asset.loanAmount);
   const curLoanAmt = parseCurrency(asset.currentLoanAmount);
   const totalCap = isSubCap ? seniorAmt + effectiveAmt : effectiveAmt;
-  const seniorLtv = propVal > 0 ? (newLoanAmt / propVal) * 100 : 0;
+  const seniorLoanForLtv = isSubCap ? seniorAmt : newLoanAmt;
+  const seniorLtv = propVal > 0 && seniorLoanForLtv > 0 ? (seniorLoanForLtv / propVal) * 100 : 0;
   const autoLtv = propVal > 0 ? (totalCap / propVal) * 100 : 0;
   const equityPct = propVal > 0 ? (parseCurrency(asset.borrowerEquity) / propVal) * 100 : 0;
   const cashOut = Math.max(0, newLoanAmt - curLoanAmt);
-  const seniorLtc = purchaseVal > 0 ? (newLoanAmt / purchaseVal) * 100 : 0;
+  const seniorLtc = purchaseVal > 0 && seniorLoanForLtv > 0 ? (seniorLoanForLtv / purchaseVal) * 100 : 0;
   return { effectiveAmt, totalCap, seniorLtv, autoLtv, equityPct, cashOut, seniorLtc, isSubCap, isConstruction, isAcquisition, isRefinance, isAcqNonConst, acqConstLoan };
 }
 
@@ -862,13 +863,26 @@ function assignAdvisors(capitalType: string, teamMembers: TeamMember[]): TeamMem
 }
 
 async function parseDeadWithAI(description: string, capitalTypeHint: string): Promise<Partial<AssetData>> {
-  const systemPrompt = `You are a commercial real estate loan intake specialist. Parse the user's deal description and extract structured loan parameters. Return ONLY a valid JSON object with these exact fields (use empty string "" if not mentioned):
-{"ownershipStatus":"Acquisition or Refinance","dealType":"one of Construction/Value add/New Development/Bridge/Takeout/Investment","assetType":"one of Apartments/Condos/Office/Mixed Use/Hotel/Hospitality/Land/Self-storage/Other etc","loanAmount":"dollar amount like $15,000,000","propertyValue":"dollar amount","selectedStates":["FL"],"recourseType":"FULL or NON RECOURSE or CASE BY CASE","dscr":"number like 1.25","numUnits":"number if mentioned","numBuildings":"number if mentioned"}
-Only return JSON. No explanation. No markdown.`;
+  const systemPrompt = `You are a commercial real estate loan intake specialist. Parse the user's deal description and extract structured loan parameters. Be generous in inferring values — if someone says "Miami" infer FL, if they say "apartments" use "Apartments", etc.
+
+Return ONLY a valid JSON object with these exact fields (use reasonable defaults if not mentioned):
+{
+  "ownershipStatus": "Acquisition" or "Refinance" (default "Acquisition"),
+  "dealType": one of "Construction"/"Value add"/"New Development"/"Bridge"/"Takeout"/"Investment" (default "Value add"),
+  "assetType": one of "Apartments"/"Condos"/"Office"/"Mixed-use"/"Hotel/Hospitality"/"Land"/"Self-storage"/"Retail-Multi Tenant"/"Retail Single Tenant"/"Senior Housing"/"Student Housing"/"SFR Portfolio"/"Light Industrial"/"Medical Office"/"Other" (infer from context),
+  "loanAmount": dollar amount as string like "$15,000,000" (infer from context if possible),
+  "propertyValue": dollar amount as string (estimate if not given),
+  "selectedStates": array of 2-letter US state codes — infer from city names (Miami=FL, New York=NY, Dallas=TX, Chicago=IL, Atlanta=GA, Boston=MA, Seattle=WA, Denver=CO, Phoenix=AZ, Las Vegas=NV, etc),
+  "recourseType": "FULL" or "NON RECOURSE" or "CASE BY CASE" (default "CASE BY CASE"),
+  "dscr": number as string like "1.25" (default "1.20" if not mentioned),
+  "numUnits": number as string if mentioned,
+  "numBuildings": number as string if mentioned
+}
+Only return the JSON. No explanation. No markdown. No backticks.`;
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, system: systemPrompt, messages: [{ role: "user", content: `Parse this deal: ${description}. Capital type: ${capitalTypeHint}` }] }),
+      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, system: systemPrompt, messages: [{ role: "user", content: `Parse this deal description: "${description}". The capital type being sought is: ${capitalTypeHint}` }] }),
     });
     const data = await response.json();
     const text = data.content?.[0]?.text || "{}";
@@ -1304,25 +1318,45 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
       const stateSet = [...new Set(assets.flatMap((a) => a.selectedStates))];
       return lenderRecords.map((l) => {
         let score = 0; const nr = normalizeRecourse(l.recourse);
-        if (totalLoan >= parseCurrency(l.minLoan) && totalLoan <= parseCurrency(l.maxLoan)) score += 30;
+        // Loan size — partial credit if within 2x range
+        if (totalLoan > 0) {
+          const min = parseCurrency(l.minLoan), max = parseCurrency(l.maxLoan);
+          if (totalLoan >= min && totalLoan <= max) score += 30;
+          else if (totalLoan >= min * 0.5 && totalLoan <= max * 2) score += 15;
+        } else { score += 15; } // no loan amount entered, give partial
         if (l.assets.includes(primary.assetType)) score += 22;
-        if (l.type === capitalType) score += 20;
-        if (stateSet.some((s) => l.states.includes(s)) || l.states.includes("Nationwide")) score += 15;
-        if (nr === primary.recourseType || nr === "CASE BY CASE") score += 10;
+        else if (l.assets.length === 0) score += 8;
+        if (l.type === capitalType) score += 25;
+        if (stateSet.length === 0 || stateSet.some((s) => l.states.includes(s)) || l.states.includes("Nationwide")) score += 15;
+        if (nr === primary.recourseType || nr === "CASE BY CASE" || !primary.recourseType) score += 8;
+        if (l.maxLtv) {
+          const lenderMaxLtv = parseFloat(l.maxLtv.replace(/[^0-9.]/g, ""));
+          const dealLtv = calcMetrics(primary, capitalType).seniorLtv;
+          if (dealLtv > 0 && lenderMaxLtv > 0) { if (dealLtv <= lenderMaxLtv) score += 5; else score -= 10; }
+        }
         return { ...l, score, nr };
-      }).filter((l) => l.score > 30).sort((a, b) => b.score - a.score).slice(0, 4);
+      }).filter((l) => l.score > 15).sort((a, b) => b.score - a.score).slice(0, 6);
     }
     return assets.flatMap((asset) => {
       const m = calcMetrics(asset, capitalType);
       return lenderRecords.map((l) => {
         let score = 0; const nr = normalizeRecourse(l.recourse);
-        if (m.effectiveAmt >= parseCurrency(l.minLoan) && m.effectiveAmt <= parseCurrency(l.maxLoan)) score += 30;
+        if (m.effectiveAmt > 0) {
+          const min = parseCurrency(l.minLoan), max = parseCurrency(l.maxLoan);
+          if (m.effectiveAmt >= min && m.effectiveAmt <= max) score += 30;
+          else if (m.effectiveAmt >= min * 0.5 && m.effectiveAmt <= max * 2) score += 15;
+        } else { score += 15; }
         if (l.assets.includes(asset.assetType)) score += 22;
-        if (l.type === capitalType) score += 20;
-        if (asset.selectedStates.some((s) => l.states.includes(s)) || l.states.includes("Nationwide")) score += 15;
-        if (nr === asset.recourseType || nr === "CASE BY CASE") score += 10;
+        else if (l.assets.length === 0) score += 8;
+        if (l.type === capitalType) score += 25;
+        if (asset.selectedStates.length === 0 || asset.selectedStates.some((s) => l.states.includes(s)) || l.states.includes("Nationwide")) score += 15;
+        if (nr === asset.recourseType || nr === "CASE BY CASE" || !asset.recourseType) score += 8;
+        if (l.maxLtv) {
+          const lenderMaxLtv = parseFloat(l.maxLtv.replace(/[^0-9.]/g, ""));
+          if (m.seniorLtv > 0 && lenderMaxLtv > 0) { if (m.seniorLtv <= lenderMaxLtv) score += 5; else score -= 10; }
+        }
         return { ...l, score, nr, assetId: asset.id };
-      }).filter((l) => l.score > 30).sort((a, b) => b.score - a.score).slice(0, 3);
+      }).filter((l) => l.score > 15).sort((a, b) => b.score - a.score).slice(0, 4);
     });
   }, [matcherStep, assets, capitalType, marketScope, collateralMode, assetMode, lenderRecords, capitalSeekerMode]);
 
