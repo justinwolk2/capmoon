@@ -2634,7 +2634,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                     const updated = submittedDeals.map((d) =>
                       d.id === deal.id ? { ...d, invitedUserIds: [...(d.invitedUserIds || []), uid] } : d
                     );
-                    handleSetSubmittedDeals(updated);
+                    setSubmittedDeals(updated);
                     setInviteUserId(""); setShowInvite(false);
                   }
 
@@ -2642,12 +2642,12 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                     const updated = submittedDeals.map((d) =>
                       d.id === deal.id ? { ...d, invitedUserIds: (d.invitedUserIds || []).filter(id => id !== uid) } : d
                     );
-                    handleSetSubmittedDeals(updated);
+                    setSubmittedDeals(updated);
                   }
 
                   function updateDealStatus(status: SubmittedDeal["status"]) {
                     const updated = submittedDeals.map((d) => d.id === deal.id ? { ...d, status } : d);
-                    handleSetSubmittedDeals(updated);
+                    setSubmittedDeals(updated);
                   }
 
                   return (
