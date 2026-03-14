@@ -75,20 +75,27 @@ type HybridProperty = {
   id: number;
   ownershipStatus: "Acquisition" | "Refinance";
   assetType: string;
+  dealType: string;
   purchasePrice: string;
   currentValue: string;
+  // Project cost fields (for acquisition value add / construction / new dev)
+  hardCosts: string;
+  softCosts: string;
+  closingCosts: string;
+  carryingCosts: string;
+  entitlementCosts: string;
   seniorLoan: string;
   subLayers: HybridSubLayer[];
   borrowerEquity: string;
   currentLoan: string;
   // Full property details
   address: AssetAddress;
-  dealType: string;
   numUnits: string;
   numBuildings: string;
   numAcres: string;
   currentNetIncome: string;
-  dscr: string;
+  dscr: string; // reused as cap rate % for acquisitions
+  arvValue: string; // manually entered or auto-calc'd
   selectedStates: string[];
   recourseType: string;
   notes: string;
@@ -1701,13 +1708,15 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
 
   function blankHybridProperty(id: number): HybridProperty {
     return {
-      id, ownershipStatus: "Acquisition", assetType: "Apartments",
-      purchasePrice: "", currentValue: "", seniorLoan: "",
+      id, ownershipStatus: "Acquisition", assetType: "Apartments", dealType: "Investment",
+      purchasePrice: "", currentValue: "",
+      hardCosts: "", softCosts: "", closingCosts: "", carryingCosts: "", entitlementCosts: "",
+      seniorLoan: "",
       subLayers: [{ id: 1, type: "Mezzanine", amount: "" }],
       borrowerEquity: "", currentLoan: "",
-      address: blankAddress(), dealType: "Value add",
+      address: blankAddress(),
       numUnits: "", numBuildings: "", numAcres: "",
-      currentNetIncome: "", dscr: "",
+      currentNetIncome: "", dscr: "", arvValue: "",
       selectedStates: [], recourseType: "CASE BY CASE", notes: "",
     };
   }
@@ -1975,12 +1984,24 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
       {matcherStep === "hybrid-form" && hybridProperties.length > 0 && (() => {
         const prop = hybridProperties[hybridIndex];
         const isAcq = prop.ownershipStatus === "Acquisition";
-        const baseValue = parseCurrency(isAcq ? prop.purchasePrice : prop.currentValue);
-        const seniorLoan = parseCurrency(prop.seniorLoan);
+        const isProjectDeal = isAcq && ["Value add", "Construction", "New Development"].includes(prop.dealType);
         const subLayers = prop.subLayers || [];
         const borrowerEquity = parseCurrency(prop.borrowerEquity);
         const showUnits = unitAssets.includes(prop.assetType);
         const showAcres = prop.assetType === "Land";
+
+        // Project cost math (for value add / construction / new dev acquisitions)
+        const purchasePrice = parseCurrency(prop.purchasePrice);
+        const hardCosts = parseCurrency(prop.hardCosts || "");
+        const softCosts = parseCurrency(prop.softCosts || "");
+        const closingCosts = parseCurrency(prop.closingCosts || "");
+        const carryingCosts = parseCurrency(prop.carryingCosts || "");
+        const entitlementCosts = parseCurrency(prop.entitlementCosts || "");
+        const totalProjectCost = purchasePrice + hardCosts + softCosts + closingCosts + carryingCosts + entitlementCosts;
+
+        // Base value for LTV: project cost for project deals, property value otherwise
+        const baseValue = isProjectDeal ? totalProjectCost : parseCurrency(isAcq ? prop.purchasePrice : prop.currentValue);
+        const seniorLoan = isProjectDeal ? totalProjectCost : parseCurrency(prop.seniorLoan);
 
         // Last dollar LTV calculations
         let runningDebt = seniorLoan;
@@ -2051,18 +2072,61 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                 <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-5">
                   <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-4">Capital Stack</div>
                   <div className="space-y-3">
-                    {/* Base value */}
-                    <div>
-                      <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">{isAcq ? "Purchase Price" : "Current Property Value / ARV"}</label>
-                      <Input value={isAcq ? prop.purchasePrice : prop.currentValue} onChange={(e) => updHybrid(isAcq ? "purchasePrice" : "currentValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} />
-                    </div>
 
-                    {/* Senior */}
-                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
-                      <label className="text-xs text-blue-700 mb-1 block font-bold uppercase">Senior Loan Amount</label>
-                      <Input value={prop.seniorLoan} onChange={(e) => updHybrid("seniorLoan", formatCurrencyInput(e.target.value))} placeholder="$0" className="bg-white border-blue-200 text-gray-800 rounded-xl" />
-                      {seniorLtv > 0 && <div className="text-xs text-blue-600 mt-1.5 font-semibold">Senior LTV: {seniorLtv.toFixed(1)}%</div>}
-                    </div>
+                    {isProjectDeal ? (
+                      /* Project Deal: Purchase Price + Costs → Total Project Cost */
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Price</label>
+                          <Input value={prop.purchasePrice} onChange={(e) => updHybrid("purchasePrice", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} />
+                        </div>
+                        <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-2">
+                          <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Project Costs</div>
+                          {([
+                            ["Hard Costs", "hardCosts"],
+                            ["Soft Costs", "softCosts"],
+                            ["Closing Costs", "closingCosts"],
+                            ["Carrying Costs", "carryingCosts"],
+                            ["Entitlement Costs", "entitlementCosts"],
+                          ] as [string, keyof HybridProperty][]).map(([label, field]) => (
+                            <div key={field} className="flex items-center gap-2">
+                              <label className="text-xs text-gray-500 w-36 shrink-0">{label}</label>
+                              <Input value={String(prop[field] || "")} onChange={(e) => updHybrid(field, formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass + " flex-1"} />
+                            </div>
+                          ))}
+                        </div>
+                        {/* Total Project Cost */}
+                        <div className="rounded-xl border-2 border-[#0a1f44]/20 bg-[#0a1f44]/5 p-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">Total Project Cost</span>
+                            <span className="text-lg font-bold text-[#c9a84c]">{totalProjectCost > 0 ? formatCurrencyInput(String(totalProjectCost)) : "—"}</span>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">This is your senior loan basis</div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Standard deal: base value input */
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">{isAcq ? "Purchase Price" : "Current Property Value / ARV"}</label>
+                        <Input value={isAcq ? prop.purchasePrice : prop.currentValue} onChange={(e) => updHybrid(isAcq ? "purchasePrice" : "currentValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} />
+                      </div>
+                    )}
+
+                    {/* Senior — shown differently for project deals */}
+                    {!isProjectDeal && (
+                      <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+                        <label className="text-xs text-blue-700 mb-1 block font-bold uppercase">Senior Loan Amount</label>
+                        <Input value={prop.seniorLoan} onChange={(e) => updHybrid("seniorLoan", formatCurrencyInput(e.target.value))} placeholder="$0" className="bg-white border-blue-200 text-gray-800 rounded-xl" />
+                        {seniorLtv > 0 && <div className="text-xs text-blue-600 mt-1.5 font-semibold">Senior LTV: {seniorLtv.toFixed(1)}%</div>}
+                      </div>
+                    )}
+                    {isProjectDeal && totalProjectCost > 0 && (
+                      <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+                        <div className="text-xs text-blue-700 font-bold uppercase mb-1">Senior = Total Project Cost</div>
+                        <div className="text-sm font-bold text-blue-800">{formatCurrencyInput(String(totalProjectCost))}</div>
+                        <div className="text-xs text-blue-500 mt-1">Senior represents 100% of project cost basis</div>
+                      </div>
+                    )}
 
                     {/* Sub-capital layers */}
                     {subLayers.map((layer, lidx) => (
@@ -2121,8 +2185,8 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                           {stackBalanced ? "✓ Stack Balances" : `Gap: ${formatCurrencyInput(String(Math.abs(stackDiff)))} ${stackDiff > 0 ? "over" : "under"}`}
                         </div>
                         <div className="space-y-1">
-                          <div className="flex justify-between text-xs"><span className="text-gray-500">{isAcq ? "Purchase Price" : "Property Value"}</span><span className="font-bold text-[#0a1f44]">{formatCurrencyInput(String(baseValue))}</span></div>
-                          <div className="flex justify-between text-xs"><span className="text-blue-600">Senior ({seniorLtv.toFixed(1)}% LTV)</span><span className="font-bold text-[#0a1f44]">{prop.seniorLoan || "—"}</span></div>
+                          <div className="flex justify-between text-xs"><span className="text-gray-500">{isProjectDeal ? "Total Project Cost (Senior)" : isAcq ? "Purchase Price" : "Property Value"}</span><span className="font-bold text-[#0a1f44]">{formatCurrencyInput(String(baseValue))}</span></div>
+                          {!isProjectDeal && <div className="flex justify-between text-xs"><span className="text-blue-600">Senior ({seniorLtv.toFixed(1)}% LTV)</span><span className="font-bold text-[#0a1f44]">{prop.seniorLoan || "—"}</span></div>}
                           {subLayers.map((layer, lidx) => (
                             <div key={layer.id} className="flex justify-between text-xs"><span className="text-purple-600">{layer.type} ({layerLtvs[lidx].toFixed(1)}% last $)</span><span className="font-bold text-[#0a1f44]">{layer.amount || "—"}</span></div>
                           ))}
@@ -2139,24 +2203,13 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-4">Property Details</div>
                   <div className="space-y-4">
                     <AddressFields address={prop.address || blankAddress()} onChange={(a) => setHybridProperties(prev => prev.map((p, i) => i === hybridIndex ? { ...p, address: a } : p))} inputClass={inputClass} />
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div>
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <label className="text-xs text-gray-500 font-medium uppercase">Deal Type</label>
-                          <div className="relative group">
-                            <div className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold cursor-help">i</div>
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 bg-[#0a1f44] text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
-                              Most transactions are considered "Investment"
-                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a1f44]" />
-                            </div>
-                          </div>
-                        </div>
-                        <Select value={prop.dealType} onValueChange={(v) => updHybrid("dealType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{dealTypes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
-                      </div>
-                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label>
-                        <Select value={prop.recourseType} onValueChange={(v) => updHybrid("recourseType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
-                      </div>
+
+                    {/* Recourse only — deal type already shown above */}
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label>
+                      <Select value={prop.recourseType} onValueChange={(v) => updHybrid("recourseType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
                     </div>
+
                     {showUnits && (
                       <div className="grid gap-3 md:grid-cols-2">
                         <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Units</label><Input value={prop.numUnits} onChange={(e) => updHybrid("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div>
@@ -2164,10 +2217,69 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                       </div>
                     )}
                     {showAcres && <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Acres</label><Input value={prop.numAcres} onChange={(e) => updHybrid("numAcres", e.target.value)} placeholder="e.g. 12.5" className={inputClass} /></div>}
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Net Income (Annual)</label><Input value={prop.currentNetIncome} onChange={(e) => updHybrid("currentNetIncome", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
-                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">DSCR</label><Input value={prop.dscr} onChange={(e) => updHybrid("dscr", e.target.value)} placeholder="e.g. 1.25" className={inputClass} /></div>
-                    </div>
+
+                    {isAcq ? (
+                      /* Acquisition: ARV Net Income + Cap Rate → ARV Value */
+                      <>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">ARV Net Income (Estimated)</label><Input value={prop.currentNetIncome} onChange={(e) => { const v = formatCurrencyInput(e.target.value); updHybrid("currentNetIncome", v); }} placeholder="$0" className={inputClass} /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Cap Rate % (Estimated)</label><Input value={prop.dscr} onChange={(e) => updHybrid("dscr", e.target.value)} placeholder="e.g. 5.5" className={inputClass} /></div>
+                        </div>
+                        {/* ARV Value — auto-calc or manual */}
+                        {(() => {
+                          const arvNetIncome = parseCurrency(prop.currentNetIncome);
+                          const capRate = parseFloat(prop.dscr || "0") / 100;
+                          const autoArv = arvNetIncome > 0 && capRate > 0 ? arvNetIncome / capRate : 0;
+                          const displayArv = parseCurrency(prop.arvValue || "") || autoArv;
+                          return (
+                            <div>
+                              <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">ARV Value</label>
+                              <Input
+                                value={prop.arvValue || (autoArv > 0 ? formatCurrencyInput(String(Math.round(autoArv))) : "")}
+                                onChange={(e) => updHybrid("arvValue", formatCurrencyInput(e.target.value))}
+                                placeholder={autoArv > 0 ? `Auto: ${formatCurrencyInput(String(Math.round(autoArv)))}` : "Enter manually or fill fields above"}
+                                className={inputClass}
+                              />
+                              {autoArv > 0 && !prop.arvValue && <div className="text-xs text-gray-400 mt-1">Auto-calculated from Net Income ÷ Cap Rate</div>}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Total ARV LTV metric boxes */}
+                        {(() => {
+                          const arvNetIncome = parseCurrency(prop.currentNetIncome);
+                          const capRate = parseFloat(prop.dscr || "0") / 100;
+                          const autoArv = arvNetIncome > 0 && capRate > 0 ? arvNetIncome / capRate : 0;
+                          const arvVal = parseCurrency(prop.arvValue || "") || autoArv;
+                          const totalDebtNow = (isProjectDeal ? totalProjectCost : parseCurrency(prop.seniorLoan)) + subLayers.reduce((s, l) => s + parseCurrency(l.amount), 0);
+                          const totalArvLtv = arvVal > 0 && totalDebtNow > 0 ? (totalDebtNow / arvVal) * 100 : 0;
+                          const seniorArvLtv = arvVal > 0 ? ((isProjectDeal ? totalProjectCost : parseCurrency(prop.seniorLoan)) / arvVal) * 100 : 0;
+                          if (arvVal === 0) return null;
+                          return (
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="rounded-xl border border-[#c9a84c]/30 bg-[#0a1f44] p-4 text-center">
+                                <div className="text-xs text-[#c9a84c] font-bold uppercase tracking-wide mb-1">Total ARV LTV</div>
+                                <div className="text-2xl font-bold text-white">{totalArvLtv.toFixed(1)}%</div>
+                                <div className="text-xs text-gray-400 mt-1">Total Debt ÷ ARV</div>
+                              </div>
+                              <div className="rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/10 p-4 text-center">
+                                <div className="text-xs text-[#0a1f44] font-bold uppercase tracking-wide mb-1">Senior ARV LTV</div>
+                                <div className="text-2xl font-bold text-[#0a1f44]">{seniorArvLtv.toFixed(1)}%</div>
+                                <div className="text-xs text-gray-500 mt-1">Senior ÷ ARV</div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </>
+                    ) : (
+                      /* Refinance: keep current net income + DSCR */
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Net Income (Annual)</label><Input value={prop.currentNetIncome} onChange={(e) => updHybrid("currentNetIncome", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">DSCR</label><Input value={prop.dscr} onChange={(e) => updHybrid("dscr", e.target.value)} placeholder="e.g. 1.25" className={inputClass} /></div>
+                      </div>
+                    )}
+
+                    {/* Target States */}
                     <div>
                       <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Target States</label>
                       <div className="mb-2 flex gap-2">
@@ -2187,6 +2299,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                         ))}
                       </div>
                     </div>
+
                     <div>
                       <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Additional Notes</label>
                       <textarea value={prop.notes} onChange={(e) => updHybrid("notes", e.target.value)} placeholder="Any additional context about this property or deal..." rows={2} className="w-full px-4 py-3 text-sm bg-white border border-gray-300 rounded-xl text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#0a1f44] resize-none" />
