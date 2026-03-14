@@ -775,20 +775,23 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                 {/* Deal Team Box */}
                 <div className="rounded-2xl bg-[#0a1f44] p-6 mb-6 text-left">
                   <div className="text-xs uppercase tracking-[0.25em] text-[#c9a84c] font-bold mb-4">Your Deal Team</div>
-                  <div className="flex items-center gap-4">
-                    <img src="/louis.jpg" alt="Louis Palumbo" className="h-20 w-20 rounded-2xl object-cover border-2 border-[#c9a84c]/30 flex-shrink-0" />
-                    <div>
-                      <div className="font-display text-xl font-bold text-white">Louis Palumbo</div>
-                      <div className="text-sm text-[#c9a84c] font-medium mt-0.5">Associate Capital Advisor</div>
-                      <div className="mt-3 space-y-1.5">
-                        <a href="mailto:lpalumbo@capmoon.com" className="flex items-center gap-2 text-xs text-gray-300 hover:text-white transition-colors">
-                          <span className="text-[#c9a84c]">✉</span> lpalumbo@capmoon.com
-                        </a>
-                        <a href="tel:3054010076" className="flex items-center gap-2 text-xs text-gray-300 hover:text-white transition-colors">
-                          <span className="text-[#c9a84c]">📱</span> 305-401-0076 (Mobile)
-                        </a>
+                  <div className="space-y-4">
+                    {[
+                      { name: "Louis Palumbo", title: "Vice President of Capital Advisory", email: "lpalumbo@capmoon.com", phone: "305-401-0076", photo: "/louis.jpg" },
+                      { name: "Shuvo Hussain", title: "Vice President of Capital Advisory", email: "shussain@capmoon.com", phone: "347-993-5545", photo: "/Shuvo.jpeg" },
+                    ].map((advisor) => (
+                      <div key={advisor.email} className="flex items-center gap-4 border-t border-[#c9a84c]/10 pt-4 first:border-t-0 first:pt-0">
+                        <img src={advisor.photo} alt={advisor.name} className="h-16 w-16 rounded-xl object-cover border-2 border-[#c9a84c]/30 flex-shrink-0" />
+                        <div>
+                          <div className="font-display text-lg font-bold text-white">{advisor.name}</div>
+                          <div className="text-xs text-[#c9a84c] font-medium mt-0.5">{advisor.title}</div>
+                          <div className="mt-2 space-y-1">
+                            <a href={`mailto:${advisor.email}`} className="flex items-center gap-2 text-xs text-gray-300 hover:text-white transition-colors"><span className="text-[#c9a84c]">✉</span> {advisor.email}</a>
+                            <a href={`tel:${advisor.phone.replace(/-/g, "")}`} className="flex items-center gap-2 text-xs text-gray-300 hover:text-white transition-colors"><span className="text-[#c9a84c]">📱</span> {advisor.phone} (Mobile)</a>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
@@ -1275,6 +1278,25 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
                           {deal.assets.map((asset, idx) => asset.address?.city ? (
                             <div key={idx} className="text-xs text-gray-500 mt-1">Asset {idx + 1}: {asset.address.street ? `${asset.address.street}, ` : ""}{asset.address.city}, {asset.address.state} {asset.address.zip}</div>
                           ) : null)}
+                          {/* Assigned Deal Team */}
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <div className="text-xs uppercase tracking-[0.15em] text-[#0a1f44] font-bold mb-3">Assigned Deal Team</div>
+                            <div className="flex gap-4">
+                              {[
+                                { name: "Louis Palumbo", title: "VP of Capital Advisory", email: "lpalumbo@capmoon.com", phone: "305-401-0076", photo: "/louis.jpg" },
+                                { name: "Shuvo Hussain", title: "VP of Capital Advisory", email: "shussain@capmoon.com", phone: "347-993-5545", photo: "/Shuvo.jpeg" },
+                              ].map((advisor) => (
+                                <div key={advisor.email} className="flex items-center gap-3 bg-[#0a1f44] rounded-xl px-4 py-3">
+                                  <img src={advisor.photo} alt={advisor.name} className="h-10 w-10 rounded-lg object-cover border border-[#c9a84c]/30 flex-shrink-0" />
+                                  <div>
+                                    <div className="text-xs font-bold text-white">{advisor.name}</div>
+                                    <div className="text-xs text-[#c9a84c]">{advisor.title}</div>
+                                    <div className="text-xs text-gray-400 mt-0.5">{advisor.phone}</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
