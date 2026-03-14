@@ -68,7 +68,19 @@ type LenderChangeRequest = {
   status: "pending" | "approved" | "denied";
 };
 type AuthSession = { user: AppUser; } | null;
-type MatcherStep = "ai-prompt" | "start" | "asset-count" | "asset-form" | "review" | "results";
+type MatcherStep = "ai-prompt" | "start" | "asset-count" | "asset-form" | "review" | "results" | "hybrid-count" | "hybrid-form";
+type HybridProperty = {
+  id: number;
+  ownershipStatus: "Acquisition" | "Refinance";
+  assetType: string;
+  purchasePrice: string;
+  currentValue: string;
+  seniorLoan: string;
+  subCapital: string;
+  subCapitalType: string;
+  borrowerEquity: string;
+  currentLoan: string; // for refinance
+};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -804,7 +816,7 @@ const seedLenders: LenderRecord[] = [
 ];
 
 const assetTypes = ["Equipment, Autos, or Other Non Real Estate Products", "Apartments", "Condos", "Senior Housing", "Student Housing", "Gaming", "Assisted Living", "Education Related", "SFR Portfolio", "Mobile Home Park", "Co-living", "Office", "Medical Office", "Manufacturing", "Mixed Use", "Lt Industrial", "Cannabis", "Retail - Multi Tenant", "Retail - Single Tenant", "Hotel/Hospitality", "Land", "Self-storage", "Religious", "Hospital/Health Care", "Distressed Debt", "Other"];
-const capitalTypes = ["Senior", "Mezzanine", "Preferred Equity", "JV Equity", "Line of Credit", "Note on Note", "Loan Sales", "C&I"];
+const capitalTypes = ["Senior", "Mezzanine", "Preferred Equity", "JV Equity", "Line of Credit", "Note on Note", "Loan Sales", "C&I", "Stretch Senior/Hybrid"];
 const dealTypes = ["Construction", "Value add", "New Development", "Bridge", "Takeout", "Investment"];
 const ownershipStatuses = ["Acquisition", "Refinance"];
 const refinanceTypes = ["Cash Out to Borrower", "Cash Out-Value Add", "Rate and Term"];
@@ -1335,6 +1347,17 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
   const [aiError, setAiError] = useState("");
   const [assignedAdvisors, setAssignedAdvisors] = useState<TeamMember[]>([]);
   const [prefillBanner, setPrefillBanner] = useState("");
+  // Hybrid/Stretch Senior state
+  const [hybridCount, setHybridCount] = useState("1");
+  const [hybridProperties, setHybridProperties] = useState<HybridProperty[]>([]);
+  const [hybridIndex, setHybridIndex] = useState(0);
+
+  function blankHybridProperty(id: number): HybridProperty {
+    return { id, ownershipStatus: "Acquisition", assetType: "Apartments", purchasePrice: "", currentValue: "", seniorLoan: "", subCapital: "", subCapitalType: "Mezzanine", borrowerEquity: "", currentLoan: "" };
+  }
+  function updHybrid(field: keyof HybridProperty, value: string) {
+    setHybridProperties(prev => prev.map((p, i) => i === hybridIndex ? { ...p, [field]: value } : p));
+  }
 
   // Pre-fill from submitted deal
   React.useEffect(() => {
@@ -1391,7 +1414,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
   }
   function handleNextAsset() { if (currentAssetIndex < assets.length - 1) { setCurrentAssetIndex((i) => i + 1); } else { setMatcherStep("review"); } }
   function handlePrevAsset() { if (currentAssetIndex > 0) { setCurrentAssetIndex((i) => i - 1); } else { setMatcherStep(assetMode === "multiple" ? "asset-count" : "start"); } }
-  function resetMatcher() { setMatcherStep("ai-prompt"); setAssetMode("single"); setCollateralMode(""); setAssets([blankAsset(1)]); setCurrentAssetIndex(0); setAiDescription(""); setAiParsed(false); setAiError(""); setAssignedAdvisors([]); setPrefillBanner(""); }
+  function resetMatcher() { setMatcherStep("ai-prompt"); setAssetMode("single"); setCollateralMode(""); setAssets([blankAsset(1)]); setCurrentAssetIndex(0); setAiDescription(""); setAiParsed(false); setAiError(""); setAssignedAdvisors([]); setPrefillBanner(""); setHybridProperties([]); setHybridIndex(0); setHybridCount("1"); }
 
   const matchResults = useMemo(() => {
     if (matcherStep !== "results" || marketScope === "INTERNATIONAL" || capitalSeekerMode) return [];
@@ -1445,8 +1468,10 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
     });
   }, [matcherStep, assets, capitalType, marketScope, collateralMode, assetMode, lenderRecords, capitalSeekerMode]);
 
-  const progressSteps = ["AI Search", "Setup", assetMode === "multiple" ? "Asset Count" : null, "Asset Details", "Review", "Results"].filter(Boolean) as string[];
-  const currentStepLabel = matcherStep === "ai-prompt" ? "AI Search" : matcherStep === "start" ? "Setup" : matcherStep === "asset-count" ? "Asset Count" : matcherStep === "asset-form" ? "Asset Details" : matcherStep === "review" ? "Review" : "Results";
+  const progressSteps = capitalType === "Stretch Senior/Hybrid"
+    ? ["AI Search", "Setup", "Property Count", "Capital Stack", "Review", "Results"].filter(Boolean) as string[]
+    : ["AI Search", "Setup", assetMode === "multiple" ? "Asset Count" : null, "Asset Details", "Review", "Results"].filter(Boolean) as string[];
+  const currentStepLabel = matcherStep === "ai-prompt" ? "AI Search" : matcherStep === "start" ? "Setup" : matcherStep === "hybrid-count" ? "Property Count" : matcherStep === "hybrid-form" ? "Capital Stack" : matcherStep === "asset-count" ? "Asset Count" : matcherStep === "asset-form" ? "Asset Details" : matcherStep === "review" ? "Review" : "Results";
   const currentStepIdx = progressSteps.indexOf(currentStepLabel);
 
   return (
@@ -1514,6 +1539,19 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
             </div>
             {marketScope === "INTERNATIONAL" ? (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600 mb-4">CAPMOON DOES NOT SERVICE INTERNATIONAL LOANS AT THIS TIME</div>
+            ) : capitalType === "Stretch Senior/Hybrid" ? (
+              <div>
+                <div className="rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/5 p-4 mb-5">
+                  <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-1">Stretch Senior / Hybrid Capital Stack</div>
+                  <p className="text-xs text-gray-600">This option lets you build a full capital stack combining Senior, Mezzanine, Preferred Equity, and/or JV Equity across one or more properties.</p>
+                </div>
+                <button
+                  onClick={() => setMatcherStep("hybrid-count")}
+                  className="w-full py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80"
+                >
+                  Continue → Build Capital Stack
+                </button>
+              </div>
             ) : (
               <div>
                 <label className="text-xs text-gray-500 mb-3 block font-bold uppercase">Single or multiple assets?</label>
@@ -1547,6 +1585,189 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
           </div>
         </div>
       )}
+
+      {/* Hybrid: how many properties */}
+      {matcherStep === "hybrid-count" && (
+        <div className="max-w-2xl">
+          <div className={cardClass + " p-8"}>
+            <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Stretch Senior / Hybrid</div>
+            <h2 className="font-display text-3xl font-bold text-[#0a1f44] mb-2">How many properties?</h2>
+            <p className="text-sm text-gray-500 mb-6">We'll build a capital stack for each one.</p>
+            <div className="mb-6">
+              <label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Number of Properties</label>
+              <Input value={hybridCount} onChange={(e) => setHybridCount(e.target.value)} type="number" min="1" max="20" className={inputClass + " max-w-xs"} />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setMatcherStep("start")} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Back</button>
+              <button
+                onClick={() => {
+                  const count = Math.max(1, Math.min(20, parseInt(hybridCount) || 1));
+                  setHybridProperties(Array.from({ length: count }, (_, i) => blankHybridProperty(i + 1)));
+                  setHybridIndex(0);
+                  setMatcherStep("hybrid-form");
+                }}
+                className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80"
+              >
+                Continue <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hybrid: property capital stack builder */}
+      {matcherStep === "hybrid-form" && hybridProperties.length > 0 && (() => {
+        const prop = hybridProperties[hybridIndex];
+        const purchasePrice = parseCurrency(prop.purchasePrice);
+        const currentValue = parseCurrency(prop.currentValue);
+        const seniorLoan = parseCurrency(prop.seniorLoan);
+        const subCapital = parseCurrency(prop.subCapital);
+        const borrowerEquity = parseCurrency(prop.borrowerEquity);
+        const currentLoan = parseCurrency(prop.currentLoan);
+        const isAcq = prop.ownershipStatus === "Acquisition";
+
+        // Stack math
+        const totalStack = isAcq ? seniorLoan + subCapital + borrowerEquity : seniorLoan + subCapital + borrowerEquity;
+        const baseValue = isAcq ? purchasePrice : currentValue;
+        const totalDebt = seniorLoan + subCapital;
+        const seniorLtv = baseValue > 0 ? (seniorLoan / baseValue) * 100 : 0;
+        const totalLtv = baseValue > 0 ? (totalDebt / baseValue) * 100 : 0;
+        const stackDiff = baseValue > 0 ? totalStack - baseValue : 0;
+        const stackBalanced = Math.abs(stackDiff) < 1000;
+
+        return (
+          <div className="max-w-3xl">
+            <div className={cardClass + " p-8"}>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">
+                    Property {hybridIndex + 1} of {hybridProperties.length}
+                  </div>
+                  <h2 className="font-display text-3xl font-bold text-[#0a1f44]">Capital Stack Builder</h2>
+                </div>
+                <button onClick={resetMatcher} className="text-xs text-gray-400 hover:text-gray-600 underline">Start Over</button>
+              </div>
+
+              <div className="space-y-5 mt-6">
+                {/* Step 1: Acquisition or Refinance */}
+                <div>
+                  <label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Is this an Acquisition or Refinance?</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(["Acquisition", "Refinance"] as const).map((opt) => (
+                      <button key={opt} onClick={() => updHybrid("ownershipStatus", opt)} className={`p-3 rounded-xl border-2 text-left transition-all ${prop.ownershipStatus === opt ? "border-[#0a1f44] bg-[#0a1f44]/5" : "border-gray-200 hover:border-[#0a1f44]/30"}`}>
+                        <div className="text-sm font-bold text-[#0a1f44]">{opt}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Step 2: Type of property */}
+                <div>
+                  <label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Type of Property</label>
+                  <Select value={prop.assetType} onValueChange={(v) => updHybrid("assetType", v)}>
+                    <SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger>
+                    <SelectContent>{assetTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+
+                {/* Step 3: Capital Stack */}
+                <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-5">
+                  <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-4">
+                    Capital Stack — {isAcq ? "Acquisition" : "Refinance"}
+                  </div>
+                  <div className="space-y-3">
+                    {isAcq ? (
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Price</label>
+                        <Input value={prop.purchasePrice} onChange={(e) => updHybrid("purchasePrice", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} />
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Property Value / ARV</label>
+                        <Input value={prop.currentValue} onChange={(e) => updHybrid("currentValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} />
+                      </div>
+                    )}
+
+                    {/* Senior Loan */}
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+                      <label className="text-xs text-blue-700 mb-1 block font-bold uppercase">Senior Loan Amount</label>
+                      <Input value={prop.seniorLoan} onChange={(e) => updHybrid("seniorLoan", formatCurrencyInput(e.target.value))} placeholder="$0" className="bg-white border-blue-200 text-gray-800 rounded-xl" />
+                      {seniorLtv > 0 && <div className="text-xs text-blue-600 mt-1 font-medium">Senior LTV: {seniorLtv.toFixed(1)}%</div>}
+                    </div>
+
+                    {/* Sub-capital */}
+                    <div className="rounded-xl border border-purple-200 bg-purple-50 p-3">
+                      <div className="flex items-center gap-3 mb-2">
+                        <label className="text-xs text-purple-700 font-bold uppercase">Subordinate Capital</label>
+                        <Select value={prop.subCapitalType} onValueChange={(v) => updHybrid("subCapitalType", v)}>
+                          <SelectTrigger className="bg-white border-purple-200 text-gray-800 rounded-xl h-7 text-xs w-44"><SelectValue /></SelectTrigger>
+                          <SelectContent>{["Mezzanine", "Preferred Equity", "JV Equity"].map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <Input value={prop.subCapital} onChange={(e) => updHybrid("subCapital", formatCurrencyInput(e.target.value))} placeholder="$0" className="bg-white border-purple-200 text-gray-800 rounded-xl" />
+                    </div>
+
+                    {/* Borrower equity */}
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                      <label className="text-xs text-emerald-700 mb-1 block font-bold uppercase">Borrower Equity / Cash</label>
+                      <Input value={prop.borrowerEquity} onChange={(e) => updHybrid("borrowerEquity", formatCurrencyInput(e.target.value))} placeholder="$0" className="bg-white border-emerald-200 text-gray-800 rounded-xl" />
+                    </div>
+
+                    {/* Stack summary */}
+                    {baseValue > 0 && (
+                      <div className={`rounded-xl border p-4 ${stackBalanced ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
+                        <div className="text-xs font-bold uppercase tracking-wide mb-3 ${stackBalanced ? 'text-emerald-700' : 'text-red-700'}">
+                          {stackBalanced ? "✓ Stack Balances" : `Stack ${stackDiff > 0 ? "Exceeds" : "Shortfall"}: ${formatCurrencyInput(String(Math.abs(stackDiff)))}`}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            [isAcq ? "Purchase Price" : "Property Value", formatCurrencyInput(String(baseValue))],
+                            ["Senior Loan", formatCurrencyInput(String(seniorLoan))],
+                            [prop.subCapitalType, formatCurrencyInput(String(subCapital))],
+                            ["Borrower Equity", formatCurrencyInput(String(borrowerEquity))],
+                            ["Total Debt", formatCurrencyInput(String(totalDebt))],
+                            ["Total LTV", `${totalLtv.toFixed(1)}%`],
+                          ].map(([label, val]) => (
+                            <div key={String(label)} className="text-xs">
+                              <span className="text-gray-500">{label}: </span>
+                              <span className="font-bold text-[#0a1f44]">{val}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Navigation */}
+              <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
+                <button
+                  onClick={() => { if (hybridIndex > 0) setHybridIndex(i => i - 1); else setMatcherStep("hybrid-count"); }}
+                  className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"
+                >
+                  <ChevronLeft className="h-4 w-4" /> Previous
+                </button>
+                <button
+                  onClick={() => { if (hybridIndex < hybridProperties.length - 1) setHybridIndex(i => i + 1); else setMatcherStep("review"); }}
+                  className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80"
+                >
+                  {hybridIndex < hybridProperties.length - 1 ? <>Next Property <ChevronRight className="h-4 w-4" /></> : <>Review & Confirm <CheckCircle className="h-4 w-4" /></>}
+                </button>
+              </div>
+
+              {/* Property mini-nav */}
+              {hybridProperties.length > 1 && (
+                <div className="flex gap-2 mt-4 justify-center">
+                  {hybridProperties.map((_, idx) => (
+                    <button key={idx} onClick={() => setHybridIndex(idx)} className={`w-8 h-8 rounded-full text-xs font-bold transition-all ${idx === hybridIndex ? "bg-[#0a1f44] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>{idx + 1}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {matcherStep === "asset-form" && (
         <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
@@ -1593,30 +1814,72 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
           <div className={cardClass + " p-8"}>
             <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Final Review</div>
             <h2 className="font-display text-3xl font-bold text-[#0a1f44] mb-2">Review & Confirm</h2>
-            <div className="grid gap-4 md:grid-cols-2 mb-8">
-              {assets.map((asset, idx) => {
-                const m = calcMetrics(asset, capitalType);
-                return (
-                  <div key={asset.id} className="rounded-xl border-2 border-gray-200 p-5 hover:border-[#0a1f44]/30 transition-all">
-                    <div className="flex items-start justify-between mb-3">
-                      <div><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Asset {idx + 1}</div><div className="text-base font-bold text-[#0a1f44]">{asset.assetType}</div><div className="text-xs text-gray-500">{asset.ownershipStatus} · {asset.dealType}</div>{asset.address?.city && <div className="text-xs text-gray-400 mt-0.5">{asset.address.street ? `${asset.address.street}, ` : ""}{asset.address.city}, {asset.address.state} {asset.address.zip}</div>}</div>
-                      <button onClick={() => { setCurrentAssetIndex(idx); setMatcherStep("asset-form"); }} className="flex items-center gap-1 px-3 py-1.5 text-xs border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/10 font-medium"><Edit2 className="h-3 w-3" /> Edit</button>
+
+            {/* Hybrid review */}
+            {capitalType === "Stretch Senior/Hybrid" && hybridProperties.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2 mb-8">
+                {hybridProperties.map((prop, idx) => {
+                  const baseVal = parseCurrency(prop.ownershipStatus === "Acquisition" ? prop.purchasePrice : prop.currentValue);
+                  const seniorLoan = parseCurrency(prop.seniorLoan);
+                  const subCap = parseCurrency(prop.subCapital);
+                  const totalDebt = seniorLoan + subCap;
+                  const totalLtv = baseVal > 0 ? (totalDebt / baseVal) * 100 : 0;
+                  return (
+                    <div key={prop.id} className="rounded-xl border-2 border-gray-200 p-5 hover:border-[#0a1f44]/30 transition-all">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Property {idx + 1}</div>
+                          <div className="text-base font-bold text-[#0a1f44]">{prop.assetType}</div>
+                          <div className="text-xs text-gray-500">{prop.ownershipStatus}</div>
+                        </div>
+                        <button onClick={() => { setHybridIndex(idx); setMatcherStep("hybrid-form"); }} className="flex items-center gap-1 px-3 py-1.5 text-xs border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/10"><Edit2 className="h-3 w-3" /> Edit</button>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs"><span className="text-gray-400">{prop.ownershipStatus === "Acquisition" ? "Purchase Price" : "Property Value"}</span><span className="font-bold text-[#0a1f44]">{prop.ownershipStatus === "Acquisition" ? prop.purchasePrice || "—" : prop.currentValue || "—"}</span></div>
+                        <div className="flex justify-between text-xs"><span className="text-blue-500 font-medium">Senior Loan</span><span className="font-bold text-[#0a1f44]">{prop.seniorLoan || "—"}</span></div>
+                        <div className="flex justify-between text-xs"><span className="text-purple-500 font-medium">{prop.subCapitalType}</span><span className="font-bold text-[#0a1f44]">{prop.subCapital || "—"}</span></div>
+                        <div className="flex justify-between text-xs"><span className="text-emerald-600 font-medium">Borrower Equity</span><span className="font-bold text-[#0a1f44]">{prop.borrowerEquity || "—"}</span></div>
+                        {totalLtv > 0 && <div className="flex justify-between text-xs pt-1 border-t border-gray-100"><span className="text-gray-400">Total LTV</span><span className="font-bold text-[#0a1f44]">{totalLtv.toFixed(1)}%</span></div>}
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[["Loan Amount", asset.loanAmount || "—"], ["Property Value", asset.propertyValue || "—"], ["Senior LTV", formatPercent(m.seniorLtv)], ["States", asset.selectedStates.length > 0 ? asset.selectedStates.slice(0, 3).join(", ") + (asset.selectedStates.length > 3 ? `+${asset.selectedStates.length - 3}` : "") : "None"]].map(([label, val]) => (
-                        <div key={String(label)} className="rounded-lg bg-gray-50 p-2"><div className="text-xs text-gray-400 mb-0.5">{label}</div><div className="text-xs font-bold text-[#0a1f44]">{val}</div></div>
-                      ))}
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 mb-8">
+                {assets.map((asset, idx) => {
+                  const m = calcMetrics(asset, capitalType);
+                  return (
+                    <div key={asset.id} className="rounded-xl border-2 border-gray-200 p-5 hover:border-[#0a1f44]/30 transition-all">
+                      <div className="flex items-start justify-between mb-3">
+                        <div><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Asset {idx + 1}</div><div className="text-base font-bold text-[#0a1f44]">{asset.assetType}</div><div className="text-xs text-gray-500">{asset.ownershipStatus} · {asset.dealType}</div>{asset.address?.city && <div className="text-xs text-gray-400 mt-0.5">{asset.address.street ? `${asset.address.street}, ` : ""}{asset.address.city}, {asset.address.state} {asset.address.zip}</div>}</div>
+                        <button onClick={() => { setCurrentAssetIndex(idx); setMatcherStep("asset-form"); }} className="flex items-center gap-1 px-3 py-1.5 text-xs border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/10 font-medium"><Edit2 className="h-3 w-3" /> Edit</button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[["Loan Amount", asset.loanAmount || "—"], ["Property Value", asset.propertyValue || "—"], ["Senior LTV", formatPercent(m.seniorLtv)], ["States", asset.selectedStates.length > 0 ? asset.selectedStates.slice(0, 3).join(", ") + (asset.selectedStates.length > 3 ? `+${asset.selectedStates.length - 3}` : "") : "None"]].map(([label, val]) => (
+                          <div key={String(label)} className="rounded-lg bg-gray-50 p-2"><div className="text-xs text-gray-400 mb-0.5">{label}</div><div className="text-xs font-bold text-[#0a1f44]">{val}</div></div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
+
             <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4 mb-6 flex items-center justify-between">
-              <div><div className="text-sm font-bold text-[#0a1f44]">{assets.length} asset{assets.length > 1 ? "s" : ""} · {capitalType}</div><div className="text-xs text-gray-500 mt-0.5">{collateralMode === "crossed" ? "Crossed Collateral" : collateralMode === "separate" ? "Treated Separately" : "Single asset"}</div></div>
+              <div>
+                <div className="text-sm font-bold text-[#0a1f44]">
+                  {capitalType === "Stretch Senior/Hybrid" ? `${hybridProperties.length} propert${hybridProperties.length > 1 ? "ies" : "y"}` : `${assets.length} asset${assets.length > 1 ? "s" : ""}`} · {capitalType}
+                </div>
+                <div className="text-xs text-gray-500 mt-0.5">{collateralMode === "crossed" ? "Crossed Collateral" : collateralMode === "separate" ? "Treated Separately" : "Single asset"}</div>
+              </div>
               <CheckCircle className="h-5 w-5 text-emerald-500" />
             </div>
             <div className="flex gap-3">
-              <button onClick={() => { setCurrentAssetIndex(0); setMatcherStep("asset-form"); }} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Back</button>
+              <button onClick={() => {
+                if (capitalType === "Stretch Senior/Hybrid") { setHybridIndex(hybridProperties.length - 1); setMatcherStep("hybrid-form"); }
+                else { setCurrentAssetIndex(0); setMatcherStep("asset-form"); }
+              }} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Back</button>
               <button onClick={() => {
                 if (capitalSeekerMode && onSubmitDeal) {
                   const advisors = assignAdvisors(capitalType, teamMembers);
