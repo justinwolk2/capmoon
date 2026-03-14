@@ -216,7 +216,10 @@ export default function Home() {
     if (isRefinance) {
       boxes.push(["Cash Out", formatCurrencyInput(String(cashOut))]);
     }
-    boxes.push(["Last $ LTV", formatPercent(autoLtv)]);
+boxes.push([
+  isSubordinateCapital ? "Subordinated LTV - Last Dollar" : "Last $ LTV",
+  isSubordinateCapital ? formatPercent(autoLtv) : "N/A"
+]);
     boxes.push(["Total Capital", formatCurrencyInput(String(totalCapitalNumeric || 0))]);
     boxes.push(["Equity %", formatPercent(equityPercent)]);
     return boxes;
