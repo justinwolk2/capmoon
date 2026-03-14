@@ -218,10 +218,10 @@ export default function Home() {
         [data-radix-select-item]:hover, [data-radix-select-item][data-highlighted] { background: rgba(201,168,76,0.1) !important; color: #c9a84c !important; }
       `}</style>
 
-      <div className="min-h-screen bg-[#060b17] text-white">
+      <div className="min-h-screen bg-[#f0f2f5] text-white">
         <div className="grid min-h-screen lg:grid-cols-[260px_1fr]">
 
-          <aside className="border-r border-[#c9a84c]/10 bg-[#080d1a] flex flex-col">
+          <aside className="border-r border-[#c9a84c]/10 bg-[#e8eaed] flex flex-col">
             <div className="px-6 py-8 border-b border-[#c9a84c]/10">
              <div className="flex items-center gap-3">
   <img src="/logo1.JPEG" alt="CapMoon" className="h-12 w-12 object-contain rounded-full" />
@@ -531,7 +531,7 @@ export default function Home() {
                         </div>
                         <div className="grid gap-2 md:grid-cols-3">
                           {([["Capital", match.type], ["Amount", isSubordinateCapital ? subordinateAmount : formatCurrencyInput(String(effectiveAmount || 0))], ["Contact", match.email || "—"]] as [string, string][]).map(([label, val]) => (
-                            <div key={label} className="rounded-lg bg-[#060b17] border border-[#c9a84c]/5 p-3">
+                            <div key={label} className="rounded-lg bg-[#f0f2f5] border border-[#c9a84c]/5 p-3">
                               <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c]/40 mb-1">{label}</div>
                               <div className="text-xs font-medium text-gray-200 break-all">{val}</div>
                             </div>
