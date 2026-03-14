@@ -2236,16 +2236,17 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                           {user.role !== "admin" && (
                             <div>
                               <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Lender Access Control</div>
-                              <div className="text-xs text-gray-500 mb-3">Check to block this user from seeing specific lenders:</div>
-                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                {lenderRecords.map((lender) => (
-                                  <label key={lender.id} className="flex items-center gap-2 text-xs cursor-pointer p-2 rounded-lg hover:bg-gray-100">
-                                    <input type="checkbox" checked={user.blockedLenderIds.includes(lender.id)} onChange={() => toggleBlockedLender(user.id, lender.id)} className="accent-red-500 w-3.5 h-3.5" />
-                                    <span className={user.blockedLenderIds.includes(lender.id) ? "text-red-500 font-semibold line-through" : "text-gray-600"}>{lender.lender}</span>
-                                  </label>
-                                ))}
-                              </div>
-                              {user.blockedLenderIds.length > 0 && (<div className="mt-2 text-xs text-red-500 font-medium">{user.blockedLenderIds.length} lender{user.blockedLenderIds.length > 1 ? "s" : ""} blocked</div>)}
+                              <div className="text-xs text-gray-500 mb-3">Select lenders to block this user from seeing:</div>
+                              <DropdownCheckbox
+                                label="Blocked Lenders"
+                                options={[...lenderRecords].sort((a,b) => a.lender.localeCompare(b.lender)).map((l) => l.lender)}
+                                selected={user.blockedLenderIds.map((id) => lenderRecords.find((l) => l.id === id)?.lender || "").filter(Boolean)}
+                                onChange={(selectedNames) => {
+                                  const newBlockedIds = lenderRecords.filter((l) => selectedNames.includes(l.lender)).map((l) => l.id);
+                                  setUsers(users.map((u) => u.id === user.id ? { ...u, blockedLenderIds: newBlockedIds } : u));
+                                }}
+                              />
+                              {user.blockedLenderIds.length > 0 && <div className="mt-2 text-xs text-red-500 font-medium">{user.blockedLenderIds.length} lender{user.blockedLenderIds.length > 1 ? "s" : ""} blocked</div>}
                             </div>
                           )}
                         </div>
