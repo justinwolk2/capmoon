@@ -878,6 +878,7 @@ function subordinateLabel(ct: string) {
 function calcMetrics(asset: AssetData, capitalType: string) {
   const isSubCap = ["Mezzanine", "Preferred Equity", "JV Equity"].includes(capitalType);
   const isConstruction = asset.dealType === "Construction";
+  const isNewDev = asset.dealType === "New Development";
   const isAcquisition = asset.ownershipStatus === "Acquisition";
   const isRefinance = asset.ownershipStatus === "Refinance";
   const isAcqNonConst = isAcquisition && !isConstruction;
@@ -895,8 +896,22 @@ function calcMetrics(asset: AssetData, capitalType: string) {
   const autoLtv = propVal > 0 ? (totalCap / propVal) * 100 : 0;
   const equityPct = propVal > 0 ? (parseCurrency(asset.borrowerEquity) / propVal) * 100 : 0;
   const cashOut = Math.max(0, newLoanAmt - curLoanAmt);
-  const seniorLtc = purchaseVal > 0 && seniorLoanForLtv > 0 ? (seniorLoanForLtv / purchaseVal) * 100 : 0;
-  return { effectiveAmt, totalCap, seniorLtv, autoLtv, equityPct, cashOut, seniorLtc, isSubCap, isConstruction, isAcquisition, isRefinance, isAcqNonConst, acqConstLoan };
+  // New Development LTC: (Total Costs − Additional Equity) ÷ Total Costs
+  // Regular acquisition LTC: Loan ÷ Purchase Price
+  let seniorLtc = 0;
+  if (isNewDev) {
+    const hardCosts = parseCurrency(asset.hardCosts || "");
+    const softCosts = parseCurrency(asset.softCosts || "");
+    const closingCosts = parseCurrency(asset.originationClosingCosts || "");
+    const carryCosts = parseCurrency(asset.carryingCosts || "");
+    const addlEquity = parseCurrency((asset as any).additionalEquity || "");
+    const totalProjectCost = purchaseVal + hardCosts + softCosts + closingCosts + carryCosts;
+    const netCost = Math.max(0, totalProjectCost - addlEquity);
+    seniorLtc = totalProjectCost > 0 ? (netCost / totalProjectCost) * 100 : 0;
+  } else {
+    seniorLtc = purchaseVal > 0 && seniorLoanForLtv > 0 ? (seniorLoanForLtv / purchaseVal) * 100 : 0;
+  }
+  return { effectiveAmt, totalCap, seniorLtv, autoLtv, equityPct, cashOut, seniorLtc, isSubCap, isConstruction, isAcquisition, isRefinance, isAcqNonConst, acqConstLoan, isNewDev };
 }
 
 // Advisor matching logic
@@ -1041,7 +1056,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
   const propVal = parseCurrency(asset.propertyValue);
   const capRate = netIncome > 0 && propVal > 0 ? (netIncome / propVal) * 100 : 0;
   const metricBoxes: [string, string][] = [["Senior LTV", formatPercent(m.seniorLtv)]];
-  if (m.isAcqNonConst && parseCurrency(asset.purchasePrice) > 0) metricBoxes.push(["Senior LTC", formatPercent(m.seniorLtc)]);
+  if (m.isAcqNonConst && parseCurrency(asset.purchasePrice) > 0) metricBoxes.push([m.isNewDev ? "LTC" : "Senior LTC", formatPercent(m.seniorLtc)]);
   if (m.isRefinance && (asset.refinanceType === "Cash Out to Borrower" || asset.refinanceType === "Cash Out-Value Add")) {
     metricBoxes.push(["Net Cash Out", m.cashOut > 0 ? formatCurrencyInput(String(m.cashOut)) : "—"]);
   }
@@ -1053,7 +1068,19 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
     <div className="grid gap-4 md:grid-cols-2">
       <AddressFields address={asset.address || blankAddress()} onChange={(a) => upd("address", a)} inputClass={inputClass} />
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Ownership Status</label><Select value={asset.ownershipStatus} onValueChange={(v) => upd("ownershipStatus", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
-      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Deal Type</label><Select value={asset.dealType} onValueChange={(v) => upd("dealType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{dealTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+      <div>
+        <div className="flex items-center gap-1.5 mb-1">
+          <label className="text-xs text-gray-500 font-medium uppercase">Deal Type</label>
+          <div className="relative group">
+            <div className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold cursor-help">i</div>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 bg-[#0a1f44] text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
+              Most transactions are considered "Investment"
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a1f44]" />
+            </div>
+          </div>
+        </div>
+        <Select value={asset.dealType} onValueChange={(v) => upd("dealType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{dealTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
+      </div>
       {asset.ownershipStatus === "Refinance" && (<div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Refinance Type</label><Select value={asset.refinanceType} onValueChange={(v) => upd("refinanceType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{refinanceTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>)}
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Asset Type</label><Select value={asset.assetType} onValueChange={(v) => upd("assetType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{assetTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
       {showUnits && (<><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Units</label><Input value={asset.numUnits} onChange={(e) => upd("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Buildings</label><Input value={asset.numBuildings} onChange={(e) => upd("numBuildings", e.target.value)} placeholder="e.g. 4" className={inputClass} /></div></>)}
@@ -2002,6 +2029,24 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   </Select>
                 </div>
 
+                {/* Deal Type */}
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <label className="text-xs text-gray-500 font-bold uppercase">Deal Type</label>
+                    <div className="relative group">
+                      <div className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold cursor-help">i</div>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 bg-[#0a1f44] text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
+                        Most transactions are considered "Investment"
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a1f44]" />
+                      </div>
+                    </div>
+                  </div>
+                  <Select value={prop.dealType} onValueChange={(v) => updHybrid("dealType", v)}>
+                    <SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger>
+                    <SelectContent>{dealTypes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+
                 {/* Capital Stack */}
                 <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-5">
                   <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-4">Capital Stack</div>
@@ -2095,7 +2140,17 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   <div className="space-y-4">
                     <AddressFields address={prop.address || blankAddress()} onChange={(a) => setHybridProperties(prev => prev.map((p, i) => i === hybridIndex ? { ...p, address: a } : p))} inputClass={inputClass} />
                     <div className="grid gap-3 md:grid-cols-2">
-                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Deal Type</label>
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <label className="text-xs text-gray-500 font-medium uppercase">Deal Type</label>
+                          <div className="relative group">
+                            <div className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold cursor-help">i</div>
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 bg-[#0a1f44] text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
+                              Most transactions are considered "Investment"
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a1f44]" />
+                            </div>
+                          </div>
+                        </div>
                         <Select value={prop.dealType} onValueChange={(v) => updHybrid("dealType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{dealTypes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
                       </div>
                       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label>
@@ -3701,6 +3756,21 @@ export default function Home() {
   const [lenderChangeRequests, setLenderChangeRequests] = useState<LenderChangeRequest[]>([]);
   const [dbLoaded, setDbLoaded] = useState(false);
 
+  // Save helper — defined first so useEffects can reference it
+  async function saveToDb(type: string, data: any[]) {
+    if (!data || data.length === 0) return;
+    try { await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, data }) }); }
+    catch (e) { console.error("DB save failed:", e); }
+  }
+
+  // Auto-save to DB on every state change — fires after every setX() anywhere in the app
+  // The dbLoaded guard prevents saving before we've loaded from DB
+  React.useEffect(() => { if (dbLoaded && users.length > 0) saveToDb("users", users); }, [users, dbLoaded]);
+  React.useEffect(() => { if (dbLoaded && teamMembers.length > 0) saveToDb("team", teamMembers); }, [teamMembers, dbLoaded]);
+  React.useEffect(() => { if (dbLoaded && submittedDeals.length > 0) saveToDb("deals", submittedDeals); }, [submittedDeals, dbLoaded]);
+  React.useEffect(() => { if (dbLoaded && deleteRequests.length > 0) saveToDb("deletes", deleteRequests); }, [deleteRequests, dbLoaded]);
+  React.useEffect(() => { if (dbLoaded && lenderChangeRequests.length > 0) saveToDb("lender-changes", lenderChangeRequests); }, [lenderChangeRequests, dbLoaded]);
+
   // Load data from DB on mount — DB is always source of truth
   React.useEffect(() => {
     async function loadData() {
@@ -3721,7 +3791,6 @@ export default function Home() {
         safeFetch("/api/data?type=deletes"),
         safeFetch("/api/data?type=lender-changes"),
       ]);
-      // Only fall back to hardcoded if DB returned nothing at all
       if (dbUsers.length > 0) setUsers(dbUsers); else setUsers(initialUsers);
       if (dbDeals.length > 0) setSubmittedDeals(dbDeals);
       if (dbTeam.length > 0) setTeamMembers(dbTeam); else setTeamMembers(initialTeamMembers);
@@ -3732,25 +3801,14 @@ export default function Home() {
     loadData();
   }, []);
 
-  // Save helpers — never save empty arrays
-  async function saveToDb(type: string, data: any[]) {
-    if (!data || data.length === 0) return;
-    try { await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, data }) }); }
-    catch (e) { console.error("DB save failed:", e); }
-  }
-
-  function handleSubmitDeal(deal: SubmittedDeal) {
-    setSubmittedDeals((prev) => { const next = [...prev, deal]; saveToDb("deals", next); return next; });
-  }
+  function handleSubmitDeal(deal: SubmittedDeal) { setSubmittedDeals((prev) => [...prev, deal]); }
   function handleLogout() { setSession(null); }
-  function handleRegisterCapitalSeeker(newUser: AppUser) {
-    setUsers((prev) => { const next = [...prev, newUser]; saveToDb("users", next); return next; });
-  }
-  function handleSetUsers(newUsers: AppUser[]) { if (newUsers.length > 0) { setUsers(newUsers); saveToDb("users", newUsers); } }
-  function handleSetTeamMembers(newTeam: TeamMember[]) { if (newTeam.length > 0) { setTeamMembers(newTeam); saveToDb("team", newTeam); } }
-  function handleSetSubmittedDeals(newDeals: SubmittedDeal[]) { setSubmittedDeals(newDeals); if (newDeals.length > 0) saveToDb("deals", newDeals); }
-  function handleSetDeleteRequests(newReqs: DeleteRequest[]) { setDeleteRequests(newReqs); if (newReqs.length > 0) saveToDb("deletes", newReqs); }
-  function handleSetLenderChangeRequests(newReqs: LenderChangeRequest[]) { setLenderChangeRequests(newReqs); saveToDb("lender-changes", newReqs); }
+  function handleRegisterCapitalSeeker(newUser: AppUser) { setUsers((prev) => [...prev, newUser]); }
+  function handleSetUsers(newUsers: AppUser[]) { if (newUsers.length > 0) setUsers(newUsers); }
+  function handleSetTeamMembers(newTeam: TeamMember[]) { if (newTeam.length > 0) setTeamMembers(newTeam); }
+  function handleSetSubmittedDeals(newDeals: SubmittedDeal[]) { setSubmittedDeals(newDeals); }
+  function handleSetDeleteRequests(newReqs: DeleteRequest[]) { setDeleteRequests(newReqs); }
+  function handleSetLenderChangeRequests(newReqs: LenderChangeRequest[]) { setLenderChangeRequests(newReqs); }
 
   if (!dbLoaded) return (
     <div className="min-h-screen bg-[#f0f2f5] flex items-center justify-center">
