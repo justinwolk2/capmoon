@@ -35,6 +35,12 @@ type NewLenderForm = {
   minLoan: string; maxLoan: string; maxLtv: string; targetStates: string[];
   sponsorStates: string[]; recourse: string; capitalType: string; status: string;
 };
+type SubmittedDeal = {
+  id: number; submittedAt: string; seekerName: string;
+  assets: AssetData[]; capitalType: string; assetMode: string; collateralMode: string;
+  status: "pending" | "assigned" | "closed";
+  advisorId?: number;
+};
 type AppUser = {
   id: number; username: string; password: string; role: "admin" | "client" | "capital-seeker";
   name: string; blockedLenderIds: number[];
@@ -471,7 +477,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
 
 // ─── Deal Matcher (shared between admin and capital seeker) ───────────────────
 
-function DealMatcher({ lenderRecords, capitalSeekerMode = false, inputClass, selectTriggerClass, cardClass }: { lenderRecords: LenderRecord[]; capitalSeekerMode?: boolean; inputClass: string; selectTriggerClass: string; cardClass: string }) {
+function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, seekerName, inputClass, selectTriggerClass, cardClass }: { lenderRecords: LenderRecord[]; capitalSeekerMode?: boolean; onSubmitDeal?: (assets: AssetData[], capitalType: string, assetMode: string, collateralMode: string) => void; seekerName?: string; inputClass: string; selectTriggerClass: string; cardClass: string }) {
   const [matcherStep, setMatcherStep] = useState<MatcherStep>("ai-prompt");
   const [marketScope, setMarketScope] = useState("US");
   const [capitalType, setCapitalType] = useState("Senior");
@@ -738,7 +744,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, inputClass, sel
             </div>
             <div className="flex gap-3">
               <button onClick={() => { setCurrentAssetIndex(0); setMatcherStep("asset-form"); }} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Back to Assets</button>
-              <button onClick={() => setMatcherStep("results")} className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Run Lender Match <ChevronRight className="h-4 w-4" /></button>
+              <button onClick={() => { if (capitalSeekerMode && onSubmitDeal) { onSubmitDeal(assets, capitalType, assetMode, collateralMode); setMatcherStep("results"); } else { setMatcherStep("results"); } }} className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">{capitalSeekerMode ? "Submit Deal" : "Run Lender Match"} <ChevronRight className="h-4 w-4" /></button>
             </div>
           </div>
         </div>
@@ -746,46 +752,94 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, inputClass, sel
 
       {matcherStep === "results" && (
         <div>
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <div className="text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold mb-1">Match Results</div>
-              <h2 className="font-display text-3xl font-bold text-[#0a1f44]">Ranked Output</h2>
-              <p className="text-sm text-gray-500 mt-1">{collateralMode === "crossed" ? "Combined portfolio" : collateralMode === "separate" ? "Individual asset matching" : "Single asset"}</p>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setMatcherStep("review")} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Back</button>
-              <button onClick={resetMatcher} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">New Deal</button>
-            </div>
-          </div>
-          {matchResults.length === 0 ? (
-            <div className={cardClass + " p-8 text-center"}><div className="text-lg font-bold text-[#0a1f44] mb-2">No matches found</div><div className="text-sm text-gray-500">Try adjusting your deal criteria or add more lenders.</div></div>
-          ) : collateralMode === "separate" && assetMode === "multiple" ? (
-            assets.map((asset) => {
-              const assetMatches = matchResults.filter((r: any) => r.assetId === asset.id);
-              return (
-                <div key={asset.id} className="mb-6">
-                  <div className="text-sm font-bold text-[#0a1f44] mb-3 flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-[#0a1f44] text-white flex items-center justify-center text-xs font-bold">{asset.id}</div>Asset {asset.id} — {asset.assetType}{asset.address?.city ? ` · ${asset.address.city}, ${asset.address.state}` : ""} · {asset.loanAmount || "—"}</div>
-                  {assetMatches.length === 0 ? (<div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-400">No matches for this asset.</div>) : (
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {assetMatches.map((match: any) => (
-                        <div key={String(match.id) + "-" + asset.id} className="rounded-xl border border-gray-200 bg-white p-4 hover:border-[#0a1f44]/30 transition-all">
-                          <div className="flex items-start justify-between gap-2 mb-3"><div><div className="text-sm font-bold text-[#0a1f44]">{match.lender}</div><div className="text-xs text-gray-500 mt-0.5">{match.program}</div></div><div className="text-right"><div className="text-xs text-gray-400">Match</div><div className="text-lg font-bold text-[#0a1f44]">{match.score}%</div></div></div>
-                          <div className="grid grid-cols-2 gap-2">{[["Capital", match.type], ["Contact", capitalSeekerMode ? "Contact via CapMoon" : (match.email || "—")]].map(([label, val]) => (<div key={String(label)} className="rounded-lg bg-gray-50 border border-gray-100 p-2"><div className="text-xs uppercase text-[#0a1f44] font-bold mb-0.5">{label}</div><div className="text-xs text-gray-600 break-all">{val}</div></div>))}</div>
-                        </div>
-                      ))}
+          {capitalSeekerMode ? (
+            /* Capital Seeker Confirmation */
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl">
+              <div className={cardClass + " p-10 text-center"}>
+                <div className="w-16 h-16 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center mx-auto mb-5">
+                  <CheckCircle className="h-8 w-8 text-emerald-500" />
+                </div>
+                <div className="font-display text-3xl font-bold text-[#0a1f44] mb-2">Deal Submitted!</div>
+                <p className="text-gray-500 text-sm mb-6">Thank you{seekerName ? `, ${seekerName}` : ""}. Your deal has been received and a CapMoon capital advisor will review it and be in touch with you shortly.</p>
+                <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4 mb-6 text-left">
+                  <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Deal Summary</div>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <div>Capital Type: <span className="font-semibold text-[#0a1f44]">{capitalType}</span></div>
+                    <div>Assets: <span className="font-semibold text-[#0a1f44]">{assets.length} asset{assets.length > 1 ? "s" : ""}</span></div>
+                    {assets[0]?.loanAmount && <div>Loan Amount: <span className="font-semibold text-[#0a1f44]">{assets[0].loanAmount}</span></div>}
+                    {assets[0]?.assetType && <div>Asset Type: <span className="font-semibold text-[#0a1f44]">{assets[0].assetType}</span></div>}
+                    {assets[0]?.address?.city && <div>Location: <span className="font-semibold text-[#0a1f44]">{assets[0].address.city}, {assets[0].address.state}</span></div>}
+                  </div>
+                </div>
+
+                {/* Deal Team Box */}
+                <div className="rounded-2xl bg-[#0a1f44] p-6 mb-6 text-left">
+                  <div className="text-xs uppercase tracking-[0.25em] text-[#c9a84c] font-bold mb-4">Your Deal Team</div>
+                  <div className="flex items-center gap-4">
+                    <img src="/louis.jpg" alt="Louis Palumbo" className="h-20 w-20 rounded-2xl object-cover border-2 border-[#c9a84c]/30 flex-shrink-0" />
+                    <div>
+                      <div className="font-display text-xl font-bold text-white">Louis Palumbo</div>
+                      <div className="text-sm text-[#c9a84c] font-medium mt-0.5">Associate Capital Advisor</div>
+                      <div className="mt-3 space-y-1.5">
+                        <a href="mailto:lpalumbo@capmoon.com" className="flex items-center gap-2 text-xs text-gray-300 hover:text-white transition-colors">
+                          <span className="text-[#c9a84c]">✉</span> lpalumbo@capmoon.com
+                        </a>
+                        <a href="tel:3054010076" className="flex items-center gap-2 text-xs text-gray-300 hover:text-white transition-colors">
+                          <span className="text-[#c9a84c]">📱</span> 305-401-0076 (Mobile)
+                        </a>
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
-              );
-            })
+
+                <button onClick={resetMatcher} className="px-6 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Submit Another Deal</button>
+              </div>
+            </motion.div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {matchResults.map((match: any, idx: number) => (
-                <div key={match.id} className="rounded-xl border border-gray-200 bg-white p-5 hover:border-[#0a1f44]/30 transition-all">
-                  <div className="flex items-start justify-between gap-2 mb-4"><div><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">#{idx + 1} Match</div><div className="text-base font-bold text-[#0a1f44]">{match.lender}</div><div className="text-xs text-gray-500 mt-0.5">{match.program}</div></div><div className="text-right"><div className="text-xs text-gray-400">Score</div><div className="text-2xl font-bold text-[#0a1f44]">{match.score}%</div></div></div>
-                  <div className="grid grid-cols-2 gap-2">{[["Capital", match.type], ["Range", `${match.minLoan}–${match.maxLoan}`], ["Recourse", match.nr], ["Contact", capitalSeekerMode ? "Contact via CapMoon" : (match.email || "—")]].map(([label, val]) => (<div key={String(label)} className="rounded-lg bg-gray-50 border border-gray-100 p-2"><div className="text-xs uppercase text-[#0a1f44] font-bold mb-0.5">{label}</div><div className="text-xs text-gray-600 break-all">{val}</div></div>))}</div>
+            /* Admin Results */
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold mb-1">Match Results</div>
+                  <h2 className="font-display text-3xl font-bold text-[#0a1f44]">Ranked Output</h2>
+                  <p className="text-sm text-gray-500 mt-1">{collateralMode === "crossed" ? "Combined portfolio" : collateralMode === "separate" ? "Individual asset matching" : "Single asset"}</p>
                 </div>
-              ))}
+                <div className="flex gap-3">
+                  <button onClick={() => setMatcherStep("review")} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Back</button>
+                  <button onClick={resetMatcher} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">New Deal</button>
+                </div>
+              </div>
+              {matchResults.length === 0 ? (
+                <div className={cardClass + " p-8 text-center"}><div className="text-lg font-bold text-[#0a1f44] mb-2">No matches found</div><div className="text-sm text-gray-500">Try adjusting your deal criteria or add more lenders.</div></div>
+              ) : collateralMode === "separate" && assetMode === "multiple" ? (
+                assets.map((asset) => {
+                  const assetMatches = matchResults.filter((r: any) => r.assetId === asset.id);
+                  return (
+                    <div key={asset.id} className="mb-6">
+                      <div className="text-sm font-bold text-[#0a1f44] mb-3 flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-[#0a1f44] text-white flex items-center justify-center text-xs font-bold">{asset.id}</div>Asset {asset.id} — {asset.assetType}{asset.address?.city ? ` · ${asset.address.city}, ${asset.address.state}` : ""} · {asset.loanAmount || "—"}</div>
+                      {assetMatches.length === 0 ? (<div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-400">No matches for this asset.</div>) : (
+                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                          {assetMatches.map((match: any) => (
+                            <div key={String(match.id) + "-" + asset.id} className="rounded-xl border border-gray-200 bg-white p-4 hover:border-[#0a1f44]/30 transition-all">
+                              <div className="flex items-start justify-between gap-2 mb-3"><div><div className="text-sm font-bold text-[#0a1f44]">{match.lender}</div><div className="text-xs text-gray-500 mt-0.5">{match.program}</div></div><div className="text-right"><div className="text-xs text-gray-400">Match</div><div className="text-lg font-bold text-[#0a1f44]">{match.score}%</div></div></div>
+                              <div className="grid grid-cols-2 gap-2">{[["Capital", match.type], ["Contact", match.email || "—"]].map(([label, val]) => (<div key={String(label)} className="rounded-lg bg-gray-50 border border-gray-100 p-2"><div className="text-xs uppercase text-[#0a1f44] font-bold mb-0.5">{label}</div><div className="text-xs text-gray-600 break-all">{val}</div></div>))}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {matchResults.map((match: any, idx: number) => (
+                    <div key={match.id} className="rounded-xl border border-gray-200 bg-white p-5 hover:border-[#0a1f44]/30 transition-all">
+                      <div className="flex items-start justify-between gap-2 mb-4"><div><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">#{idx + 1} Match</div><div className="text-base font-bold text-[#0a1f44]">{match.lender}</div><div className="text-xs text-gray-500 mt-0.5">{match.program}</div></div><div className="text-right"><div className="text-xs text-gray-400">Score</div><div className="text-2xl font-bold text-[#0a1f44]">{match.score}%</div></div></div>
+                      <div className="grid grid-cols-2 gap-2">{[["Capital", match.type], ["Range", `${match.minLoan}–${match.maxLoan}`], ["Recourse", match.nr], ["Contact", match.email || "—"]].map(([label, val]) => (<div key={String(label)} className="rounded-lg bg-gray-50 border border-gray-100 p-2"><div className="text-xs uppercase text-[#0a1f44] font-bold mb-0.5">{label}</div><div className="text-xs text-gray-600 break-all">{val}</div></div>))}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -796,11 +850,15 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, inputClass, sel
 
 // ─── Capital Seeker Portal ────────────────────────────────────────────────────
 
-function CapitalSeekerPortal({ lenderRecords, onLogout }: { lenderRecords: LenderRecord[]; onLogout: () => void }) {
+function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session }: { lenderRecords: LenderRecord[]; onLogout: () => void; onSubmitDeal: (deal: SubmittedDeal) => void; session: AuthSession }) {
   const [activeTab, setActiveTab] = useState("matcher");
   const inputClass = "bg-white border-gray-300 text-gray-800 placeholder:text-gray-400 rounded-xl focus:border-[#0a1f44] focus:ring-0";
   const selectTriggerClass = "bg-white border-gray-300 text-gray-800 rounded-xl focus:border-[#0a1f44]";
   const cardClass = "rounded-2xl border border-gray-200 bg-white shadow-sm";
+
+  function handleSubmit(assets: AssetData[], capitalType: string, assetMode: string, collateralMode: string) {
+    onSubmitDeal({ id: Date.now(), submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Guest", assets, capitalType, assetMode, collateralMode, status: "pending" });
+  }
 
   return (
     <>
@@ -838,7 +896,7 @@ function CapitalSeekerPortal({ lenderRecords, onLogout }: { lenderRecords: Lende
                 <h1 className="font-display text-4xl font-bold text-[#0a1f44] mt-1">Find Your Lender</h1>
                 <p className="mt-1 text-sm text-gray-500">CapMoon's Premier Capital Search Dashboard</p>
               </div>
-              {activeTab === "matcher" && <DealMatcher lenderRecords={lenderRecords} capitalSeekerMode={true} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />}
+              {activeTab === "matcher" && <DealMatcher lenderRecords={lenderRecords} capitalSeekerMode={true} onSubmitDeal={handleSubmit} seekerName={session?.user.name} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />}
               {activeTab === "uploads" && (
                 <div className={cardClass + " p-6"}>
                   <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Documents</div>
@@ -864,13 +922,14 @@ function CapitalSeekerPortal({ lenderRecords, onLogout }: { lenderRecords: Lende
 const adminNavItems: [string, string, any, string?][] = [
   ["overview", "Overview", Gauge], ["lenders", "Lender Programs", Landmark],
   ["add-lender", "Add Lender", Plus, "sub"], ["matcher", "Deal Matcher", Filter],
-  ["uploads", "Upload Center", FileSpreadsheet], ["user-management", "User Management", Settings],
+  ["submitted-deals", "Submitted Deals", FileSpreadsheet],
+  ["uploads", "Upload Center", Upload], ["user-management", "User Management", Settings],
 ];
 
-function AdminPortal({ session, onLogout }: { session: AuthSession; onLogout: () => void }) {
+function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersProp, setUsers: setUsersExternal }: { session: AuthSession; onLogout: () => void; submittedDeals: SubmittedDeal[]; users: AppUser[]; setUsers: (u: AppUser[]) => void }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [lenderRecords, setLenderRecords] = useState<LenderRecord[]>(seedLenders);
-  const [users, setUsers] = useState<AppUser[]>(initialUsers);
+  const [users, setUsers] = useState<AppUser[]>(initialUsersProp);
   const [search, setSearch] = useState("");
   const [selectedSourceFilter, setSelectedSourceFilter] = useState("All");
   const [selectedCapitalFilter, setSelectedCapitalFilter] = useState("All");
@@ -1185,6 +1244,44 @@ function AdminPortal({ session, onLogout }: { session: AuthSession; onLogout: ()
                 <DealMatcher lenderRecords={lenderRecords} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />
               )}
 
+              {activeTab === "submitted-deals" && (
+                <div className={cardClass + " p-6"}>
+                  <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Incoming</div>
+                  <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">Submitted Deals</h2>
+                  {submittedDeals.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">No deals submitted yet. Capital seekers will appear here once they submit a deal.</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {submittedDeals.map((deal) => (
+                        <div key={deal.id} className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Deal #{deal.id}</div>
+                              <div className="text-base font-bold text-[#0a1f44]">{deal.seekerName}</div>
+                              <div className="text-xs text-gray-500 mt-0.5">Submitted: {deal.submittedAt}</div>
+                            </div>
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${deal.status === "pending" ? "bg-amber-50 text-amber-600 border border-amber-200" : deal.status === "assigned" ? "bg-blue-50 text-blue-600 border border-blue-200" : "bg-emerald-50 text-emerald-600 border border-emerald-200"}`}>
+                              {deal.status.charAt(0).toUpperCase() + deal.status.slice(1)}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                            {[["Capital Type", deal.capitalType], ["Assets", `${deal.assets.length} asset${deal.assets.length > 1 ? "s" : ""}`], ["Loan Amount", deal.assets[0]?.loanAmount || "—"], ["Asset Type", deal.assets[0]?.assetType || "—"]].map(([label, val]) => (
+                              <div key={String(label)} className="rounded-lg bg-white border border-gray-200 p-3">
+                                <div className="text-xs text-gray-400 mb-1">{label}</div>
+                                <div className="text-sm font-bold text-[#0a1f44]">{val}</div>
+                              </div>
+                            ))}
+                          </div>
+                          {deal.assets.map((asset, idx) => asset.address?.city ? (
+                            <div key={idx} className="text-xs text-gray-500 mt-1">Asset {idx + 1}: {asset.address.street ? `${asset.address.street}, ` : ""}{asset.address.city}, {asset.address.state} {asset.address.zip}</div>
+                          ) : null)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {activeTab === "uploads" && (
                 <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
                   <div className={cardClass + " p-6"}>
@@ -1280,10 +1377,15 @@ function AdminPortal({ session, onLogout }: { session: AuthSession; onLogout: ()
 
 export default function Home() {
   const [session, setSession] = useState<AuthSession>(null);
+  const [submittedDeals, setSubmittedDeals] = useState<SubmittedDeal[]>([]);
+  const [users, setUsers] = useState<AppUser[]>(initialUsers);
+
+  function handleSubmitDeal(deal: SubmittedDeal) { setSubmittedDeals((prev) => [...prev, deal]); }
+  function handleLogout() { setSession(null); }
 
   if (!session) return <LoginWall onLogin={setSession} />;
   if (session.user.role === "capital-seeker") {
-    return <CapitalSeekerPortal lenderRecords={seedLenders} onLogout={() => setSession(null)} />;
+    return <CapitalSeekerPortal lenderRecords={seedLenders} onLogout={handleLogout} onSubmitDeal={handleSubmitDeal} session={session} />;
   }
-  return <AdminPortal session={session} onLogout={() => setSession(null)} />;
+  return <AdminPortal session={session} onLogout={handleLogout} submittedDeals={submittedDeals} users={users} setUsers={setUsers} />;
 }
