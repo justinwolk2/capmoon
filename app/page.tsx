@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart3, Building2, FileSpreadsheet, Filter, Gauge, Landmark, Plus, Search, ShieldCheck, Upload, Users } from "lucide-react";
+import { BarChart3, Building2, FileSpreadsheet, Filter, Gauge, Landmark, Plus, Search, ShieldCheck, Upload, Users, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 type LenderRecord = {
@@ -29,22 +29,36 @@ type LenderRecord = {
   recourse: string;
 };
 
+type RetailUnit = {
+  id: number;
+  tenant: string;
+  rent: string;
+  sqft: string;
+};
+
 const seedLenders: LenderRecord[] = [
-  { id: 1, source: "Spreadsheet", spreadsheetRow: "A2", program: "Bridge Lending Program", lender: "Apex Credit Partners", type: "Senior", minLoan: "$3,000,000", maxLoan: "$35,000,000", maxLtv: "75%", minDscr: "1.20x", states: ["FL", "GA", "TX"], assets: ["Apartments", "MIXEDUSE", "Retail-MT"], status: "Active", email: "originations@apexcp.com", phone: "(305) 555-0101", recourse: "FULL" },
+  { id: 1, source: "Spreadsheet", spreadsheetRow: "A2", program: "Bridge Lending Program", lender: "Apex Credit Partners", type: "Senior", minLoan: "$3,000,000", maxLoan: "$35,000,000", maxLtv: "75%", minDscr: "1.20x", states: ["FL", "GA", "TX"], assets: ["Apartments", "Mixed Use", "Retail - Multi Tenant"], status: "Active", email: "originations@apexcp.com", phone: "(305) 555-0101", recourse: "FULL" },
   { id: 2, source: "Spreadsheet", spreadsheetRow: "A3", program: "Transitional CRE", lender: "Harborline Capital", type: "Mezzanine", minLoan: "$10,000,000", maxLoan: "$80,000,000", maxLtv: "80%", minDscr: "1.05x", states: ["NY", "FL", "NJ", "IL"], assets: ["Office", "Hotel/Hospitality", "Self-storage"], status: "Active", email: "deals@harborline.com", phone: "(212) 555-0142", recourse: "NON RECOURSE" },
   { id: 3, source: "Spreadsheet", spreadsheetRow: "A4", program: "Value-Add Multifamily", lender: "Northgate Real Estate Credit", type: "Preferred Equity", minLoan: "$5,000,000", maxLoan: "$50,000,000", maxLtv: "85%", minDscr: "1.10x", states: ["FL", "NC", "SC", "TN"], assets: ["Apartments", "Student Housing", "SFR Portfolio"], status: "Review", email: "placements@northgatecredit.com", phone: "(704) 555-0198", recourse: "SELECTIVE" },
   { id: 4, source: "Spreadsheet", spreadsheetRow: "A5", program: "Construction Capital", lender: "BlueRidge Finance", type: "JV Equity", minLoan: "$15,000,000", maxLoan: "$125,000,000", maxLtv: "70%", minDscr: "N/A", states: ["FL", "TX", "AZ", "NV"], assets: ["Land", "Condos", "Other"], status: "Active", email: "capitalmarkets@blueridgefin.com", phone: "(214) 555-0117", recourse: "" },
-  { id: 5, source: "Spreadsheet", spreadsheetRow: "A6", program: "Sponsor Credit Facility", lender: "Summit Specialty Lending", type: "Line of Credit", minLoan: "$2,000,000", maxLoan: "$20,000,000", maxLtv: "65%", minDscr: "1.25x", states: ["Nationwide"], assets: ["MIXEDUSE", "Retail-MT", "Lt Industrial"], status: "Inactive", email: "sponsors@summitsl.com", phone: "(615) 555-0133", recourse: "CASE BY CASE" },
+  { id: 5, source: "Spreadsheet", spreadsheetRow: "A6", program: "Sponsor Credit Facility", lender: "Summit Specialty Lending", type: "Line of Credit", minLoan: "$2,000,000", maxLoan: "$20,000,000", maxLtv: "65%", minDscr: "1.25x", states: ["Nationwide"], assets: ["Mixed Use", "Retail - Multi Tenant", "Lt Industrial"], status: "Inactive", email: "sponsors@summitsl.com", phone: "(615) 555-0133", recourse: "CASE BY CASE" },
 ];
 
-const assetTypes = ["Equipment, Autos, or Other Non Real Estate Products", "Apartments", "Condos", "Senior Housing", "Student Housing", "Gaming", "Assisted Living", "Education Related", "SFR Portfolio", "Mobile Home Park", "Co-living", "Office", "Medical Office", "Manufacturing", "MIXEDUSE", "Lt Industrial", "Cannabis", "Retail-MT", "Retail- ST", "Hotel/Hospitality", "Loan sales", "Land", "Self-storage", "Religious", "Hospital/Health Care", "Distressed Debt", "Other"];
-const capitalTypes = ["Senior", "Mezzanine", "Preferred Equity", "JV Equity", "Line of Credit", "Note on Note"];
+const assetTypes = [
+  "Equipment, Autos, or Other Non Real Estate Products",
+  "Apartments", "Condos", "Senior Housing", "Student Housing", "Gaming", "Assisted Living", "Education Related", "SFR Portfolio", "Mobile Home Park", "Co-living", "Office", "Medical Office", "Manufacturing", "Mixed Use", "Lt Industrial", "Cannabis", "Retail - Multi Tenant", "Retail - Single Tenant", "Hotel/Hospitality", "Land", "Self-storage", "Religious", "Hospital/Health Care", "Distressed Debt", "Other",
+];
+
+const capitalTypes = ["Senior", "Mezzanine", "Preferred Equity", "JV Equity", "Line of Credit", "Note on Note", "Loan Sales"];
 const dealTypes = ["Construction", "Value add", "New Development", "Bridge", "Takeout", "Investment", "C&I"];
 const ownershipStatuses = ["Acquisition", "Refinance"];
 const refinanceTypes = ["Cash Out to Borrower", "Cash Out-Value Add", "Rate and Term"];
 const recourseOptions = ["FULL", "NON RECOURSE", "CASE BY CASE"];
 const marketOptions = ["US", "INTERNATIONAL"];
 const allStates = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
+
+const unitAssets = ["Apartments", "Condos", "Hotel/Hospitality", "Gaming"];
+const retailAssets = ["Retail - Multi Tenant", "Retail - Single Tenant"];
 
 function normalizeRecourse(value: string) { return value === "SELECTIVE" || !value ? "CASE BY CASE" : value; }
 function parseCurrency(value: string) { return Number(String(value || "0").replace(/[^0-9.]/g, "")); }
@@ -103,6 +117,8 @@ export default function Home() {
   const [selectedCapitalFilter, setSelectedCapitalFilter] = useState("All");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState("All");
   const [editingLenderId, setEditingLenderId] = useState<number | null>(null);
+
+  // Deal matcher state
   const [capitalType, setCapitalType] = useState("Senior");
   const [loanAmount, setLoanAmount] = useState("$25,000,000");
   const [seniorLoanAmount, setSeniorLoanAmount] = useState("$20,000,000");
@@ -128,11 +144,21 @@ export default function Home() {
   const [recourseType, setRecourseType] = useState("CASE BY CASE");
   const [marketScope, setMarketScope] = useState("US");
 
+  // Asset-specific fields
+  const [numUnits, setNumUnits] = useState("");
+  const [numBuildings, setNumBuildings] = useState("");
+  const [numAcres, setNumAcres] = useState("");
+  const [retailUnits, setRetailUnits] = useState<RetailUnit[]>([{ id: 1, tenant: "", rent: "", sqft: "" }]);
+  const [tenantDatabase, setTenantDatabase] = useState<string[]>([]);
+
   const isRefinance = ownershipStatus === "Refinance";
   const isAcquisition = ownershipStatus === "Acquisition";
   const isConstruction = dealType === "Construction";
   const isAcquisitionNonConstruction = isAcquisition && !isConstruction;
   const isSubordinateCapital = ["Mezzanine", "Preferred Equity", "JV Equity"].includes(capitalType);
+  const showUnitFields = unitAssets.includes(assetType);
+  const showRetailFields = retailAssets.includes(assetType);
+  const showAcresField = assetType === "Land";
 
   const projectEstimatedCostsTotal = parseCurrency(landCost) + parseCurrency(softCosts) + parseCurrency(originationClosingCosts) + parseCurrency(hardCosts) + parseCurrency(carryingCosts);
   const acquisitionConstructionLoanAmount = Math.max(0, projectEstimatedCostsTotal - parseCurrency(borrowerEquity));
@@ -142,19 +168,12 @@ export default function Home() {
   const purchasePriceNumeric = parseCurrency(purchasePrice);
   const currentLoanNumeric = parseCurrency(currentLoanAmount);
   const newLoanNumeric = parseCurrency(loanAmount);
-
   const totalCapitalNumeric = isSubordinateCapital ? seniorAmountNumeric + effectiveAmount : effectiveAmount;
-
-  // Senior LTV = loan amount / property value
   const seniorLtv = propertyValueNumeric > 0 ? (newLoanNumeric / propertyValueNumeric) * 100 : 0;
   const autoLtv = propertyValueNumeric > 0 ? (totalCapitalNumeric / propertyValueNumeric) * 100 : 0;
   const currentLtv = ltvMode === "MANUAL" ? Number(manualLtv || 0) : autoLtv;
   const equityPercent = propertyValueNumeric > 0 ? (parseCurrency(borrowerEquity) / propertyValueNumeric) * 100 : 0;
-
-  // Cash out = new loan - current loan (only positive values)
   const cashOut = Math.max(0, newLoanNumeric - currentLoanNumeric);
-
-  // Senior LTC = loan amount / purchase price
   const seniorLtc = purchasePriceNumeric > 0 ? (newLoanNumeric / purchasePriceNumeric) * 100 : 0;
 
   const filtered = useMemo(() => {
@@ -202,12 +221,20 @@ export default function Home() {
     setLenderRecords((prev) => prev.map((l) => (l.id !== id ? l : { ...l, status: l.status === "Inactive" ? "Active" : "Inactive" })));
   }
 
-  const inputClass = "bg-white border-gray-300 text-gray-800 placeholder:text-gray-400 rounded-xl focus:border-[#0a1f44] focus:ring-0";
-  const selectTriggerClass = "bg-white border-gray-300 text-gray-800 rounded-xl focus:border-[#0a1f44]";
-  const cardClass = "rounded-2xl border border-gray-200 bg-white shadow-sm";
+  function addRetailUnit() {
+    setRetailUnits((prev) => [...prev, { id: prev.length + 1, tenant: "", rent: "", sqft: "" }]);
+  }
+  function removeRetailUnit(id: number) {
+    setRetailUnits((prev) => prev.filter((u) => u.id !== id));
+  }
+  function updateRetailUnit(id: number, field: keyof RetailUnit, value: string) {
+    setRetailUnits((prev) => prev.map((u) => u.id === id ? { ...u, [field]: value } : u));
+    if (field === "tenant" && value.trim().length > 2) {
+      setTenantDatabase((prev) => prev.includes(value.trim()) ? prev : [...prev, value.trim()]);
+    }
+  }
 
-  // Build metric boxes dynamically based on scenario
-  const metricBoxes = () => {
+  const metricBoxes = (): [string, string][] => {
     const boxes: [string, string][] = [];
     boxes.push(["Senior LTV", formatPercent(seniorLtv)]);
     if (isAcquisitionNonConstruction && purchasePriceNumeric > 0) {
@@ -216,14 +243,18 @@ export default function Home() {
     if (isRefinance) {
       boxes.push(["Cash Out", formatCurrencyInput(String(cashOut))]);
     }
-boxes.push([
-  isSubordinateCapital ? "Subordinated LTV - Last Dollar" : "Last $ LTV",
-  isSubordinateCapital ? formatPercent(autoLtv) : "N/A"
-]);
+    boxes.push([
+      isSubordinateCapital ? "Subordinated LTV - Last Dollar" : "Last $ LTV",
+      isSubordinateCapital ? formatPercent(autoLtv) : "N/A"
+    ]);
     boxes.push(["Total Capital", formatCurrencyInput(String(totalCapitalNumeric || 0))]);
     boxes.push(["Equity %", formatPercent(equityPercent)]);
     return boxes;
   };
+
+  const inputClass = "bg-white border-gray-300 text-gray-800 placeholder:text-gray-400 rounded-xl focus:border-[#0a1f44] focus:ring-0";
+  const selectTriggerClass = "bg-white border-gray-300 text-gray-800 rounded-xl focus:border-[#0a1f44]";
+  const cardClass = "rounded-2xl border border-gray-200 bg-white shadow-sm";
 
   return (
     <>
@@ -296,7 +327,7 @@ boxes.push([
                 <StatCard title="Total Lenders" value={String(lenderRecords.length)} detail="Spreadsheet + dashboard records" icon={Building2} />
                 <StatCard title="Spreadsheet" value={String(spreadsheetCount)} detail="Imported criteria rows" icon={FileSpreadsheet} />
                 <StatCard title="Dashboard Added" value={String(dashboardCount)} detail="Created manually" icon={Users} />
-                <StatCard title="Capital Types" value="6" detail="Senior · Mezz · Pref · JV · LOC · Note" icon={BarChart3} />
+                <StatCard title="Capital Types" value={String(capitalTypes.length)} detail="Senior · Mezz · Pref · JV · LOC · Note" icon={BarChart3} />
               </div>
 
               {/* Overview Tab */}
@@ -492,7 +523,61 @@ boxes.push([
                         <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Refinance Type</label><Select value={refinanceType} onValueChange={setRefinanceType}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{refinanceTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
                       )}
 
-                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Asset Type</label><Select value={assetType} onValueChange={setAssetType}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{assetTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
+                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Asset Type</label><Select value={assetType} onValueChange={(v) => { setAssetType(v); setRetailUnits([{ id: 1, tenant: "", rent: "", sqft: "" }]); }}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{assetTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
+
+                      {/* Unit fields for Apartments, Condos, Hotels, Gaming */}
+                      {showUnitFields && (
+                        <>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Units</label><Input value={numUnits} onChange={(e) => setNumUnits(e.target.value)} placeholder="e.g. 120" className={inputClass} /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Buildings</label><Input value={numBuildings} onChange={(e) => setNumBuildings(e.target.value)} placeholder="e.g. 4" className={inputClass} /></div>
+                        </>
+                      )}
+
+                      {/* Acres field for Land */}
+                      {showAcresField && (
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Acres</label><Input value={numAcres} onChange={(e) => setNumAcres(e.target.value)} placeholder="e.g. 12.5" className={inputClass} /></div>
+                      )}
+
+                      {/* Retail unit breakdown */}
+                      {showRetailFields && (
+                        <div className="md:col-span-2">
+                          <div className="flex items-center justify-between mb-3">
+                            <label className="text-xs text-gray-500 font-bold uppercase tracking-wide">Retail Units</label>
+                            <button onClick={addRetailUnit} className="flex items-center gap-1 px-3 py-1 text-xs bg-[#0a1f44] text-white rounded-lg hover:bg-[#0a1f44]/80 transition-all"><Plus className="h-3 w-3" /> Add Unit</button>
+                          </div>
+                          <div className="space-y-3">
+                            {retailUnits.map((unit, idx) => (
+                              <div key={unit.id} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs font-bold text-[#0a1f44]">Unit {idx + 1}</span>
+                                  {retailUnits.length > 1 && <button onClick={() => removeRetailUnit(unit.id)} className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>}
+                                </div>
+                                <div className="grid gap-2 md:grid-cols-3">
+                                  <div>
+                                    <label className="text-xs text-gray-400 mb-1 block">Tenant Name</label>
+                                    <input list={`tenants-${unit.id}`} value={unit.tenant} onChange={(e) => updateRetailUnit(unit.id, "tenant", e.target.value)} placeholder="Tenant name" className="w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#0a1f44]" />
+                                    <datalist id={`tenants-${unit.id}`}>{tenantDatabase.map((t) => <option key={t} value={t} />)}</datalist>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-gray-400 mb-1 block">Monthly Rent</label>
+                                    <Input value={unit.rent} onChange={(e) => updateRetailUnit(unit.id, "rent", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-gray-400 mb-1 block">Square Footage</label>
+                                    <Input value={unit.sqft} onChange={(e) => updateRetailUnit(unit.id, "sqft", e.target.value)} placeholder="e.g. 2,400" className={inputClass} />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {tenantDatabase.length > 0 && (
+                            <div className="mt-2 rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-3">
+                              <div className="text-xs font-bold text-[#0a1f44] mb-1">Saved Tenants</div>
+                              <div className="flex flex-wrap gap-1">{tenantDatabase.map((t) => <span key={t} className="px-2 py-0.5 text-xs bg-white border border-gray-200 rounded-full text-gray-600">{t}</span>)}</div>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Refinance: Current Loan Amount */}
                       {isRefinance && (
@@ -516,12 +601,10 @@ boxes.push([
                         </div>
                       )}
 
-                      {/* Loan amount field */}
+                      {/* Loan amount */}
                       {!isSubordinateCapital && !(isConstruction && isAcquisition) && (
                         <div className="md:col-span-2">
-                          <label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">
-                            {isRefinance ? "New Loan Amount" : "Loan Amount"}
-                          </label>
+                          <label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">{isRefinance ? "New Loan Amount" : "Loan Amount"}</label>
                           <Input value={loanAmount} onChange={(e) => setLoanAmount(formatCurrencyInput(e.target.value))} className={inputClass} />
                         </div>
                       )}
@@ -554,8 +637,8 @@ boxes.push([
                       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">DSCR</label><Input value={dscr} onChange={(e) => setDscr(e.target.value)} className={inputClass} /></div>
                       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label><Select value={recourseType} onValueChange={setRecourseType}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
 
-                      {/* Dynamic metric boxes */}
-                      <div className={`md:col-span-2 grid gap-3`} style={{ gridTemplateColumns: `repeat(${Math.min(metricBoxes().length, 4)}, 1fr)` }}>
+                      {/* Metric boxes */}
+                      <div className="md:col-span-2 grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(metricBoxes().length, 4)}, 1fr)` }}>
                         {metricBoxes().map(([label, val]) => (
                           <div key={label} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
                             <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">{label}</div>
