@@ -1959,153 +1959,148 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                   <div className="flex flex-wrap gap-2 mb-4">{[`Spreadsheet: ${spreadsheetCount}`, `Dashboard: ${dashboardCount}`, `Showing: ${filteredLenders.length}`].map((t) => (<span key={t} className="px-3 py-1 rounded-full text-xs border border-[#c9a84c]/30 text-[#c9a84c] font-bold">{t}</span>))}</div>
                   <div className="overflow-hidden rounded-xl border border-gray-200">
                     <Table>
-                      <TableHeader><TableRow className="border-gray-200 bg-gray-50 hover:bg-gray-50">{["Source","Row","Lender","Program","Capital","Contact","Phone","Status",""].map((h) => <TableHead key={h} className="text-xs uppercase tracking-[0.15em] text-[#0a1f44] font-bold">{h}</TableHead>)}</TableRow></TableHeader>
+                      <TableHeader>
+                        <TableRow className="border-gray-200 bg-gray-50 hover:bg-gray-50">
+                          <TableHead className="text-xs uppercase tracking-[0.15em] text-[#0a1f44] font-bold">Lender</TableHead>
+                          <TableHead className="text-xs uppercase tracking-[0.15em] text-[#0a1f44] font-bold">Program</TableHead>
+                          <TableHead className="text-xs uppercase tracking-[0.15em] text-[#0a1f44] font-bold">Status</TableHead>
+                          <TableHead className="text-xs uppercase tracking-[0.15em] text-[#0a1f44] font-bold text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
                       <TableBody>
                         {filteredLenders.map((item) => (
-                          <TableRow key={item.id} className="border-gray-100 hover:bg-gray-50">
-                            <TableCell><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${item.source === "Spreadsheet" ? "bg-gray-100 text-gray-600 border border-gray-200" : "bg-emerald-50 text-emerald-600 border border-emerald-200"}`}>{item.source}</span></TableCell>
-                            <TableCell className="text-gray-400 text-xs">{item.spreadsheetRow}</TableCell>
-                            <TableCell><button onClick={() => setViewingLenderId(item.id === viewingLenderId ? null : item.id)} className="font-semibold text-[#0a1f44] text-sm hover:text-[#c9a84c] hover:underline transition-colors text-left">{item.lender}</button></TableCell>
-                            <TableCell className="text-gray-600 text-xs">{item.program}</TableCell>
-                            <TableCell className="text-gray-600 text-xs">{item.type}</TableCell>
-                            <TableCell className="text-gray-400 text-xs">{item.contactPerson || "—"}</TableCell>
-                            <TableCell className="text-gray-400 text-xs">{item.phone || "—"}</TableCell>
-                            <TableCell><span className="px-2 py-0.5 rounded-full text-xs border border-gray-200 text-gray-500">{item.status}</span></TableCell>
-                            <TableCell className="text-right"><button onClick={() => { setEditingLenderId(item.id === editingLenderId ? null : item.id); setViewingLenderId(null); }} className="px-3 py-1 text-xs border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/10 font-medium">{item.id === editingLenderId ? "Close" : "Edit"}</button></TableCell>
-                          </TableRow>
+                          <React.Fragment key={item.id}>
+                            <TableRow className={`border-gray-100 ${viewingLenderId === item.id || editingLenderId === item.id ? "bg-[#0a1f44]/5 border-l-2 border-l-[#c9a84c]" : "hover:bg-gray-50"}`}>
+                              <TableCell>
+                                <button onClick={() => { setViewingLenderId(viewingLenderId === item.id ? null : item.id); setEditingLenderId(null); }} className="font-semibold text-[#0a1f44] text-sm hover:text-[#c9a84c] transition-colors text-left flex items-center gap-1.5">
+                                  <ChevronRight className={`h-3.5 w-3.5 text-gray-400 transition-transform flex-shrink-0 ${viewingLenderId === item.id ? "rotate-90 text-[#c9a84c]" : ""}`} />
+                                  {item.lender}
+                                </button>
+                                <div className="text-xs text-gray-400 mt-0.5 ml-5">{item.type} · {item.minLoan} – {item.maxLoan}</div>
+                              </TableCell>
+                              <TableCell className="text-gray-500 text-xs">{item.program}</TableCell>
+                              <TableCell>
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${item.status === "Active" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : item.status === "Inactive" ? "bg-gray-100 text-gray-500 border-gray-200" : "bg-amber-50 text-amber-600 border-amber-200"}`}>{item.status}</span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <button onClick={() => { setEditingLenderId(editingLenderId === item.id ? null : item.id); setViewingLenderId(null); }} className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${editingLenderId === item.id ? "bg-[#c9a84c]/20 text-[#0a1f44] border-[#c9a84c]/30" : "border-[#0a1f44]/20 text-[#0a1f44] hover:bg-[#0a1f44]/10"}`}>
+                                  {editingLenderId === item.id ? "Close" : "Edit"}
+                                </button>
+                              </TableCell>
+                            </TableRow>
+
+                            {/* Profile view */}
+                            {viewingLenderId === item.id && (
+                              <TableRow className="border-0">
+                                <TableCell colSpan={4} className="p-0">
+                                  <div className="border-t border-[#0a1f44]/10 bg-white p-5">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                                      {[["Capital Type", item.type], ["Min Loan", item.minLoan || "—"], ["Max Loan", item.maxLoan || "—"], ["Max LTV", item.maxLtv || "—"], ["Recourse", item.recourse || "—"], ["Contact", item.contactPerson || "—"], ["Email", item.email || "—"], ["Phone", item.phone || "—"]].map(([label, val]) => (
+                                        <div key={String(label)} className="rounded-lg bg-gray-50 border border-gray-100 p-2.5">
+                                          <div className="text-xs text-[#c9a84c] font-bold uppercase tracking-wide mb-0.5">{label}</div>
+                                          <div className="text-xs font-semibold text-[#0a1f44] break-all">{val}</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    {item.assets && item.assets.length > 0 && (<div className="mb-3"><div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-1.5">Property Types</div><div className="flex flex-wrap gap-1.5">{item.assets.map((t) => <span key={t} className="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600 border border-gray-200">{t}</span>)}</div></div>)}
+                                    {item.typeOfLoans && item.typeOfLoans.length > 0 && (<div className="mb-3"><div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-1.5">Loan Types</div><div className="flex flex-wrap gap-1.5">{item.typeOfLoans.map((t) => <span key={t} className="px-2 py-0.5 rounded-full text-xs border border-[#0a1f44]/20 text-[#0a1f44]">{t}</span>)}</div></div>)}
+                                    {item.states && item.states.length > 0 && (<div className="mb-3"><div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-1.5">States ({item.states.length})</div><div className="flex flex-wrap gap-1">{item.states.includes("Nationwide") ? <span className="px-2 py-0.5 rounded-full text-xs bg-[#0a1f44] text-white">Nationwide</span> : item.states.map((s) => <span key={s} className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600 border border-gray-200">{s}</span>)}</div></div>)}
+                                    {item.loanTerms && <div className="mb-3"><div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-1">Loan Terms</div><div className="text-xs text-gray-600">{item.loanTerms}</div></div>}
+                                    {item.notes && (<div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2"><div className="text-xs font-bold text-amber-700 mb-0.5">Notes</div><div className="text-xs text-gray-700 whitespace-pre-wrap">{item.notes}</div></div>)}
+                                    <div className="mt-4 flex gap-2">
+                                      <button onClick={() => { setEditingLenderId(item.id); setViewingLenderId(null); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#0a1f44] text-white rounded-lg hover:bg-[#0a1f44]/80"><Edit2 className="h-3 w-3" /> Edit Lender</button>
+                                      <button onClick={() => toggleLenderStatus(item.id)} className="px-3 py-1.5 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50">{item.status === "Inactive" ? "Activate" : "Deactivate"}</button>
+                                      <button onClick={() => setViewingLenderId(null)} className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-600">Close ✕</button>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+
+                            {/* Inline edit form */}
+                            {editingLenderId === item.id && (
+                              <TableRow className="border-0">
+                                <TableCell colSpan={4} className="p-0">
+                                  <div className="border-t border-[#0a1f44]/20 bg-gray-50 p-6">
+                                    <div className="flex items-center justify-between mb-5">
+                                      <div><div className="text-xs uppercase tracking-[0.2em] text-[#c9a84c] font-bold mb-1">Editing</div><div className="text-lg font-bold text-[#0a1f44]">{item.lender}</div></div>
+                                      <div className="flex gap-2">
+                                        <button onClick={() => setEditingLenderId(null)} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Done</button>
+                                        <button onClick={() => toggleLenderStatus(item.id)} className="px-3 py-2 text-xs border border-gray-200 text-gray-500 rounded-xl hover:bg-white">{item.status === "Inactive" ? "Activate" : "Deactivate"}</button>
+                                        <button onClick={() => handleDeleteLender(item.id)} className="flex items-center gap-1 px-3 py-2 text-xs text-red-500 border border-red-200 rounded-xl hover:bg-red-50"><Trash2 className="h-3 w-3" />{isAdmin ? " Delete" : " Request"}</button>
+                                      </div>
+                                    </div>
+                                    <div className="space-y-5">
+                                      <div className="grid gap-3 md:grid-cols-3">
+                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Lender Name</label><Input value={item.lender} onChange={(e) => updateLenderField(item.id, "lender", e.target.value)} className={inputClass} /></div>
+                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Contact Person</label><Input value={item.contactPerson || ""} onChange={(e) => updateLenderField(item.id, "contactPerson", e.target.value)} className={inputClass} /></div>
+                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Email</label><Input value={item.email || ""} onChange={(e) => updateLenderField(item.id, "email", e.target.value)} className={inputClass} /></div>
+                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Phone</label><Input value={item.phone || ""} onChange={(e) => updateLenderField(item.id, "phone", e.target.value)} className={inputClass} /></div>
+                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Website</label><Input value={item.website || ""} onChange={(e) => updateLenderField(item.id, "website", e.target.value)} className={inputClass} /></div>
+                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Status</label><Select value={item.status} onValueChange={(v) => updateLenderField(item.id, "status", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent></Select></div>
+                                      </div>
+                                      <div className="grid gap-3 md:grid-cols-3">
+                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Min Loan</label><Input value={item.minLoan || ""} onChange={(e) => updateLenderField(item.id, "minLoan", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
+                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max Loan</label><Input value={item.maxLoan || ""} onChange={(e) => updateLenderField(item.id, "maxLoan", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
+                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max LTV</label><Input value={item.maxLtv || ""} onChange={(e) => updateLenderField(item.id, "maxLtv", e.target.value)} className={inputClass} /></div>
+                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Recourse</label><Select value={item.recourse || "CASE BY CASE"} onValueChange={(v) => updateLenderField(item.id, "recourse", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+                                        {item.type === "C&I" ? (
+                                          <>
+                                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Property Types</label><Input value={item.assets?.join(", ") || ""} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, assets: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } : l))} className={inputClass} /></div>
+                                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Loan Terms</label><Input value={item.loanTerms || ""} onChange={(e) => updateLenderField(item.id, "loanTerms", e.target.value)} className={inputClass} /></div>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <DropdownCheckbox label="Property Types" options={lenderPropertyTypeOptions} selected={item.assets || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, assets: v } : l))} />
+                                            <DropdownCheckbox label="Loan Terms" options={loanTermOptions} selected={item.loanTerms ? item.loanTerms.split(",").map(s => s.trim()).filter(Boolean) : []} onChange={(v) => updateLenderField(item.id, "loanTerms", v.join(", "))} />
+                                          </>
+                                        )}
+                                      </div>
+                                      <CheckboxGroup label="Type of Lender" options={typeOfLenderOptions} selected={item.typeOfLenders || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, typeOfLenders: v } : l))} />
+                                      <CheckboxGroup label="Type of Loans" options={typeOfLoanOptions} selected={item.typeOfLoans || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, typeOfLoans: v } : l))} />
+                                      <CheckboxGroup label="Program" options={programTypeOptions} selected={item.programTypes || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, programTypes: v } : l))} />
+                                      <StateSelector label="Target States" selected={item.states || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, states: v } : l))} />
+                                      <StateSelector label="Sponsor States" selected={item.sponsorStates || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, sponsorStates: v } : l))} />
+                                      <div>
+                                        <div className="flex items-center justify-between mb-3">
+                                          <label className="text-xs text-gray-500 font-bold uppercase tracking-wide">Additional Contacts</label>
+                                          <button onClick={() => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, contacts: [...(l.contacts || []), { id: Date.now(), name: "", phone: "", email: "", region: "" }] } : l))} className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-[#0a1f44] text-white rounded-lg hover:bg-[#0a1f44]/80"><Plus className="h-3 w-3" /> Add Contact</button>
+                                        </div>
+                                        {(!item.contacts || item.contacts.length === 0) ? (
+                                          <div className="rounded-xl border border-dashed border-gray-300 bg-white p-4 text-center text-xs text-gray-400">No additional contacts yet.</div>
+                                        ) : (
+                                          <div className="space-y-3">
+                                            {item.contacts.map((contact, cidx) => (
+                                              <div key={contact.id} className="rounded-xl border border-gray-200 bg-white p-4">
+                                                <div className="flex items-center justify-between mb-3"><span className="text-xs font-bold text-[#0a1f44]">Contact {cidx + 1}</span><button onClick={() => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, contacts: (l.contacts || []).filter((c) => c.id !== contact.id) } : l))} className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button></div>
+                                                <div className="grid gap-2 md:grid-cols-2">
+                                                  <div><label className="text-xs text-gray-400 mb-1 block">Name</label><Input value={contact.name} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, name: e.target.value } : c) } : l))} className={inputClass} /></div>
+                                                  <div><label className="text-xs text-gray-400 mb-1 block">Phone</label><Input value={contact.phone} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, phone: e.target.value } : c) } : l))} className={inputClass} /></div>
+                                                  <div><label className="text-xs text-gray-400 mb-1 block">Email</label><Input value={contact.email} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, email: e.target.value } : c) } : l))} className={inputClass} /></div>
+                                                  <div><label className="text-xs text-gray-400 mb-1 block">Region</label><Input value={contact.region} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, region: e.target.value } : c) } : l))} className={inputClass} /></div>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase tracking-wide">Notes</label>
+                                        <textarea value={item.notes || ""} onChange={(e) => updateLenderField(item.id, "notes", e.target.value)} placeholder="Add any notes about this lender..." rows={3} className="w-full px-4 py-3 text-sm bg-white border border-gray-300 rounded-xl text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#0a1f44] resize-none" />
+                                      </div>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
                         ))}
                       </TableBody>
                     </Table>
                   </div>
-
-                  {/* Profile View */}
-                  {viewingLenderId && (() => {
-                    const lender = lenderRecords.find((l) => l.id === viewingLenderId);
-                    if (!lender) return null;
-                    return (
-                      <div className="mt-6 rounded-xl border border-[#c9a84c]/20 bg-white shadow-sm overflow-hidden">
-                        <div className="bg-[#0a1f44] px-6 py-5 flex items-start justify-between">
-                          <div>
-                            <div className="text-xs uppercase tracking-[0.25em] text-[#c9a84c] font-bold mb-1">Lender Profile</div>
-                            <div className="font-display text-2xl font-bold text-white">{lender.lender}</div>
-                            <div className="text-sm text-gray-300 mt-1">{lender.program}</div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${lender.status === "Active" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-gray-500/20 text-gray-300 border border-gray-500/30"}`}>{lender.status}</span>
-                            <button onClick={() => setViewingLenderId(null)} className="text-gray-400 hover:text-white text-lg font-bold">✕</button>
-                          </div>
-                        </div>
-                        <div className="p-6 space-y-6">
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {[["Capital Type", lender.type], ["Min Loan", lender.minLoan], ["Max Loan", lender.maxLoan], ["Max LTV", lender.maxLtv], ["Recourse", lender.recourse || "—"], ["Source", lender.source], ["Row", lender.spreadsheetRow], ["Loan Terms", lender.loanTerms || "—"]].map(([label, val]) => (
-                              <div key={String(label)} className="rounded-xl bg-gray-50 border border-gray-100 p-3"><div className="text-xs uppercase tracking-[0.12em] text-[#c9a84c] font-bold mb-1">{label}</div><div className="text-sm font-semibold text-[#0a1f44]">{val}</div></div>
-                            ))}
-                          </div>
-                          <div>
-                            <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-3">Primary Contact</div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                              {[["Name", lender.contactPerson || "—"], ["Email", lender.email || "—"], ["Phone", lender.phone || "—"], ["Website", lender.website || "—"]].map(([label, val]) => (
-                                <div key={String(label)} className="rounded-xl bg-gray-50 border border-gray-100 p-3"><div className="text-xs text-gray-400 mb-1">{label}</div><div className="text-sm font-medium text-[#0a1f44] break-all">{val}</div></div>
-                              ))}
-                            </div>
-                          </div>
-                          {lender.contacts && lender.contacts.length > 0 && (<div><div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-3">Additional Contacts</div><div className="grid gap-3 md:grid-cols-2">{lender.contacts.map((contact, idx) => (<div key={contact.id} className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4"><div className="text-xs font-bold text-[#0a1f44] mb-2">Contact {idx + 1}{contact.region ? ` — ${contact.region}` : ""}</div><div className="grid grid-cols-2 gap-2">{[["Name", contact.name || "—"], ["Phone", contact.phone || "—"], ["Email", contact.email || "—"], ["Region", contact.region || "—"]].map(([label, val]) => (<div key={String(label)}><div className="text-xs text-gray-400">{label}</div><div className="text-xs font-semibold text-[#0a1f44] break-all">{val}</div></div>))}</div></div>))}</div></div>)}
-                          {lender.typeOfLenders && lender.typeOfLenders.length > 0 && (<div><div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Type of Lender</div><div className="flex flex-wrap gap-2">{lender.typeOfLenders.map((t) => <span key={t} className="px-3 py-1 rounded-full text-xs bg-[#0a1f44] text-white font-medium">{t}</span>)}</div></div>)}
-                          {lender.typeOfLoans && lender.typeOfLoans.length > 0 && (<div><div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Type of Loans</div><div className="flex flex-wrap gap-2">{lender.typeOfLoans.map((t) => <span key={t} className="px-3 py-1 rounded-full text-xs border border-[#0a1f44]/20 text-[#0a1f44] font-medium">{t}</span>)}</div></div>)}
-                          {lender.programTypes && lender.programTypes.length > 0 && (<div><div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Program</div><div className="flex flex-wrap gap-2">{lender.programTypes.map((t) => <span key={t} className="px-3 py-1 rounded-full text-xs border border-[#c9a84c]/30 text-[#c9a84c] font-bold">{t}</span>)}</div></div>)}
-                          {lender.assets && lender.assets.length > 0 && (<div><div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Property Types</div><div className="flex flex-wrap gap-2">{lender.assets.map((t) => <span key={t} className="px-3 py-1 rounded-full text-xs bg-gray-100 text-gray-600 border border-gray-200">{t}</span>)}</div></div>)}
-                          {lender.states && lender.states.length > 0 && (<div><div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Target States ({lender.states.length})</div><div className="flex flex-wrap gap-1.5">{lender.states.includes("Nationwide") ? <span className="px-3 py-1 rounded-full text-xs bg-[#0a1f44] text-white font-medium">Nationwide</span> : lender.states.map((s) => <span key={s} className="px-2 py-0.5 rounded-md text-xs bg-gray-100 text-gray-600 border border-gray-200 font-medium">{s}</span>)}</div></div>)}
-                          {lender.sponsorStates && lender.sponsorStates.length > 0 && (<div><div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Sponsor States ({lender.sponsorStates.length})</div><div className="flex flex-wrap gap-1.5">{lender.sponsorStates.map((s) => <span key={s} className="px-2 py-0.5 rounded-md text-xs bg-gray-100 text-gray-600 border border-gray-200 font-medium">{s}</span>)}</div></div>)}
-                          {lender.notes && (<div><div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Notes</div><div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-gray-700 whitespace-pre-wrap">{lender.notes}</div></div>)}
-                          <div className="flex gap-3 pt-2 border-t border-gray-100">
-                            <button onClick={() => { setEditingLenderId(lender.id); setViewingLenderId(null); }} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80"><Edit2 className="h-3.5 w-3.5" /> Edit Lender</button>
-                            <button onClick={() => setViewingLenderId(null)} className="px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">Close</button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Edit Panel */}
-                  {editingLenderId && (() => {
-                    const lender = lenderRecords.find((l) => l.id === editingLenderId);
-                    if (!lender) return null;
-                    return (
-                      <div className="mt-6 rounded-xl border border-[#0a1f44]/20 bg-gray-50 p-6">
-                        <div className="flex items-center justify-between mb-5">
-                          <div><div className="text-xs uppercase tracking-[0.2em] text-[#c9a84c] font-bold mb-1">Editing</div><div className="text-lg font-bold text-[#0a1f44]">{lender.lender}</div></div>
-                          <button onClick={() => handleDeleteLender(lender.id)} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-500 border border-red-200 rounded-xl hover:bg-red-50">
-                            <Trash2 className="h-3.5 w-3.5" /> {isAdmin ? "Delete Lender" : "Request Deletion"}
-                          </button>
-                        </div>
-                        <div className="space-y-5">
-                          <div className="grid gap-3 md:grid-cols-3">
-                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Lender Name</label><Input value={lender.lender} onChange={(e) => updateLenderField(lender.id, "lender", e.target.value)} className={inputClass} /></div>
-                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Contact Person</label><Input value={lender.contactPerson || ""} onChange={(e) => updateLenderField(lender.id, "contactPerson", e.target.value)} className={inputClass} /></div>
-                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Email</label><Input value={lender.email || ""} onChange={(e) => updateLenderField(lender.id, "email", e.target.value)} className={inputClass} /></div>
-                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Phone</label><Input value={lender.phone || ""} onChange={(e) => updateLenderField(lender.id, "phone", e.target.value)} className={inputClass} /></div>
-                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Website</label><Input value={lender.website || ""} onChange={(e) => updateLenderField(lender.id, "website", e.target.value)} className={inputClass} /></div>
-                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Status</label><Select value={lender.status} onValueChange={(v) => updateLenderField(lender.id, "status", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent></Select></div>
-                          </div>
-                          <div className="grid gap-3 md:grid-cols-3">
-                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Min Loan</label><Input value={lender.minLoan || ""} onChange={(e) => updateLenderField(lender.id, "minLoan", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
-                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max Loan</label><Input value={lender.maxLoan || ""} onChange={(e) => updateLenderField(lender.id, "maxLoan", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
-                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max LTV</label><Input value={lender.maxLtv || ""} onChange={(e) => updateLenderField(lender.id, "maxLtv", e.target.value)} className={inputClass} /></div>
-                            {lender.type === "C&I" ? (
-                              <>
-                                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Property Types</label><Input value={lender.assets?.join(", ") || ""} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, assets: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } : l))} className={inputClass} /></div>
-                                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Loan Terms</label><Input value={lender.loanTerms || ""} onChange={(e) => updateLenderField(lender.id, "loanTerms", e.target.value)} className={inputClass} /></div>
-                              </>
-                            ) : (
-                              <>
-                                <DropdownCheckbox label="Property Types" options={lenderPropertyTypeOptions} selected={lender.assets || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, assets: v } : l))} />
-                                <DropdownCheckbox label="Loan Terms" options={loanTermOptions} selected={lender.loanTerms ? lender.loanTerms.split(",").map(s => s.trim()).filter(Boolean) : []} onChange={(v) => updateLenderField(lender.id, "loanTerms", v.join(", "))} />
-                              </>
-                            )}
-                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Recourse</label><Select value={lender.recourse || "CASE BY CASE"} onValueChange={(v) => updateLenderField(lender.id, "recourse", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
-                          </div>
-                          <CheckboxGroup label="Type of Lender" options={typeOfLenderOptions} selected={lender.typeOfLenders || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, typeOfLenders: v } : l))} />
-                          <CheckboxGroup label="Type of Loans" options={typeOfLoanOptions} selected={lender.typeOfLoans || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, typeOfLoans: v } : l))} />
-                          <CheckboxGroup label="Program" options={programTypeOptions} selected={lender.programTypes || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, programTypes: v } : l))} />
-                          <StateSelector label="Target States" selected={lender.states || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, states: v } : l))} />
-                          <StateSelector label="Sponsor States" selected={lender.sponsorStates || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, sponsorStates: v } : l))} />
-                          <div>
-                            <div className="flex items-center justify-between mb-3">
-                              <div><label className="text-xs text-gray-500 font-bold uppercase tracking-wide">Additional Contacts</label><p className="text-xs text-gray-400 mt-0.5">Add multiple contacts with geographic coverage</p></div>
-                              <button onClick={() => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: [...(l.contacts || []), { id: Date.now(), name: "", phone: "", email: "", region: "" }] } : l))} className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-[#0a1f44] text-white rounded-lg hover:bg-[#0a1f44]/80"><Plus className="h-3 w-3" /> Add Contact</button>
-                            </div>
-                            {(!lender.contacts || lender.contacts.length === 0) ? (
-                              <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4 text-center text-xs text-gray-400">No additional contacts yet.</div>
-                            ) : (
-                              <div className="space-y-3">
-                                {lender.contacts.map((contact, cidx) => (
-                                  <div key={contact.id} className="rounded-xl border border-gray-200 bg-white p-4">
-                                    <div className="flex items-center justify-between mb-3"><span className="text-xs font-bold text-[#0a1f44]">Contact {cidx + 1}</span><button onClick={() => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).filter((c) => c.id !== contact.id) } : l))} className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button></div>
-                                    <div className="grid gap-2 md:grid-cols-2">
-                                      <div><label className="text-xs text-gray-400 mb-1 block">Name</label><Input value={contact.name} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, name: e.target.value } : c) } : l))} placeholder="Full name" className={inputClass} /></div>
-                                      <div><label className="text-xs text-gray-400 mb-1 block">Phone</label><Input value={contact.phone} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, phone: e.target.value } : c) } : l))} placeholder="(555) 000-0000" className={inputClass} /></div>
-                                      <div><label className="text-xs text-gray-400 mb-1 block">Email</label><Input value={contact.email} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, email: e.target.value } : c) } : l))} placeholder="email@example.com" className={inputClass} /></div>
-                                      <div><label className="text-xs text-gray-400 mb-1 block">Region</label><Input value={contact.region} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, region: e.target.value } : c) } : l))} placeholder="e.g. Southeast" className={inputClass} /></div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase tracking-wide">Notes</label>
-                            <textarea value={lender.notes || ""} onChange={(e) => updateLenderField(lender.id, "notes", e.target.value)} placeholder="Add any notes about this lender — deal history, preferences, spreadsheet notes, etc." rows={4} className="w-full px-4 py-3 text-sm bg-white border border-gray-300 rounded-xl text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#0a1f44] resize-none" />
-                          </div>
-                          <div className="flex gap-3 pt-2 border-t border-gray-200">
-                            <button onClick={() => setEditingLenderId(null)} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Done</button>
-                            <button onClick={() => toggleLenderStatus(lender.id)} className="px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">{lender.status === "Inactive" ? "Activate" : "Deactivate"}</button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
                 </div>
               )}
+
 
               {activeTab === "add-lender" && <AddLenderPage onSave={handleSaveLender} onCancel={() => setActiveTab("lenders")} existingLenders={lenderRecords} inputClass={inputClass} selectTriggerClass={selectTriggerClass} />}
 
