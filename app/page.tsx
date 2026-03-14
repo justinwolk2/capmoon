@@ -1,10 +1,10 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart3, Building2, FileSpreadsheet, Filter, Gauge, Landmark, Plus, Search, ShieldCheck, Upload, Users, Trash2, ChevronRight, ChevronLeft, CheckCircle, Edit2, Sparkles, Loader2, Lock, LogOut, Settings, Eye, EyeOff } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { BarChart3, Building2, FileSpreadsheet, Filter, Gauge, Landmark, Plus, Search, ShieldCheck, Upload, Users, Trash2, ChevronRight, ChevronLeft, CheckCircle, Edit2, Sparkles, Loader2, Lock, LogOut, Settings, Eye, EyeOff, Bell } from "lucide-react";
+import { motion } from "framer-motion";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,7 +14,7 @@ type LenderRecord = {
   type: string; minLoan: string; maxLoan: string; maxLtv: string; minDscr: string;
   states: string[]; assets: string[]; status: string; email: string; phone: string; recourse: string;
   contactPerson?: string; website?: string; sponsorStates?: string[]; loanTerms?: string;
-  typeOfLoans?: string[]; programTypes?: string[]; typeOfLenders?: string[]; contacts?: LenderContact[];
+  typeOfLoans?: string[]; programTypes?: string[]; typeOfLenders?: string[]; contacts?: LenderContact[]; notes?: string;
 };
 type RetailUnit = { id: number; tenant: string; rent: string; sqft: string; };
 type AssetAddress = { street: string; unit: string; city: string; state: string; zip: string; };
@@ -31,24 +31,41 @@ type AssetData = {
 };
 type NewLenderForm = {
   programName: string; contactPerson: string; email: string; phone: string; website: string;
-  typeOfLenders: string[]; typeOfLoans: string[]; programTypes: string[]; propertyTypes: string; loanTerms: string;
+  typeOfLenders: string[]; typeOfLoans: string[]; programTypes: string[]; propertyTypes: string[]; loanTerms: string[]; notes: string;
   minLoan: string; maxLoan: string; maxLtv: string; targetStates: string[];
   sponsorStates: string[]; recourse: string; capitalType: string; status: string;
+};
+type TeamMember = {
+  id: number; name: string; email: string; phone: string; photo: string;
+  geographicMarket: string; specialtyAreas: string[]; title: string;
+};
+type AppUser = {
+  id: number; username: string; password: string; role: "admin" | "advisor" | "capital-seeker";
+  name: string; blockedLenderIds: number[]; teamMemberId?: number;
 };
 type SubmittedDeal = {
   id: number; submittedAt: string; seekerName: string;
   assets: AssetData[]; capitalType: string; assetMode: string; collateralMode: string;
-  status: "pending" | "assigned" | "closed";
-  advisorId?: number;
+  status: "pending" | "assigned" | "closed"; assignedAdvisorIds: number[];
 };
-type AppUser = {
-  id: number; username: string; password: string; role: "admin" | "client" | "capital-seeker";
-  name: string; blockedLenderIds: number[];
+type DeleteRequest = {
+  id: number; lenderId: number; lenderName: string; requestedBy: string; requestedAt: string; status: "pending" | "approved" | "denied";
 };
 type AuthSession = { user: AppUser; } | null;
 type MatcherStep = "ai-prompt" | "start" | "asset-count" | "asset-form" | "review" | "results";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+
+const initialTeamMembers: TeamMember[] = [
+  { id: 1, name: "Louis Palumbo", email: "lpalumbo@capmoon.com", phone: "305-401-0076", photo: "/louis.jpg", geographicMarket: "Southeast, Florida", specialtyAreas: ["Senior", "Mezzanine", "Bridge"], title: "Vice President of Capital Advisory" },
+  { id: 2, name: "Shuvo Hussain", email: "shussain@capmoon.com", phone: "347-993-5545", photo: "/Shuvo.jpeg", geographicMarket: "Northeast, New York", specialtyAreas: ["JV Equity", "Preferred Equity", "Mezzanine"], title: "Vice President of Capital Advisory" },
+];
+
+const initialUsers: AppUser[] = [
+  { id: 1, username: "justin.wolk@capmoon.com", password: "Chairam1!", role: "admin", name: "Justin Wolk", blockedLenderIds: [] },
+  { id: 2, username: "lpalumbo@capmoon.com", password: "Louis2024!", role: "advisor", name: "Louis Palumbo", blockedLenderIds: [], teamMemberId: 1 },
+  { id: 3, username: "shussain@capmoon.com", password: "Shuvo2024!", role: "advisor", name: "Shuvo Hussain", blockedLenderIds: [], teamMemberId: 2 },
+];
 
 const seedLenders: LenderRecord[] = [
   { id: 1, source: "Spreadsheet", spreadsheetRow: "A2", program: "Bridge Lending Program", lender: "Apex Credit Partners", type: "Senior", minLoan: "$3,000,000", maxLoan: "$35,000,000", maxLtv: "75%", minDscr: "1.20x", states: ["FL", "GA", "TX"], assets: ["Apartments", "Mixed Use", "Retail - Multi Tenant"], status: "Active", email: "originations@apexcp.com", phone: "(305) 555-0101", recourse: "FULL", contactPerson: "John Smith", website: "www.apexcp.com", typeOfLoans: ["Acquisition", "Value add"], programTypes: ["Small Balance"] },
@@ -56,10 +73,6 @@ const seedLenders: LenderRecord[] = [
   { id: 3, source: "Spreadsheet", spreadsheetRow: "A4", program: "Value-Add Multifamily", lender: "Northgate Real Estate Credit", type: "Preferred Equity", minLoan: "$5,000,000", maxLoan: "$50,000,000", maxLtv: "85%", minDscr: "1.10x", states: ["FL", "NC", "SC", "TN"], assets: ["Apartments", "Student Housing", "SFR Portfolio"], status: "Review", email: "placements@northgatecredit.com", phone: "(704) 555-0198", recourse: "SELECTIVE", typeOfLoans: ["Acquisition", "New Development"], programTypes: ["Fannie/Freddie"] },
   { id: 4, source: "Spreadsheet", spreadsheetRow: "A5", program: "Construction Capital", lender: "BlueRidge Finance", type: "JV Equity", minLoan: "$15,000,000", maxLoan: "$125,000,000", maxLtv: "70%", minDscr: "N/A", states: ["FL", "TX", "AZ", "NV"], assets: ["Land", "Condos", "Other"], status: "Active", email: "capitalmarkets@blueridgefin.com", phone: "(214) 555-0117", recourse: "", typeOfLoans: ["Construction", "New Development"], programTypes: ["Construction", "Land"] },
   { id: 5, source: "Spreadsheet", spreadsheetRow: "A6", program: "Sponsor Credit Facility", lender: "Summit Specialty Lending", type: "Line of Credit", minLoan: "$2,000,000", maxLoan: "$20,000,000", maxLtv: "65%", minDscr: "1.25x", states: ["Nationwide"], assets: ["Mixed Use", "Retail - Multi Tenant", "Lt Industrial"], status: "Inactive", email: "sponsors@summitsl.com", phone: "(615) 555-0133", recourse: "CASE BY CASE", typeOfLoans: ["Refinance"], programTypes: ["Small Balance"] },
-];
-
-const initialUsers: AppUser[] = [
-  { id: 1, username: "justin.wolk", password: "Chairam1!", role: "admin", name: "Justin Wolk", blockedLenderIds: [] },
 ];
 
 const assetTypes = ["Equipment, Autos, or Other Non Real Estate Products", "Apartments", "Condos", "Senior Housing", "Student Housing", "Gaming", "Assisted Living", "Education Related", "SFR Portfolio", "Mobile Home Park", "Co-living", "Office", "Medical Office", "Manufacturing", "Mixed Use", "Lt Industrial", "Cannabis", "Retail - Multi Tenant", "Retail - Single Tenant", "Hotel/Hospitality", "Land", "Self-storage", "Religious", "Hospital/Health Care", "Distressed Debt", "Other"];
@@ -76,6 +89,10 @@ const typeOfLoanOptions = ["Acquisition", "Construction", "Value add", "New Deve
 const programTypeOptions = ["Refinance", "Acquisition", "Construction", "Land", "Fannie/Freddie", "HUD", "Small Balance", "Interest-only", "Cannabis"];
 const typeOfLenderOptions = ["Bridge", "Conventional", "Local Bank", "CMBS", "Fannie/Freddie", "Small Balance", "Family Office", "Private Lender", "Hard Money", "C&I", "JV", "Non-conventional", "Regional Bank", "Balance Sheet", "Investment Bank"];
 
+const lenderPropertyTypeOptions = ["Apartments", "Condos", "Senior Housing", "Student Housing", "Casino/Gaming", "Assisted Living", "Education Related", "SFR Portfolio", "Mobile Home Park", "Co-living", "Office", "Medical Office", "Manufacturing", "Mixed-use", "Light Industrial", "Cannabis", "Retail-Multi Tenant", "Retail Single Tenant", "Hotel/Hospitality-Flag Required", "Hotel/Hospitality-Private or No Flag", "NOTE PURCHASE", "Loan Sales", "Land", "Self-storage", "Religious", "Hospital/Health Care"];
+
+const loanTermOptions = ["Less than 1 year", "1 year", "2 year", "3 year", "5 year", "7 year", "10 year", "15 year", "20 year", "30 year", "35 year", "40 year+"];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function parseCurrency(v: string) { return Number(String(v || "0").replace(/[^0-9.]/g, "")); }
@@ -86,16 +103,13 @@ function formatCurrencyInput(v: string) {
   return `$${decimal !== undefined ? `${Number(whole||0).toLocaleString("en-US")}.${decimal.slice(0,2)}` : Number(whole||0).toLocaleString("en-US")}`;
 }
 function formatPercent(v: number) { if (!Number.isFinite(v) || !isFinite(v) || v === 0) return "—"; return `${v.toFixed(1)}%`; }
-function parsePercent(v: string) { return Number(String(v || "0").replace(/[^0-9.]/g, "")); }
-function parseDscr(v: string) { if (v === "N/A") return 0; return Number(String(v || "0").replace(/[^0-9.]/g, "")); }
 function normalizeRecourse(v: string) { return v === "SELECTIVE" || !v ? "CASE BY CASE" : v; }
-
 function blankAddress(): AssetAddress { return { street: "", unit: "", city: "", state: "", zip: "" }; }
 function blankAsset(id: number): AssetData {
   return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "Apartments", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dscr: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
 }
 function blankLenderForm(): NewLenderForm {
-  return { programName: "", contactPerson: "", email: "", phone: "", website: "", typeOfLenders: [], typeOfLoans: [], programTypes: [], propertyTypes: "", loanTerms: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalType: "Senior", status: "Active" };
+  return { programName: "", contactPerson: "", email: "", phone: "", website: "", typeOfLenders: [], typeOfLoans: [], programTypes: [], propertyTypes: [], loanTerms: [], notes: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalType: "Senior", status: "Active" };
 }
 function subordinateLabel(ct: string) {
   if (ct === "Mezzanine") return "Mezzanine Amount";
@@ -126,6 +140,15 @@ function calcMetrics(asset: AssetData, capitalType: string) {
   return { effectiveAmt, totalCap, seniorLtv, autoLtv, equityPct, cashOut, seniorLtc, isSubCap, isConstruction, isAcquisition, isRefinance, isAcqNonConst, acqConstLoan };
 }
 
+// Advisor matching logic
+function assignAdvisors(capitalType: string, teamMembers: TeamMember[]): TeamMember[] {
+  const specialists = teamMembers.filter(m => m.specialtyAreas.includes(capitalType));
+  const pool = specialists.length > 0 ? specialists : teamMembers;
+  if (pool.length === 0) return [];
+  const picked = pool[Math.floor(Math.random() * pool.length)];
+  return [picked];
+}
+
 async function parseDeadWithAI(description: string, capitalTypeHint: string): Promise<Partial<AssetData>> {
   const systemPrompt = `You are a commercial real estate loan intake specialist. Parse the user's deal description and extract structured loan parameters. Return ONLY a valid JSON object with these exact fields (use empty string "" if not mentioned):
 {"ownershipStatus":"Acquisition or Refinance","dealType":"one of Construction/Value add/New Development/Bridge/Takeout/Investment","assetType":"one of Apartments/Condos/Office/Mixed Use/Hotel/Hospitality/Land/Self-storage/Other etc","loanAmount":"dollar amount like $15,000,000","propertyValue":"dollar amount","selectedStates":["FL"],"recourseType":"FULL or NON RECOURSE or CASE BY CASE","dscr":"number like 1.25","numUnits":"number if mentioned","numBuildings":"number if mentioned"}
@@ -141,7 +164,7 @@ Only return JSON. No explanation. No markdown.`;
   } catch { return {}; }
 }
 
-// ─── UI Components ────────────────────────────────────────────────────────────
+// ─── Shared UI ────────────────────────────────────────────────────────────────
 
 function StatCard({ title, value, detail, icon: Icon }: { title: string; value: string; detail: string; icon: any }) {
   return (
@@ -175,7 +198,39 @@ function CheckboxGroup({ label, options, selected, onChange }: { label: string; 
   );
 }
 
-function StateSelector({ label, selected, onChange }: { label: string; selected: string[]; onChange: (v: string[]) => void }) {
+function DropdownCheckbox({ label, options, selected, onChange }: { label: string; options: string[]; selected: string[]; onChange: (v: string[]) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase tracking-wide">{label}</label>
+      <button type="button" onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-300 rounded-xl text-sm text-left hover:border-[#0a1f44]/40 transition-all">
+        <span className={selected.length > 0 ? "text-[#0a1f44] font-medium" : "text-gray-400"}>
+          {selected.length === 0 ? `Select ${label}...` : selected.length === 1 ? selected[0] : `${selected.length} selected`}
+        </span>
+        <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gray-50">
+            <span className="text-xs text-gray-500 font-medium">{selected.length} selected</span>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => onChange(options)} className="text-xs text-[#0a1f44] font-medium hover:underline">All</button>
+              <button type="button" onClick={() => onChange([])} className="text-xs text-gray-400 hover:underline">Clear</button>
+            </div>
+          </div>
+          <div className="max-h-56 overflow-y-auto p-2">
+            {options.map((opt) => (
+              <label key={opt} className="flex items-center gap-2.5 px-2 py-1.5 text-xs cursor-pointer rounded-lg hover:bg-gray-50">
+                <input type="checkbox" checked={selected.includes(opt)} onChange={() => onChange(selected.includes(opt) ? selected.filter((x) => x !== opt) : [...selected, opt])} className="accent-[#0a1f44] w-3.5 h-3.5 flex-shrink-0" />
+                <span className={selected.includes(opt) ? "text-[#0a1f44] font-semibold" : "text-gray-600"}>{opt}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
   return (
     <div>
       <label className="text-xs text-gray-500 mb-2 block font-bold uppercase tracking-wide">{label}</label>
@@ -201,208 +256,15 @@ function AddressFields({ address, onChange, inputClass }: { address: AssetAddres
   return (
     <div className="md:col-span-2">
       <div className="text-xs uppercase tracking-[0.2em] text-[#c9a84c] font-bold mb-3">Property Address</div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="md:col-span-2 grid grid-cols-4 gap-2">
+      <div className="grid gap-3">
+        <div className="grid grid-cols-4 gap-2">
           <div className="col-span-3"><label className="text-xs text-gray-500 mb-1 block font-medium">Street Address</label><Input value={address.street} onChange={(e) => upd("street", e.target.value)} placeholder="123 Main St" className={inputClass} /></div>
-          <div><label className="text-xs text-gray-500 mb-1 block font-medium">Unit #</label><Input value={address.unit} onChange={(e) => upd("unit", e.target.value)} placeholder="Apt 4B" className={inputClass} /></div>
+          <div><label className="text-xs text-gray-500 mb-1 block font-medium">Unit #</label><Input value={address.unit} onChange={(e) => upd("unit", e.target.value)} placeholder="4B" className={inputClass} /></div>
         </div>
-        <div><label className="text-xs text-gray-500 mb-1 block font-medium">City</label><Input value={address.city} onChange={(e) => upd("city", e.target.value)} placeholder="Miami" className={inputClass} /></div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-4 gap-2">
+          <div className="col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium">City</label><Input value={address.city} onChange={(e) => upd("city", e.target.value)} placeholder="Miami" className={inputClass} /></div>
           <div><label className="text-xs text-gray-500 mb-1 block font-medium">State</label><Input value={address.state} onChange={(e) => upd("state", e.target.value)} placeholder="FL" className={inputClass} /></div>
-          <div><label className="text-xs text-gray-500 mb-1 block font-medium">Zip Code</label><Input value={address.zip} onChange={(e) => upd("zip", e.target.value)} placeholder="33101" className={inputClass} /></div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Login Wall ───────────────────────────────────────────────────────────────
-
-function LoginWall({ onLogin }: { onLogin: (session: AuthSession) => void }) {
-  const [mode, setMode] = useState<"" | "client" | "capital">(""); 
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPass, setShowPass] = useState(false);
-  const [error, setError] = useState("");
-  const [users] = useState<AppUser[]>(initialUsers);
-
-  function handleLogin() {
-    const user = users.find((u) => u.username.toLowerCase() === username.toLowerCase());
-    if (!user) { setError("Username not found."); return; }
-    if (user.password !== password) { setError("Incorrect password. If you forgot it, please contact admin."); return; }
-    setError("");
-    onLogin({ user });
-  }
-
-  function handleCapitalSeeker() {
-    const guestUser: AppUser = { id: 9999, username: "guest", password: "", role: "capital-seeker", name: "Capital Seeker", blockedLenderIds: [] };
-    onLogin({ user: guestUser });
-  }
-
-  return (
-    <div className="min-h-screen bg-[#f0f2f5] flex">
-      {/* Left — blurred dashboard preview */}
-      <div className="hidden lg:flex flex-col w-[260px] bg-[#0a1f44] border-r border-[#c9a84c]/10 relative flex-shrink-0">
-        <div className="px-6 py-8 border-b border-[#c9a84c]/20">
-          <div className="flex items-center gap-3 mb-2">
-            <img src="/logo1.JPEG" alt="CapMoon" className="h-12 w-12 object-contain rounded-full" />
-            <div>
-              <div className="font-display text-2xl font-bold text-white">CapMoon</div>
-              <div className="text-xs text-gray-400 tracking-wide">Lender Intelligence Platform</div>
-            </div>
-          </div>
-          <div className="text-xs uppercase tracking-[0.35em] text-[#c9a84c] font-bold mt-3">Investment Banking</div>
-        </div>
-        <nav className="space-y-1 p-4 flex-1 opacity-40 pointer-events-none select-none">
-          {[["Overview", Gauge], ["Lender Programs", Landmark], ["Add Lender", Plus], ["Deal Matcher", Filter], ["Upload Center", FileSpreadsheet]].map(([label, Icon]: any) => (
-            <div key={String(label)} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-gray-300 border border-transparent">
-              <Icon className="h-4 w-4 flex-shrink-0" />
-              <span className="text-sm font-medium tracking-wide">{label}</span>
-            </div>
-          ))}
-        </nav>
-        <div className="p-4 border-t border-[#c9a84c]/20 opacity-40">
-          <div className="rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/10 p-4">
-            <div className="flex items-center gap-2 mb-2"><ShieldCheck className="h-4 w-4 text-[#c9a84c]" /><span className="text-xs font-bold text-[#c9a84c] tracking-wide uppercase">Auto-Match Engine</span></div>
-            <p className="text-xs text-gray-300 leading-relaxed">Spreadsheet-driven criteria plus dashboard lenders.</p>
-          </div>
-        </div>
-        {/* Lock overlay */}
-        <div className="absolute inset-0 bg-[#0a1f44]/60 backdrop-blur-[2px] flex items-center justify-center">
-          <div className="text-center">
-            <Lock className="h-8 w-8 text-[#c9a84c] mx-auto mb-2" />
-            <div className="text-xs text-gray-300 font-medium">Login Required</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Right — login options */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <img src="/logo1.JPEG" alt="CapMoon" className="h-16 w-16 object-contain rounded-full mx-auto mb-4" />
-            <div className="font-display text-4xl font-bold text-[#0a1f44] mb-1">CapMoon</div>
-            <div className="text-sm text-gray-500">Premier Capital Search Platform</div>
-          </div>
-
-          {mode === "" && (
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-              <button onClick={() => setMode("client")} className="w-full p-6 rounded-2xl border-2 border-[#0a1f44] bg-[#0a1f44] text-white text-left hover:bg-[#0a1f44]/90 transition-all group">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-lg font-bold mb-1">CapMoon Client Login</div>
-                    <div className="text-sm text-gray-300">Access the full lender intelligence dashboard</div>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-[#c9a84c] group-hover:translate-x-1 transition-transform" />
-                </div>
-              </button>
-              <button onClick={handleCapitalSeeker} className="w-full p-6 rounded-2xl border-2 border-[#c9a84c]/30 bg-white text-left hover:border-[#c9a84c] transition-all group">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-lg font-bold text-[#0a1f44] mb-1">I Am Looking for Capital</div>
-                    <div className="text-sm text-gray-500">Submit your deal for lender matching</div>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-[#c9a84c] group-hover:translate-x-1 transition-transform" />
-                </div>
-              </button>
-            </motion.div>
-          )}
-
-          {mode === "client" && (
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
-              <button onClick={() => { setMode(""); setError(""); }} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-6"><ChevronLeft className="h-3 w-3" /> Back</button>
-              <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Secure Access</div>
-              <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-6">Client Login</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Username</label>
-                  <Input value={username} onChange={(e) => setUsername(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()} placeholder="your.username" className="bg-white border-gray-300 text-gray-800 rounded-xl" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Password</label>
-                  <div className="relative">
-                    <Input type={showPass ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()} placeholder="••••••••" className="bg-white border-gray-300 text-gray-800 rounded-xl pr-10" />
-                    <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                      {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-                {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
-                <button onClick={handleLogin} className="w-full py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all">Sign In</button>
-              </div>
-            </motion.div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Add Lender Page ──────────────────────────────────────────────────────────
-
-function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTriggerClass }: { onSave: (form: NewLenderForm) => void; onCancel: () => void; existingLenders: LenderRecord[]; inputClass: string; selectTriggerClass: string }) {
-  const [form, setForm] = useState<NewLenderForm>(blankLenderForm());
-  const [matchMode, setMatchMode] = useState<Record<string, "manual" | "spreadsheet">>({ programName: "manual", contactPerson: "manual", email: "manual", phone: "manual", website: "manual" });
-  function upd(field: keyof NewLenderForm, value: any) { setForm((prev) => ({ ...prev, [field]: value })); }
-  const spreadsheetSuggestions: Record<string, string[]> = {
-    programName: [...new Set(existingLenders.map((l) => l.program))],
-    contactPerson: [...new Set(existingLenders.map((l) => l.contactPerson || "").filter(Boolean))],
-    email: [...new Set(existingLenders.map((l) => l.email).filter(Boolean))],
-    phone: [...new Set(existingLenders.map((l) => l.phone).filter(Boolean))],
-    website: [...new Set(existingLenders.map((l) => l.website || "").filter(Boolean))],
-  };
-  const matchableFields: [keyof NewLenderForm, string][] = [["programName", "Program Name (Lender)"], ["contactPerson", "Contact Person"], ["email", "Email Address"], ["phone", "Phone Number"], ["website", "Website"]];
-  return (
-    <div className="max-w-4xl">
-      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-8">
-        <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">New Entry</div>
-        <h2 className="font-display text-3xl font-bold text-[#0a1f44] mb-2">Add Lender</h2>
-        <p className="text-sm text-gray-500 mb-8">Fill in lender details manually or match from your spreadsheet data.</p>
-        <div className="space-y-6">
-          <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-5">
-            <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-4">Lender Information</div>
-            <div className="grid gap-4 md:grid-cols-2">
-              {matchableFields.map(([field, label]) => (
-                <div key={String(field)}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs text-gray-500 font-bold uppercase tracking-wide">{label}</label>
-                    <button type="button" onClick={() => setMatchMode((prev) => ({ ...prev, [String(field)]: prev[String(field)] === "manual" ? "spreadsheet" : "manual" }))} className={`text-xs px-2 py-0.5 rounded-full border transition-all ${matchMode[String(field)] === "spreadsheet" ? "bg-[#0a1f44] text-white border-[#0a1f44]" : "bg-white text-gray-500 border-gray-200"}`}>
-                      {matchMode[String(field)] === "spreadsheet" ? "📋 Spreadsheet" : "✏️ Manual"}
-                    </button>
-                  </div>
-                  {matchMode[String(field)] === "spreadsheet" ? (
-                    <Select value={String(form[field])} onValueChange={(v) => upd(field, v)}><SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Select from spreadsheet..." /></SelectTrigger><SelectContent>{(spreadsheetSuggestions[String(field)] || []).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select>
-                  ) : (
-                    <Input value={String(form[field])} onChange={(e) => upd(field, e.target.value)} placeholder={`Enter ${label.toLowerCase()}`} className={inputClass} />
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Capital Type</label><Select value={form.capitalType} onValueChange={(v) => upd("capitalType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{capitalTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
-            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Recourse</label><Select value={form.recourse} onValueChange={(v) => upd("recourse", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
-            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Status</label><Select value={form.status} onValueChange={(v) => upd("status", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent></Select></div>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Minimum Loan Size</label><Input value={form.minLoan} onChange={(e) => upd("minLoan", formatCurrencyInput(e.target.value))} placeholder="$1,000,000" className={inputClass} /></div>
-            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Maximum Loan Size</label><Input value={form.maxLoan} onChange={(e) => upd("maxLoan", formatCurrencyInput(e.target.value))} placeholder="$25,000,000" className={inputClass} /></div>
-            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Max LTV</label><Input value={form.maxLtv} onChange={(e) => upd("maxLtv", e.target.value)} placeholder="75%" className={inputClass} /></div>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Property Types</label><Input value={form.propertyTypes} onChange={(e) => upd("propertyTypes", e.target.value)} placeholder="e.g. Apartments, Office, Retail" className={inputClass} /></div>
-            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Loan Terms</label><Input value={form.loanTerms} onChange={(e) => upd("loanTerms", e.target.value)} placeholder="e.g. 12-36 months" className={inputClass} /></div>
-          </div>
-          <CheckboxGroup label="Type of Lender" options={typeOfLenderOptions} selected={form.typeOfLenders} onChange={(v) => upd("typeOfLenders", v)} />
-          <CheckboxGroup label="Type of Loans" options={typeOfLoanOptions} selected={form.typeOfLoans} onChange={(v) => upd("typeOfLoans", v)} />
-          <CheckboxGroup label="Program" options={programTypeOptions} selected={form.programTypes} onChange={(v) => upd("programTypes", v)} />
-          <StateSelector label="Target States" selected={form.targetStates} onChange={(v) => upd("targetStates", v)} />
-          <StateSelector label="Sponsor States" selected={form.sponsorStates} onChange={(v) => upd("sponsorStates", v)} />
-          <div className="flex gap-3 pt-4 border-t border-gray-100">
-            <button onClick={() => { if (!form.programName.trim()) return; onSave(form); }} className="px-6 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Save Lender</button>
-            <button onClick={() => setForm(blankLenderForm())} className="px-4 py-2.5 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">Reset Form</button>
-            <button onClick={onCancel} className="px-4 py-2.5 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">Cancel</button>
-          </div>
+          <div><label className="text-xs text-gray-500 mb-1 block font-medium">Zip</label><Input value={address.zip} onChange={(e) => upd("zip", e.target.value)} placeholder="33101" className={inputClass} /></div>
         </div>
       </div>
     </div>
@@ -429,7 +291,6 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
   metricBoxes.push(["Cap Rate", capRate > 0 ? formatPercent(capRate) : "—"]);
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      {/* Address */}
       <AddressFields address={asset.address || blankAddress()} onChange={(a) => upd("address", a)} inputClass={inputClass} />
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Ownership Status</label><Select value={asset.ownershipStatus} onValueChange={(v) => upd("ownershipStatus", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Deal Type</label><Select value={asset.dealType} onValueChange={(v) => upd("dealType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{dealTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
@@ -475,9 +336,195 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
   );
 }
 
-// ─── Deal Matcher (shared between admin and capital seeker) ───────────────────
+// ─── Add Lender Page ──────────────────────────────────────────────────────────
 
-function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, seekerName, inputClass, selectTriggerClass, cardClass }: { lenderRecords: LenderRecord[]; capitalSeekerMode?: boolean; onSubmitDeal?: (assets: AssetData[], capitalType: string, assetMode: string, collateralMode: string) => void; seekerName?: string; inputClass: string; selectTriggerClass: string; cardClass: string }) {
+function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTriggerClass }: { onSave: (form: NewLenderForm) => void; onCancel: () => void; existingLenders: LenderRecord[]; inputClass: string; selectTriggerClass: string }) {
+  const [form, setForm] = useState<NewLenderForm>(blankLenderForm());
+  const [matchMode, setMatchMode] = useState<Record<string, "manual" | "spreadsheet">>({ programName: "manual", contactPerson: "manual", email: "manual", phone: "manual", website: "manual" });
+  function upd(field: keyof NewLenderForm, value: any) { setForm((prev) => ({ ...prev, [field]: value })); }
+  const spreadsheetSuggestions: Record<string, string[]> = {
+    programName: [...new Set(existingLenders.map((l) => l.program))],
+    contactPerson: [...new Set(existingLenders.map((l) => l.contactPerson || "").filter(Boolean))],
+    email: [...new Set(existingLenders.map((l) => l.email).filter(Boolean))],
+    phone: [...new Set(existingLenders.map((l) => l.phone).filter(Boolean))],
+    website: [...new Set(existingLenders.map((l) => l.website || "").filter(Boolean))],
+  };
+  const matchableFields: [keyof NewLenderForm, string][] = [["programName", "Program Name (Lender)"], ["contactPerson", "Contact Person"], ["email", "Email Address"], ["phone", "Phone Number"], ["website", "Website"]];
+  return (
+    <div className="max-w-4xl">
+      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-8">
+        <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">New Entry</div>
+        <h2 className="font-display text-3xl font-bold text-[#0a1f44] mb-2">Add Lender</h2>
+        <div className="space-y-6">
+          <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-5">
+            <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-4">Lender Information</div>
+            <div className="grid gap-4 md:grid-cols-2">
+              {matchableFields.map(([field, label]) => (
+                <div key={String(field)}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs text-gray-500 font-bold uppercase tracking-wide">{label}</label>
+                    <button type="button" onClick={() => setMatchMode((prev) => ({ ...prev, [String(field)]: prev[String(field)] === "manual" ? "spreadsheet" : "manual" }))} className={`text-xs px-2 py-0.5 rounded-full border transition-all ${matchMode[String(field)] === "spreadsheet" ? "bg-[#0a1f44] text-white border-[#0a1f44]" : "bg-white text-gray-500 border-gray-200"}`}>
+                      {matchMode[String(field)] === "spreadsheet" ? "📋 Spreadsheet" : "✏️ Manual"}
+                    </button>
+                  </div>
+                  {matchMode[String(field)] === "spreadsheet" ? (
+                    <Select value={String(form[field])} onValueChange={(v) => upd(field, v)}><SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Select from spreadsheet..." /></SelectTrigger><SelectContent>{(spreadsheetSuggestions[String(field)] || []).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select>
+                  ) : (
+                    <Input value={String(form[field])} onChange={(e) => upd(field, e.target.value)} placeholder={`Enter ${label.toLowerCase()}`} className={inputClass} />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Capital Type</label><Select value={form.capitalType} onValueChange={(v) => upd("capitalType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{capitalTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Recourse</label><Select value={form.recourse} onValueChange={(v) => upd("recourse", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Status</label><Select value={form.status} onValueChange={(v) => upd("status", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent></Select></div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Minimum Loan Size</label><Input value={form.minLoan} onChange={(e) => upd("minLoan", formatCurrencyInput(e.target.value))} placeholder="$1,000,000" className={inputClass} /></div>
+            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Maximum Loan Size</label><Input value={form.maxLoan} onChange={(e) => upd("maxLoan", formatCurrencyInput(e.target.value))} placeholder="$25,000,000" className={inputClass} /></div>
+            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Max LTV</label><Input value={form.maxLtv} onChange={(e) => upd("maxLtv", e.target.value)} placeholder="75%" className={inputClass} /></div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {form.capitalType === "C&I" ? (
+              <>
+                <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Property Types</label><Input value={Array.isArray(form.propertyTypes) ? form.propertyTypes.join(", ") : form.propertyTypes} onChange={(e) => upd("propertyTypes", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))} placeholder="e.g. Office, Manufacturing" className={inputClass} /></div>
+                <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Loan Terms</label><Input value={Array.isArray(form.loanTerms) ? form.loanTerms.join(", ") : form.loanTerms} onChange={(e) => upd("loanTerms", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))} placeholder="e.g. 12-36 months" className={inputClass} /></div>
+              </>
+            ) : (
+              <>
+                <DropdownCheckbox label="Property Types" options={lenderPropertyTypeOptions} selected={Array.isArray(form.propertyTypes) ? form.propertyTypes : []} onChange={(v) => upd("propertyTypes", v)} />
+                <DropdownCheckbox label="Loan Terms" options={loanTermOptions} selected={Array.isArray(form.loanTerms) ? form.loanTerms : []} onChange={(v) => upd("loanTerms", v)} />
+              </>
+            )}
+          </div>
+          <CheckboxGroup label="Type of Lender" options={typeOfLenderOptions} selected={form.typeOfLenders} onChange={(v) => upd("typeOfLenders", v)} />
+          <CheckboxGroup label="Type of Loans" options={typeOfLoanOptions} selected={form.typeOfLoans} onChange={(v) => upd("typeOfLoans", v)} />
+          <CheckboxGroup label="Program" options={programTypeOptions} selected={form.programTypes} onChange={(v) => upd("programTypes", v)} />
+          <StateSelector label="Target States" selected={form.targetStates} onChange={(v) => upd("targetStates", v)} />
+          <StateSelector label="Sponsor States" selected={form.sponsorStates} onChange={(v) => upd("sponsorStates", v)} />
+          <div>
+            <label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase tracking-wide">Notes</label>
+            <textarea value={form.notes} onChange={(e) => upd("notes", e.target.value)} placeholder="Add any notes about this lender — deal history, preferences, spreadsheet notes, etc." rows={4} className="w-full px-4 py-3 text-sm bg-white border border-gray-300 rounded-xl text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#0a1f44] resize-none" />
+          </div>
+          <div className="flex gap-3 pt-4 border-t border-gray-100">
+            <button onClick={() => { if (!form.programName.trim()) return; onSave(form); }} className="px-6 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Save Lender</button>
+            <button onClick={() => setForm(blankLenderForm())} className="px-4 py-2.5 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">Reset</button>
+            <button onClick={onCancel} className="px-4 py-2.5 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Deal Team Tab ────────────────────────────────────────────────────────────
+
+function DealTeamTab({ teamMembers, setTeamMembers, currentUserId, isAdmin, inputClass, selectTriggerClass, cardClass }: { teamMembers: TeamMember[]; setTeamMembers: (m: TeamMember[]) => void; currentUserId: number; isAdmin: boolean; inputClass: string; selectTriggerClass: string; cardClass: string }) {
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [newMember, setNewMember] = useState<Partial<TeamMember>>({ name: "", email: "", phone: "", photo: "", geographicMarket: "", specialtyAreas: [], title: "" });
+
+  function saveEdit(updated: TeamMember) { setTeamMembers(teamMembers.map((m) => m.id === updated.id ? updated : m)); setEditingId(null); }
+  function deleteMember(id: number) { if (window.confirm("Remove this team member?")) setTeamMembers(teamMembers.filter((m) => m.id !== id)); }
+  function addMember() {
+    if (!newMember.name || !newMember.email) return;
+    setTeamMembers([...teamMembers, { id: Date.now(), name: newMember.name!, email: newMember.email!, phone: newMember.phone || "", photo: newMember.photo || "", geographicMarket: newMember.geographicMarket || "", specialtyAreas: newMember.specialtyAreas || [], title: newMember.title || "" }]);
+    setNewMember({ name: "", email: "", phone: "", photo: "", geographicMarket: "", specialtyAreas: [], title: "" });
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className={cardClass + " p-6"}>
+        <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">CapMoon</div>
+        <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-6">Deal Team</h2>
+        <div className="grid gap-6 md:grid-cols-2">
+          {teamMembers.map((member) => {
+            const canEdit = isAdmin || member.id === teamMembers.find((m) => m.id === currentUserId)?.id;
+            const isEditing = editingId === member.id;
+            return (
+              <div key={member.id} className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+                <div className="bg-[#0a1f44] p-5 flex items-center gap-4">
+                  <img src={member.photo || "/logo1.JPEG"} alt={member.name} className="h-16 w-16 rounded-xl object-cover border-2 border-[#c9a84c]/30 flex-shrink-0" />
+                  <div>
+                    <div className="font-display text-xl font-bold text-white">{member.name}</div>
+                    <div className="text-xs text-[#c9a84c] font-medium mt-0.5">{member.title}</div>
+                    <div className="text-xs text-gray-400 mt-1">{member.email}</div>
+                  </div>
+                </div>
+                <div className="p-5">
+                  {!isEditing ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div><div className="text-xs text-gray-400 mb-0.5">Phone</div><div className="text-sm font-medium text-[#0a1f44]">{member.phone || "—"}</div></div>
+                        <div><div className="text-xs text-gray-400 mb-0.5">Market</div><div className="text-sm font-medium text-[#0a1f44]">{member.geographicMarket || "—"}</div></div>
+                      </div>
+                      {member.specialtyAreas.length > 0 && (
+                        <div>
+                          <div className="text-xs text-gray-400 mb-2">Specialty Areas</div>
+                          <div className="flex flex-wrap gap-1.5">{member.specialtyAreas.map((s) => <span key={s} className="px-2 py-0.5 rounded-full text-xs bg-[#0a1f44]/10 text-[#0a1f44] border border-[#0a1f44]/20 font-medium">{s}</span>)}</div>
+                        </div>
+                      )}
+                      <div className="flex gap-2 pt-2">
+                        {(isAdmin || member.id === currentUserId) && <button onClick={() => setEditingId(member.id)} className="flex items-center gap-1 px-3 py-1.5 text-xs border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/10 font-medium"><Edit2 className="h-3 w-3" /> Edit</button>}
+                        {isAdmin && <button onClick={() => deleteMember(member.id)} className="flex items-center gap-1 px-3 py-1.5 text-xs border border-red-200 text-red-500 rounded-lg hover:bg-red-50"><Trash2 className="h-3 w-3" /> Remove</button>}
+                      </div>
+                    </div>
+                  ) : (
+                    <EditMemberForm member={member} onSave={saveEdit} onCancel={() => setEditingId(null)} isAdmin={isAdmin} inputClass={inputClass} selectTriggerClass={selectTriggerClass} />
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {isAdmin && (
+        <div className={cardClass + " p-6"}>
+          <div className="text-xs uppercase tracking-[0.2em] text-[#c9a84c] font-bold mb-1">Admin</div>
+          <h3 className="font-display text-xl font-bold text-[#0a1f44] mb-4">Add Team Member</h3>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Full Name</label><Input value={newMember.name || ""} onChange={(e) => setNewMember((p) => ({ ...p, name: e.target.value }))} placeholder="John Smith" className={inputClass} /></div>
+            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Email (cannot be changed later)</label><Input value={newMember.email || ""} onChange={(e) => setNewMember((p) => ({ ...p, email: e.target.value }))} placeholder="john@capmoon.com" className={inputClass} /></div>
+            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Title</label><Input value={newMember.title || ""} onChange={(e) => setNewMember((p) => ({ ...p, title: e.target.value }))} placeholder="Vice President of Capital Advisory" className={inputClass} /></div>
+            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Phone</label><Input value={newMember.phone || ""} onChange={(e) => setNewMember((p) => ({ ...p, phone: e.target.value }))} placeholder="305-000-0000" className={inputClass} /></div>
+            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Geographic Market</label><Input value={newMember.geographicMarket || ""} onChange={(e) => setNewMember((p) => ({ ...p, geographicMarket: e.target.value }))} placeholder="Southeast, Florida" className={inputClass} /></div>
+            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Photo URL</label><Input value={newMember.photo || ""} onChange={(e) => setNewMember((p) => ({ ...p, photo: e.target.value }))} placeholder="/photo.jpg" className={inputClass} /></div>
+            <div className="md:col-span-2">
+              <CheckboxGroup label="Specialty Areas (Capital Types)" options={capitalTypes} selected={newMember.specialtyAreas || []} onChange={(v) => setNewMember((p) => ({ ...p, specialtyAreas: v }))} />
+            </div>
+          </div>
+          <button onClick={addMember} className="mt-4 px-5 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Add Team Member</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EditMemberForm({ member, onSave, onCancel, isAdmin, inputClass, selectTriggerClass }: { member: TeamMember; onSave: (m: TeamMember) => void; onCancel: () => void; isAdmin: boolean; inputClass: string; selectTriggerClass: string }) {
+  const [form, setForm] = useState<TeamMember>({ ...member });
+  function upd(field: keyof TeamMember, value: any) { setForm((p) => ({ ...p, [field]: value })); }
+  return (
+    <div className="space-y-3">
+      {isAdmin && <div><label className="text-xs text-gray-400 mb-1 block">Name</label><Input value={form.name} onChange={(e) => upd("name", e.target.value)} className={inputClass} /></div>}
+      <div><label className="text-xs text-gray-400 mb-1 block">Email <span className="text-gray-300">(locked)</span></label><div className="px-3 py-2 text-sm text-gray-400 bg-gray-100 rounded-xl border border-gray-200">{form.email}</div></div>
+      {isAdmin && <div><label className="text-xs text-gray-400 mb-1 block">Title</label><Input value={form.title} onChange={(e) => upd("title", e.target.value)} className={inputClass} /></div>}
+      <div><label className="text-xs text-gray-400 mb-1 block">Phone</label><Input value={form.phone} onChange={(e) => upd("phone", e.target.value)} className={inputClass} /></div>
+      <div><label className="text-xs text-gray-400 mb-1 block">Photo URL (e.g. /photo.jpg)</label><Input value={form.photo} onChange={(e) => upd("photo", e.target.value)} placeholder="/photo.jpg" className={inputClass} /></div>
+      <div><label className="text-xs text-gray-400 mb-1 block">Geographic Market</label><Input value={form.geographicMarket} onChange={(e) => upd("geographicMarket", e.target.value)} className={inputClass} /></div>
+      <CheckboxGroup label="Specialty Areas" options={capitalTypes} selected={form.specialtyAreas} onChange={(v) => upd("specialtyAreas", v)} />
+      <div className="flex gap-2 pt-2">
+        <button onClick={() => onSave(form)} className="px-4 py-2 text-xs font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Save</button>
+        <button onClick={onCancel} className="px-3 py-2 text-xs border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Deal Matcher ─────────────────────────────────────────────────────────────
+
+function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, seekerName, teamMembers, inputClass, selectTriggerClass, cardClass }: { lenderRecords: LenderRecord[]; capitalSeekerMode?: boolean; onSubmitDeal?: (assets: AssetData[], capitalType: string, assetMode: string, collateralMode: string) => void; seekerName?: string; teamMembers: TeamMember[]; inputClass: string; selectTriggerClass: string; cardClass: string }) {
   const [matcherStep, setMatcherStep] = useState<MatcherStep>("ai-prompt");
   const [marketScope, setMarketScope] = useState("US");
   const [capitalType, setCapitalType] = useState("Senior");
@@ -491,6 +538,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
   const [aiLoading, setAiLoading] = useState(false);
   const [aiParsed, setAiParsed] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [assignedAdvisors, setAssignedAdvisors] = useState<TeamMember[]>([]);
 
   function addTenant(name: string) { setTenantDatabase((prev) => prev.includes(name) ? prev : [...prev, name]); }
   function updateAsset(updated: AssetData) { setAssets((prev) => prev.map((a) => a.id === updated.id ? updated : a)); }
@@ -518,10 +566,10 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
   }
   function handleNextAsset() { if (currentAssetIndex < assets.length - 1) { setCurrentAssetIndex((i) => i + 1); } else { setMatcherStep("review"); } }
   function handlePrevAsset() { if (currentAssetIndex > 0) { setCurrentAssetIndex((i) => i - 1); } else { setMatcherStep(assetMode === "multiple" ? "asset-count" : "start"); } }
-  function resetMatcher() { setMatcherStep("ai-prompt"); setAssetMode("single"); setCollateralMode(""); setAssets([blankAsset(1)]); setCurrentAssetIndex(0); setAiDescription(""); setAiParsed(false); setAiError(""); }
+  function resetMatcher() { setMatcherStep("ai-prompt"); setAssetMode("single"); setCollateralMode(""); setAssets([blankAsset(1)]); setCurrentAssetIndex(0); setAiDescription(""); setAiParsed(false); setAiError(""); setAssignedAdvisors([]); }
 
   const matchResults = useMemo(() => {
-    if (matcherStep !== "results" || marketScope === "INTERNATIONAL") return [];
+    if (matcherStep !== "results" || marketScope === "INTERNATIONAL" || capitalSeekerMode) return [];
     if (collateralMode === "crossed" || assetMode === "single") {
       const totalLoan = assets.reduce((sum, a) => sum + calcMetrics(a, capitalType).effectiveAmt, 0);
       const primary = assets[0];
@@ -548,7 +596,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
         return { ...l, score, nr, assetId: asset.id };
       }).filter((l) => l.score > 30).sort((a, b) => b.score - a.score).slice(0, 3);
     });
-  }, [matcherStep, assets, capitalType, marketScope, collateralMode, assetMode, lenderRecords]);
+  }, [matcherStep, assets, capitalType, marketScope, collateralMode, assetMode, lenderRecords, capitalSeekerMode]);
 
   const progressSteps = ["AI Search", "Setup", assetMode === "multiple" ? "Asset Count" : null, "Asset Details", "Review", "Results"].filter(Boolean) as string[];
   const currentStepLabel = matcherStep === "ai-prompt" ? "AI Search" : matcherStep === "start" ? "Setup" : matcherStep === "asset-count" ? "Asset Count" : matcherStep === "asset-form" ? "Asset Details" : matcherStep === "review" ? "Review" : "Results";
@@ -581,7 +629,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                 <h2 className="font-display text-3xl font-bold text-[#0a1f44]">Describe Your Deal</h2>
               </div>
             </div>
-            <p className="text-sm text-gray-500 mb-6">Tell us about your deal in plain English and our AI will find the best matching lenders instantly.</p>
+            <p className="text-sm text-gray-500 mb-6">{capitalSeekerMode ? "Tell us about your deal and we'll connect you with the right advisor." : "Tell us about your deal and our AI will find the best matching lenders."}</p>
             <div className="mb-5"><label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Capital Type</label><Select value={capitalType} onValueChange={setCapitalType}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{capitalTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
             <div className="mb-4">
               <label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Describe Your Deal</label>
@@ -613,7 +661,6 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
           <div className={cardClass + " p-8"}>
             <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Deal Matcher</div>
             <h2 className="font-display text-3xl font-bold text-[#0a1f44] mb-2">Let's get started</h2>
-            <p className="text-sm text-gray-500 mb-8">Tell us your market and capital type.</p>
             <div className="grid gap-5 md:grid-cols-2 mb-8">
               <div><label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Market</label><Select value={marketScope} onValueChange={setMarketScope}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{marketOptions.map((i) => <SelectItem key={i} value={i}>{i === "US" ? "US" : "International"}</SelectItem>)}</SelectContent></Select></div>
               <div><label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Capital Type</label><Select value={capitalType} onValueChange={setCapitalType}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{capitalTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
@@ -622,10 +669,10 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600 mb-4">CAPMOON DOES NOT SERVICE INTERNATIONAL LOANS AT THIS TIME</div>
             ) : (
               <div>
-                <label className="text-xs text-gray-500 mb-3 block font-bold uppercase">Is this one asset or multiple assets?</label>
+                <label className="text-xs text-gray-500 mb-3 block font-bold uppercase">Single or multiple assets?</label>
                 <div className="grid grid-cols-2 gap-3 mb-5">
-                  <button onClick={() => handleAssetModeSelect("single")} className={`p-4 rounded-xl border-2 text-left transition-all ${assetMode === "single" ? "border-[#0a1f44] bg-[#0a1f44]/5" : "border-gray-200 hover:border-[#0a1f44]/30"}`}><div className="text-sm font-bold text-[#0a1f44]">Single Asset</div><div className="text-xs text-gray-500 mt-1">One property or collateral</div></button>
-                  <button onClick={() => handleAssetModeSelect("multiple")} className={`p-4 rounded-xl border-2 text-left transition-all ${assetMode === "multiple" ? "border-[#0a1f44] bg-[#0a1f44]/5" : "border-gray-200 hover:border-[#0a1f44]/30"}`}><div className="text-sm font-bold text-[#0a1f44]">Multiple Assets</div><div className="text-xs text-gray-500 mt-1">Portfolio or pool of assets</div></button>
+                  <button onClick={() => handleAssetModeSelect("single")} className={`p-4 rounded-xl border-2 text-left transition-all ${assetMode === "single" ? "border-[#0a1f44] bg-[#0a1f44]/5" : "border-gray-200 hover:border-[#0a1f44]/30"}`}><div className="text-sm font-bold text-[#0a1f44]">Single Asset</div><div className="text-xs text-gray-500 mt-1">One property</div></button>
+                  <button onClick={() => handleAssetModeSelect("multiple")} className={`p-4 rounded-xl border-2 text-left transition-all ${assetMode === "multiple" ? "border-[#0a1f44] bg-[#0a1f44]/5" : "border-gray-200 hover:border-[#0a1f44]/30"}`}><div className="text-sm font-bold text-[#0a1f44]">Multiple Assets</div><div className="text-xs text-gray-500 mt-1">Portfolio of assets</div></button>
                 </div>
                 <button onClick={() => setMatcherStep("ai-prompt")} className="flex items-center gap-2 text-xs text-[#c9a84c] font-medium hover:underline"><Sparkles className="h-3.5 w-3.5" /> Switch to AI search</button>
               </div>
@@ -640,12 +687,10 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
             <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Multiple Assets</div>
             <h2 className="font-display text-3xl font-bold text-[#0a1f44] mb-2">Portfolio Setup</h2>
             <div className="space-y-6">
-              <div><label className="text-xs text-gray-500 mb-2 block font-bold uppercase">How many assets in total?</label><Input value={assetCount} onChange={(e) => setAssetCount(e.target.value)} type="number" min="2" max="20" className={inputClass + " max-w-xs"} /></div>
+              <div><label className="text-xs text-gray-500 mb-2 block font-bold uppercase">How many assets?</label><Input value={assetCount} onChange={(e) => setAssetCount(e.target.value)} type="number" min="2" max="20" className={inputClass + " max-w-xs"} /></div>
               <div>
-                <label className="text-xs text-gray-500 mb-3 block font-bold uppercase">How should these assets be treated?</label>
+                <label className="text-xs text-gray-500 mb-3 block font-bold uppercase">How should they be treated?</label>
                 <Select value={collateralMode} onValueChange={(v) => setCollateralMode(v as "crossed" | "separate")}><SelectTrigger className={selectTriggerClass + " max-w-xs"}><SelectValue placeholder="Select treatment..." /></SelectTrigger><SelectContent><SelectItem value="crossed">Crossed Collateral</SelectItem><SelectItem value="separate">Treated Separately</SelectItem></SelectContent></Select>
-                {collateralMode === "crossed" && <p className="text-xs text-gray-500 mt-2">All assets combined and matched as a single portfolio loan.</p>}
-                {collateralMode === "separate" && <p className="text-xs text-gray-500 mt-2">Each asset matched independently with its own lender results.</p>}
               </div>
               <div className="flex gap-3">
                 <button onClick={() => setMatcherStep("start")} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Previous</button>
@@ -664,17 +709,9 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                 <div className="text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold mb-1">{assets.length > 1 ? `Asset ${currentAssetIndex + 1} of ${assets.length}` : "Asset Details"}</div>
                 <h2 className="font-display text-2xl font-bold text-[#0a1f44]">{assets.length > 1 ? `Asset ${currentAssetIndex + 1}` : "Deal Details"}</h2>
               </div>
-              <div className="flex items-center gap-3">
-                {aiParsed && (<div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#c9a84c]/10 border border-[#c9a84c]/20"><Sparkles className="h-3 w-3 text-[#c9a84c]" /><span className="text-xs font-semibold text-[#0a1f44]">AI-filled</span></div>)}
-                {assets.length > 1 && (<div className="flex gap-1">{assets.map((_, idx) => (<div key={idx} className={`w-2 h-2 rounded-full ${idx === currentAssetIndex ? "bg-[#0a1f44]" : idx < currentAssetIndex ? "bg-[#c9a84c]" : "bg-gray-300"}`} />))}</div>)}
-              </div>
+              {aiParsed && (<div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#c9a84c]/10 border border-[#c9a84c]/20"><Sparkles className="h-3 w-3 text-[#c9a84c]" /><span className="text-xs font-semibold text-[#0a1f44]">AI-filled</span></div>)}
             </div>
-            {aiParsed && (
-              <div className="mb-4 rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 px-4 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-[#c9a84c]" /><span className="text-xs text-gray-600">Parameters filled by AI. Review and edit any field below.</span></div>
-                <button onClick={() => setAiParsed(false)} className="text-xs text-gray-400 hover:text-gray-600 underline">Dismiss</button>
-              </div>
-            )}
+            {aiParsed && (<div className="mb-4 rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 px-4 py-3 flex items-center justify-between"><div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-[#c9a84c]" /><span className="text-xs text-gray-600">Parameters filled by AI. Review and edit any field below.</span></div><button onClick={() => setAiParsed(false)} className="text-xs text-gray-400 hover:text-gray-600 underline">Dismiss</button></div>)}
             <AssetForm asset={assets[currentAssetIndex]} capitalType={capitalType} onUpdate={updateAsset} tenantDatabase={tenantDatabase} onTenantAdd={addTenant} inputClass={inputClass} selectTriggerClass={selectTriggerClass} />
             <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
               <button onClick={handlePrevAsset} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Previous</button>
@@ -691,12 +728,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                 {assets.map((a, idx) => (
                   <div key={a.id} className={`rounded-xl border p-3 cursor-pointer transition-all ${idx === currentAssetIndex ? "border-[#0a1f44] bg-[#0a1f44]/5" : "border-gray-200 bg-gray-50 hover:border-[#0a1f44]/30"}`} onClick={() => setCurrentAssetIndex(idx)}>
                     <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-xs font-bold text-[#0a1f44]">Asset {idx + 1}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{a.assetType} · {a.ownershipStatus}</div>
-                        {a.address?.city && <div className="text-xs text-gray-400 mt-0.5">{a.address.city}{a.address.state ? `, ${a.address.state}` : ""}</div>}
-                        {a.loanAmount && <div className="text-xs font-semibold text-[#c9a84c] mt-1">{a.loanAmount}</div>}
-                      </div>
+                      <div><div className="text-xs font-bold text-[#0a1f44]">Asset {idx + 1}</div><div className="text-xs text-gray-500 mt-0.5">{a.assetType} · {a.ownershipStatus}</div>{a.address?.city && <div className="text-xs text-gray-400 mt-0.5">{a.address.city}, {a.address.state}</div>}{a.loanAmount && <div className="text-xs font-semibold text-[#c9a84c] mt-1">{a.loanAmount}</div>}</div>
                       {idx < currentAssetIndex && <CheckCircle className="h-4 w-4 text-emerald-500" />}
                       {idx === currentAssetIndex && <div className="w-2 h-2 rounded-full bg-[#0a1f44]" />}
                     </div>
@@ -713,20 +745,13 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
           <div className={cardClass + " p-8"}>
             <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Final Review</div>
             <h2 className="font-display text-3xl font-bold text-[#0a1f44] mb-2">Review & Confirm</h2>
-            <p className="text-sm text-gray-500 mb-8">Review all assets. Click Edit to make changes, then run the match.</p>
             <div className="grid gap-4 md:grid-cols-2 mb-8">
               {assets.map((asset, idx) => {
                 const m = calcMetrics(asset, capitalType);
-                const addr = asset.address;
                 return (
                   <div key={asset.id} className="rounded-xl border-2 border-gray-200 p-5 hover:border-[#0a1f44]/30 transition-all">
                     <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Asset {idx + 1}</div>
-                        <div className="text-base font-bold text-[#0a1f44]">{asset.assetType}</div>
-                        <div className="text-xs text-gray-500">{asset.ownershipStatus} · {asset.dealType}</div>
-                        {addr?.street && <div className="text-xs text-gray-400 mt-0.5">{addr.street}{addr.unit ? ` ${addr.unit}` : ""}, {addr.city}, {addr.state} {addr.zip}</div>}
-                      </div>
+                      <div><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Asset {idx + 1}</div><div className="text-base font-bold text-[#0a1f44]">{asset.assetType}</div><div className="text-xs text-gray-500">{asset.ownershipStatus} · {asset.dealType}</div>{asset.address?.city && <div className="text-xs text-gray-400 mt-0.5">{asset.address.street ? `${asset.address.street}, ` : ""}{asset.address.city}, {asset.address.state} {asset.address.zip}</div>}</div>
                       <button onClick={() => { setCurrentAssetIndex(idx); setMatcherStep("asset-form"); }} className="flex items-center gap-1 px-3 py-1.5 text-xs border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/10 font-medium"><Edit2 className="h-3 w-3" /> Edit</button>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -743,8 +768,17 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
               <CheckCircle className="h-5 w-5 text-emerald-500" />
             </div>
             <div className="flex gap-3">
-              <button onClick={() => { setCurrentAssetIndex(0); setMatcherStep("asset-form"); }} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Back to Assets</button>
-              <button onClick={() => { if (capitalSeekerMode && onSubmitDeal) { onSubmitDeal(assets, capitalType, assetMode, collateralMode); setMatcherStep("results"); } else { setMatcherStep("results"); } }} className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">{capitalSeekerMode ? "Submit Deal" : "Run Lender Match"} <ChevronRight className="h-4 w-4" /></button>
+              <button onClick={() => { setCurrentAssetIndex(0); setMatcherStep("asset-form"); }} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Back</button>
+              <button onClick={() => {
+                if (capitalSeekerMode && onSubmitDeal) {
+                  const advisors = assignAdvisors(capitalType, teamMembers);
+                  setAssignedAdvisors(advisors);
+                  onSubmitDeal(assets, capitalType, assetMode, collateralMode);
+                }
+                setMatcherStep("results");
+              }} className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">
+                {capitalSeekerMode ? "Submit Deal" : "Run Lender Match"} <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
           </div>
         </div>
@@ -753,14 +787,11 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
       {matcherStep === "results" && (
         <div>
           {capitalSeekerMode ? (
-            /* Capital Seeker Confirmation */
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl">
               <div className={cardClass + " p-10 text-center"}>
-                <div className="w-16 h-16 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center mx-auto mb-5">
-                  <CheckCircle className="h-8 w-8 text-emerald-500" />
-                </div>
+                <div className="w-16 h-16 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center mx-auto mb-5"><CheckCircle className="h-8 w-8 text-emerald-500" /></div>
                 <div className="font-display text-3xl font-bold text-[#0a1f44] mb-2">Deal Submitted!</div>
-                <p className="text-gray-500 text-sm mb-6">Thank you{seekerName ? `, ${seekerName}` : ""}. Your deal has been received and a CapMoon capital advisor will review it and be in touch with you shortly.</p>
+                <p className="text-gray-500 text-sm mb-6">Thank you{seekerName ? `, ${seekerName}` : ""}. Your deal has been received and a CapMoon capital advisor will review it and be in touch shortly.</p>
                 <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4 mb-6 text-left">
                   <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Deal Summary</div>
                   <div className="text-xs text-gray-600 space-y-1">
@@ -771,17 +802,13 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                     {assets[0]?.address?.city && <div>Location: <span className="font-semibold text-[#0a1f44]">{assets[0].address.city}, {assets[0].address.state}</span></div>}
                   </div>
                 </div>
-
                 {/* Deal Team Box */}
                 <div className="rounded-2xl bg-[#0a1f44] p-6 mb-6 text-left">
                   <div className="text-xs uppercase tracking-[0.25em] text-[#c9a84c] font-bold mb-4">Your Deal Team</div>
                   <div className="space-y-4">
-                    {[
-                      { name: "Louis Palumbo", title: "Vice President of Capital Advisory", email: "lpalumbo@capmoon.com", phone: "305-401-0076", photo: "/louis.jpg" },
-                      { name: "Shuvo Hussain", title: "Vice President of Capital Advisory", email: "shussain@capmoon.com", phone: "347-993-5545", photo: "/Shuvo.jpeg" },
-                    ].map((advisor) => (
-                      <div key={advisor.email} className="flex items-center gap-4 border-t border-[#c9a84c]/10 pt-4 first:border-t-0 first:pt-0">
-                        <img src={advisor.photo} alt={advisor.name} className="h-16 w-16 rounded-xl object-cover border-2 border-[#c9a84c]/30 flex-shrink-0" />
+                    {(assignedAdvisors.length > 0 ? assignedAdvisors : teamMembers).map((advisor, idx) => (
+                      <div key={advisor.id} className={`flex items-center gap-4 ${idx > 0 ? "border-t border-[#c9a84c]/10 pt-4" : ""}`}>
+                        <img src={advisor.photo || "/logo1.JPEG"} alt={advisor.name} className="h-16 w-16 rounded-xl object-cover border-2 border-[#c9a84c]/30 flex-shrink-0" />
                         <div>
                           <div className="font-display text-lg font-bold text-white">{advisor.name}</div>
                           <div className="text-xs text-[#c9a84c] font-medium mt-0.5">{advisor.title}</div>
@@ -794,12 +821,10 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                     ))}
                   </div>
                 </div>
-
                 <button onClick={resetMatcher} className="px-6 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Submit Another Deal</button>
               </div>
             </motion.div>
           ) : (
-            /* Admin Results */
             <div>
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -819,7 +844,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   const assetMatches = matchResults.filter((r: any) => r.assetId === asset.id);
                   return (
                     <div key={asset.id} className="mb-6">
-                      <div className="text-sm font-bold text-[#0a1f44] mb-3 flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-[#0a1f44] text-white flex items-center justify-center text-xs font-bold">{asset.id}</div>Asset {asset.id} — {asset.assetType}{asset.address?.city ? ` · ${asset.address.city}, ${asset.address.state}` : ""} · {asset.loanAmount || "—"}</div>
+                      <div className="text-sm font-bold text-[#0a1f44] mb-3 flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-[#0a1f44] text-white flex items-center justify-center text-xs font-bold">{asset.id}</div>Asset {asset.id} — {asset.assetType}{asset.address?.city ? ` · ${asset.address.city}, ${asset.address.state}` : ""}</div>
                       {assetMatches.length === 0 ? (<div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-400">No matches for this asset.</div>) : (
                         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                           {assetMatches.map((match: any) => (
@@ -851,16 +876,103 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
   );
 }
 
+// ─── Login Wall ───────────────────────────────────────────────────────────────
+
+function LoginWall({ onLogin, users }: { onLogin: (session: AuthSession) => void; users: AppUser[] }) {
+  const [mode, setMode] = useState<"" | "client" | "capital">(""); 
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [error, setError] = useState("");
+
+  function handleLogin() {
+    const user = users.find((u) => u.username.toLowerCase() === username.toLowerCase());
+    if (!user) { setError("Username not found."); return; }
+    if (user.password !== password) { setError("Incorrect password. If you forgot it, please contact your admin."); return; }
+    setError(""); onLogin({ user });
+  }
+
+  function handleCapitalSeeker() {
+    const guestUser: AppUser = { id: 9999, username: "guest", password: "", role: "capital-seeker", name: "Capital Seeker", blockedLenderIds: [] };
+    onLogin({ user: guestUser });
+  }
+
+  return (
+    <div className="min-h-screen bg-[#f0f2f5] flex">
+      <div className="hidden lg:flex flex-col w-[260px] bg-[#0a1f44] border-r border-[#c9a84c]/10 relative flex-shrink-0">
+        <div className="px-6 py-8 border-b border-[#c9a84c]/20">
+          <div className="flex items-center gap-3 mb-2">
+            <img src="/logo1.JPEG" alt="CapMoon" className="h-12 w-12 object-contain rounded-full" />
+            <div><div className="font-display text-2xl font-bold text-white">CapMoon</div><div className="text-xs text-gray-400 tracking-wide">Lender Intelligence Platform</div></div>
+          </div>
+          <div className="text-xs uppercase tracking-[0.35em] text-[#c9a84c] font-bold mt-3">Investment Banking</div>
+        </div>
+        <nav className="space-y-1 p-4 flex-1 opacity-40 pointer-events-none select-none">
+          {[["Overview", Gauge], ["Lender Programs", Landmark], ["Add Lender", Plus], ["Deal Matcher", Filter], ["Deal Team", Users], ["Upload Center", FileSpreadsheet]].map(([label, Icon]: any) => (
+            <div key={String(label)} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-gray-300 border border-transparent">
+              <Icon className="h-4 w-4 flex-shrink-0" /><span className="text-sm font-medium tracking-wide">{label}</span>
+            </div>
+          ))}
+        </nav>
+        <div className="p-4 border-t border-[#c9a84c]/20 opacity-40">
+          <div className="rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/10 p-4">
+            <div className="flex items-center gap-2 mb-2"><ShieldCheck className="h-4 w-4 text-[#c9a84c]" /><span className="text-xs font-bold text-[#c9a84c] tracking-wide uppercase">Auto-Match Engine</span></div>
+            <p className="text-xs text-gray-300 leading-relaxed">Spreadsheet-driven criteria plus dashboard lenders.</p>
+          </div>
+        </div>
+        <div className="absolute inset-0 bg-[#0a1f44]/60 backdrop-blur-[2px] flex items-center justify-center">
+          <div className="text-center"><Lock className="h-8 w-8 text-[#c9a84c] mx-auto mb-2" /><div className="text-xs text-gray-300 font-medium">Login Required</div></div>
+        </div>
+      </div>
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <img src="/logo1.JPEG" alt="CapMoon" className="h-16 w-16 object-contain rounded-full mx-auto mb-4" />
+            <div className="font-display text-4xl font-bold text-[#0a1f44] mb-1">CapMoon</div>
+            <div className="text-sm text-gray-500">Premier Capital Search Platform</div>
+          </div>
+          {mode === "" && (
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+              <button onClick={() => setMode("client")} className="w-full p-6 rounded-2xl border-2 border-[#0a1f44] bg-[#0a1f44] text-white text-left hover:bg-[#0a1f44]/90 transition-all group">
+                <div className="flex items-center justify-between"><div><div className="text-lg font-bold mb-1">CapMoon Client Login</div><div className="text-sm text-gray-300">Access the full lender intelligence dashboard</div></div><ChevronRight className="h-5 w-5 text-[#c9a84c] group-hover:translate-x-1 transition-transform" /></div>
+              </button>
+              <button onClick={handleCapitalSeeker} className="w-full p-6 rounded-2xl border-2 border-[#c9a84c]/30 bg-white text-left hover:border-[#c9a84c] transition-all group">
+                <div className="flex items-center justify-between"><div><div className="text-lg font-bold text-[#0a1f44] mb-1">I Am Looking for Capital</div><div className="text-sm text-gray-500">Submit your deal for lender matching</div></div><ChevronRight className="h-5 w-5 text-[#c9a84c] group-hover:translate-x-1 transition-transform" /></div>
+              </button>
+            </motion.div>
+          )}
+          {mode === "client" && (
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+              <button onClick={() => { setMode(""); setError(""); }} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-6"><ChevronLeft className="h-3 w-3" /> Back</button>
+              <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Secure Access</div>
+              <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-6">Client Login</h2>
+              <div className="space-y-4">
+                <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Username / Email</label><Input value={username} onChange={(e) => setUsername(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()} placeholder="your@email.com" className="bg-white border-gray-300 text-gray-800 rounded-xl" /></div>
+                <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Password</label>
+                  <div className="relative"><Input type={showPass ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()} placeholder="••••••••" className="bg-white border-gray-300 text-gray-800 rounded-xl pr-10" /><button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">{showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
+                </div>
+                {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
+                <button onClick={handleLogin} className="w-full py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Sign In</button>
+              </div>
+            </motion.div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Capital Seeker Portal ────────────────────────────────────────────────────
 
-function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session }: { lenderRecords: LenderRecord[]; onLogout: () => void; onSubmitDeal: (deal: SubmittedDeal) => void; session: AuthSession }) {
+function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, teamMembers }: { lenderRecords: LenderRecord[]; onLogout: () => void; onSubmitDeal: (deal: SubmittedDeal) => void; session: AuthSession; teamMembers: TeamMember[] }) {
   const [activeTab, setActiveTab] = useState("matcher");
   const inputClass = "bg-white border-gray-300 text-gray-800 placeholder:text-gray-400 rounded-xl focus:border-[#0a1f44] focus:ring-0";
   const selectTriggerClass = "bg-white border-gray-300 text-gray-800 rounded-xl focus:border-[#0a1f44]";
   const cardClass = "rounded-2xl border border-gray-200 bg-white shadow-sm";
 
   function handleSubmit(assets: AssetData[], capitalType: string, assetMode: string, collateralMode: string) {
-    onSubmitDeal({ id: Date.now(), submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Guest", assets, capitalType, assetMode, collateralMode, status: "pending" });
+    const advisors = assignAdvisors(capitalType, teamMembers);
+    onSubmitDeal({ id: Date.now(), submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Guest", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a) => a.id) });
   }
 
   return (
@@ -887,7 +999,7 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session }:
             <div className="p-4 space-y-3 border-t border-[#c9a84c]/20">
               <div className="rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/10 p-4">
                 <div className="flex items-center gap-2 mb-2"><ShieldCheck className="h-4 w-4 text-[#c9a84c]" /><span className="text-xs font-bold text-[#c9a84c] tracking-wide uppercase">Auto-Match Engine</span></div>
-                <p className="text-xs text-gray-300 leading-relaxed">Tell us about your deal and we'll find the best lenders for you.</p>
+                <p className="text-xs text-gray-300 leading-relaxed">Tell us about your deal and we'll find the best advisors for you.</p>
               </div>
               <button onClick={onLogout} className="w-full flex items-center gap-2 px-4 py-2 text-xs text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all"><LogOut className="h-3.5 w-3.5" /> Exit Portal</button>
             </div>
@@ -899,7 +1011,7 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session }:
                 <h1 className="font-display text-4xl font-bold text-[#0a1f44] mt-1">Find Your Lender</h1>
                 <p className="mt-1 text-sm text-gray-500">CapMoon's Premier Capital Search Dashboard</p>
               </div>
-              {activeTab === "matcher" && <DealMatcher lenderRecords={lenderRecords} capitalSeekerMode={true} onSubmitDeal={handleSubmit} seekerName={session?.user.name} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />}
+              {activeTab === "matcher" && <DealMatcher lenderRecords={lenderRecords} capitalSeekerMode={true} onSubmitDeal={handleSubmit} seekerName={session?.user.name} teamMembers={teamMembers} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />}
               {activeTab === "uploads" && (
                 <div className={cardClass + " p-6"}>
                   <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Documents</div>
@@ -907,7 +1019,7 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session }:
                   <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 p-10 text-center hover:border-[#0a1f44]/40 transition-all">
                     <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-[#0a1f44]/10 border border-[#0a1f44]/20 text-[#0a1f44] mb-4"><Upload className="h-6 w-6" /></div>
                     <div className="text-base font-bold text-[#0a1f44] mb-1">Upload Deal Documents</div>
-                    <div className="text-sm text-gray-500 mb-5">Upload financials, rent rolls, or any supporting documents for your deal.</div>
+                    <div className="text-sm text-gray-500 mb-5">Upload financials, rent rolls, or supporting documents.</div>
                     <button className="px-5 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Select Files</button>
                   </div>
                 </div>
@@ -920,46 +1032,67 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session }:
   );
 }
 
-// ─── Admin Portal ─────────────────────────────────────────────────────────────
+// ─── Main Portal (Admin + Advisor) ────────────────────────────────────────────
 
-const adminNavItems: [string, string, any, string?][] = [
-  ["overview", "Overview", Gauge], ["lenders", "Lender Programs", Landmark],
-  ["add-lender", "Add Lender", Plus, "sub"], ["matcher", "Deal Matcher", Filter],
-  ["submitted-deals", "Submitted Deals", FileSpreadsheet],
-  ["uploads", "Upload Center", Upload], ["user-management", "User Management", Settings],
-];
-
-function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersProp, setUsers: setUsersExternal }: { session: AuthSession; onLogout: () => void; submittedDeals: SubmittedDeal[]; users: AppUser[]; setUsers: (u: AppUser[]) => void }) {
+function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, users, setUsers, teamMembers, setTeamMembers, deleteRequests, setDeleteRequests }: {
+  session: AuthSession; onLogout: () => void;
+  submittedDeals: SubmittedDeal[]; setSubmittedDeals: (d: SubmittedDeal[]) => void;
+  users: AppUser[]; setUsers: (u: AppUser[]) => void;
+  teamMembers: TeamMember[]; setTeamMembers: (m: TeamMember[]) => void;
+  deleteRequests: DeleteRequest[]; setDeleteRequests: (r: DeleteRequest[]) => void;
+}) {
+  const isAdmin = session?.user.role === "admin";
   const [activeTab, setActiveTab] = useState("overview");
   const [lenderRecords, setLenderRecords] = useState<LenderRecord[]>(seedLenders);
-  const [users, setUsers] = useState<AppUser[]>(initialUsersProp);
   const [search, setSearch] = useState("");
   const [selectedSourceFilter, setSelectedSourceFilter] = useState("All");
   const [selectedCapitalFilter, setSelectedCapitalFilter] = useState("All");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState("All");
   const [editingLenderId, setEditingLenderId] = useState<number | null>(null);
   const [viewingLenderId, setViewingLenderId] = useState<number | null>(null);
-  const [newUserForm, setNewUserForm] = useState({ name: "", username: "", password: "", role: "client" as AppUser["role"] });
+  const [newUserForm, setNewUserForm] = useState({ name: "", username: "", password: "", role: "capital-seeker" as AppUser["role"] });
 
   const inputClass = "bg-white border-gray-300 text-gray-800 placeholder:text-gray-400 rounded-xl focus:border-[#0a1f44] focus:ring-0";
   const selectTriggerClass = "bg-white border-gray-300 text-gray-800 rounded-xl focus:border-[#0a1f44]";
   const cardClass = "rounded-2xl border border-gray-200 bg-white shadow-sm";
 
+  const pendingDeleteCount = deleteRequests.filter((r) => r.status === "pending").length;
+
+  function handleDeleteLender(id: number) {
+    const lender = lenderRecords.find((l) => l.id === id);
+    if (!lender) return;
+    if (isAdmin) {
+      if (window.confirm(`Delete ${lender.lender}? This cannot be undone.`)) {
+        setLenderRecords((prev) => prev.filter((l) => l.id !== id));
+        setEditingLenderId(null);
+      }
+    } else {
+      setDeleteRequests([...deleteRequests, { id: Date.now(), lenderId: id, lenderName: lender.lender, requestedBy: session?.user.name || "Advisor", requestedAt: new Date().toLocaleString(), status: "pending" }]);
+      alert(`Delete request for "${lender.lender}" has been sent to admin for approval.`);
+    }
+  }
+
+  function handleDeleteRequestAction(reqId: number, action: "approved" | "denied") {
+    const req = deleteRequests.find((r) => r.id === reqId);
+    if (!req) return;
+    if (action === "approved") setLenderRecords((prev) => prev.filter((l) => l.id !== req.lenderId));
+    setDeleteRequests(deleteRequests.map((r) => r.id === reqId ? { ...r, status: action } : r));
+  }
+
   function updateLenderField(id: number, field: keyof LenderRecord, value: string) { setLenderRecords((prev) => prev.map((l) => l.id === id ? { ...l, [field]: value } : l)); }
   function toggleLenderStatus(id: number) { setLenderRecords((prev) => prev.map((l) => l.id !== id ? l : { ...l, status: l.status === "Inactive" ? "Active" : "Inactive" })); }
   function handleSaveLender(form: NewLenderForm) {
-    setLenderRecords((prev) => [...prev, { id: prev.length + 1, source: "Dashboard", spreadsheetRow: "—", program: form.programName, lender: form.programName, type: form.capitalType, minLoan: form.minLoan, maxLoan: form.maxLoan, maxLtv: form.maxLtv, minDscr: "1.20x", states: form.targetStates.length > 0 ? form.targetStates : ["Nationwide"], assets: form.propertyTypes.split(",").map((s) => s.trim()).filter(Boolean), status: form.status, email: form.email, phone: form.phone, recourse: form.recourse, contactPerson: form.contactPerson, website: form.website, sponsorStates: form.sponsorStates, loanTerms: form.loanTerms, typeOfLoans: form.typeOfLoans, programTypes: form.programTypes, typeOfLenders: form.typeOfLenders }]);
+    setLenderRecords((prev) => [...prev, { id: prev.length + 1, source: "Dashboard", spreadsheetRow: "—", program: form.programName, lender: form.programName, type: form.capitalType, minLoan: form.minLoan, maxLoan: form.maxLoan, maxLtv: form.maxLtv, minDscr: "1.20x", states: form.targetStates.length > 0 ? form.targetStates : ["Nationwide"], assets: Array.isArray(form.propertyTypes) ? form.propertyTypes : form.propertyTypes.toString().split(",").map((s: string) => s.trim()).filter(Boolean), status: form.status, email: form.email, phone: form.phone, recourse: form.recourse, contactPerson: form.contactPerson, website: form.website, sponsorStates: form.sponsorStates, loanTerms: Array.isArray(form.loanTerms) ? form.loanTerms.join(", ") : form.loanTerms, typeOfLoans: form.typeOfLoans, programTypes: form.programTypes, typeOfLenders: form.typeOfLenders, notes: form.notes }]);
     setActiveTab("lenders");
   }
   function addUser() {
     if (!newUserForm.name.trim() || !newUserForm.username.trim() || !newUserForm.password.trim()) return;
-    setUsers((prev) => [...prev, { id: prev.length + 1, ...newUserForm, blockedLenderIds: [] }]);
-    setNewUserForm({ name: "", username: "", password: "", role: "client" });
+    setUsers([...users, { id: users.length + 1, ...newUserForm, blockedLenderIds: [] }]);
+    setNewUserForm({ name: "", username: "", password: "", role: "capital-seeker" });
   }
   function toggleBlockedLender(userId: number, lenderId: number) {
-    setUsers((prev) => prev.map((u) => u.id !== userId ? u : { ...u, blockedLenderIds: u.blockedLenderIds.includes(lenderId) ? u.blockedLenderIds.filter((id) => id !== lenderId) : [...u.blockedLenderIds, lenderId] }));
+    setUsers(users.map((u) => u.id !== userId ? u : { ...u, blockedLenderIds: u.blockedLenderIds.includes(lenderId) ? u.blockedLenderIds.filter((id) => id !== lenderId) : [...u.blockedLenderIds, lenderId] }));
   }
-  function deleteUser(userId: number) { setUsers((prev) => prev.filter((u) => u.id !== userId)); }
 
   const filteredLenders = useMemo(() => lenderRecords.filter((l) =>
     (selectedSourceFilter === "All" || l.source === selectedSourceFilter) &&
@@ -970,6 +1103,18 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
 
   const spreadsheetCount = lenderRecords.filter((l) => l.source === "Spreadsheet").length;
   const dashboardCount = lenderRecords.filter((l) => l.source === "Dashboard").length;
+
+  const navItems: [string, string, any, string?][] = [
+    ["overview", "Overview", Gauge],
+    ["lenders", "Lender Programs", Landmark],
+    ["add-lender", "Add Lender", Plus, "sub"],
+    ["matcher", "Deal Matcher", Filter],
+    ["deal-team", "Deal Team", Users],
+    ["submitted-deals", "Submitted Deals", FileSpreadsheet],
+    ["uploads", "Upload Center", Upload],
+    ...(isAdmin ? [["user-management", "User Management", Settings] as [string, string, any]] : []),
+    ...(isAdmin && pendingDeleteCount > 0 ? [["delete-queue", `Delete Requests (${pendingDeleteCount})`, Bell] as [string, string, any]] : []),
+  ];
 
   return (
     <>
@@ -984,8 +1129,8 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
               </div>
               <div className="text-xs uppercase tracking-[0.35em] text-[#c9a84c] font-bold mt-3">Investment Banking</div>
             </div>
-            <nav className="space-y-1 p-4 flex-1">
-              {adminNavItems.map(([key, label, Icon, type]) => (
+            <nav className="space-y-1 p-4 flex-1 overflow-y-auto">
+              {navItems.map(([key, label, Icon, type]) => (
                 <button key={key} onClick={() => setActiveTab(key)} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-all duration-200 ${type === "sub" ? "pl-8" : ""} ${activeTab === key ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/30" : "text-gray-300 hover:bg-white/5 hover:text-white border border-transparent"}`}>
                   <Icon className={`flex-shrink-0 ${type === "sub" ? "h-3.5 w-3.5" : "h-4 w-4"}`} />
                   <span className={`font-medium tracking-wide ${type === "sub" ? "text-xs" : "text-sm"}`}>{label}</span>
@@ -1033,7 +1178,7 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
                     <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Pipeline</div>
                     <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">Snapshot</h2>
                     <div className="grid gap-4 md:grid-cols-3 mb-6">
-                      {[["New Deal Requests", "18", "This week"], ["Matched This Month", "126", "Ranked & exported"], ["Dashboard Lenders", String(dashboardCount), "Added manually"]].map(([label, value, detail]) => (
+                      {[["New Deal Requests", String(submittedDeals.length), "Total submitted"], ["Pending", String(submittedDeals.filter(d => d.status === "pending").length), "Awaiting advisor"], ["Dashboard Lenders", String(dashboardCount), "Added manually"]].map(([label, value, detail]) => (
                         <div key={String(label)} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                           <div className="text-xs text-gray-500 mb-1">{label}</div>
                           <div className="text-2xl font-bold text-[#0a1f44]">{value}</div>
@@ -1071,7 +1216,7 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
                     <div>
                       <div className="text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold mb-1">Registry</div>
                       <h2 className="font-display text-2xl font-bold text-[#0a1f44]">Lender Programs</h2>
-                      <p className="text-xs text-gray-500 mt-0.5">Click a lender name to view details. Click Edit to modify.</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Click a lender name to view profile. Click Edit to modify.</p>
                     </div>
                     <button onClick={() => setActiveTab("add-lender")} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80"><Plus className="h-4 w-4" /> Add Lender</button>
                   </div>
@@ -1103,7 +1248,7 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
                     </Table>
                   </div>
 
-                  {/* Lender Profile View */}
+                  {/* Profile View */}
                   {viewingLenderId && (() => {
                     const lender = lenderRecords.find((l) => l.id === viewingLenderId);
                     if (!lender) return null;
@@ -1123,46 +1268,25 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
                         <div className="p-6 space-y-6">
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             {[["Capital Type", lender.type], ["Min Loan", lender.minLoan], ["Max Loan", lender.maxLoan], ["Max LTV", lender.maxLtv], ["Recourse", lender.recourse || "—"], ["Source", lender.source], ["Row", lender.spreadsheetRow], ["Loan Terms", lender.loanTerms || "—"]].map(([label, val]) => (
-                              <div key={String(label)} className="rounded-xl bg-gray-50 border border-gray-100 p-3">
-                                <div className="text-xs uppercase tracking-[0.12em] text-[#c9a84c] font-bold mb-1">{label}</div>
-                                <div className="text-sm font-semibold text-[#0a1f44]">{val}</div>
-                              </div>
+                              <div key={String(label)} className="rounded-xl bg-gray-50 border border-gray-100 p-3"><div className="text-xs uppercase tracking-[0.12em] text-[#c9a84c] font-bold mb-1">{label}</div><div className="text-sm font-semibold text-[#0a1f44]">{val}</div></div>
                             ))}
                           </div>
                           <div>
                             <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-3">Primary Contact</div>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                               {[["Name", lender.contactPerson || "—"], ["Email", lender.email || "—"], ["Phone", lender.phone || "—"], ["Website", lender.website || "—"]].map(([label, val]) => (
-                                <div key={String(label)} className="rounded-xl bg-gray-50 border border-gray-100 p-3">
-                                  <div className="text-xs text-gray-400 mb-1">{label}</div>
-                                  <div className="text-sm font-medium text-[#0a1f44] break-all">{val}</div>
-                                </div>
+                                <div key={String(label)} className="rounded-xl bg-gray-50 border border-gray-100 p-3"><div className="text-xs text-gray-400 mb-1">{label}</div><div className="text-sm font-medium text-[#0a1f44] break-all">{val}</div></div>
                               ))}
                             </div>
                           </div>
-                          {lender.contacts && lender.contacts.length > 0 && (
-                            <div>
-                              <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-3">Additional Contacts</div>
-                              <div className="grid gap-3 md:grid-cols-2">
-                                {lender.contacts.map((contact, idx) => (
-                                  <div key={contact.id} className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4">
-                                    <div className="text-xs font-bold text-[#0a1f44] mb-2">Contact {idx + 1}{contact.region ? ` — ${contact.region}` : ""}</div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      {[["Name", contact.name || "—"], ["Phone", contact.phone || "—"], ["Email", contact.email || "—"], ["Region", contact.region || "—"]].map(([label, val]) => (
-                                        <div key={String(label)}><div className="text-xs text-gray-400">{label}</div><div className="text-xs font-semibold text-[#0a1f44] break-all">{val}</div></div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                          {lender.contacts && lender.contacts.length > 0 && (<div><div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-3">Additional Contacts</div><div className="grid gap-3 md:grid-cols-2">{lender.contacts.map((contact, idx) => (<div key={contact.id} className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4"><div className="text-xs font-bold text-[#0a1f44] mb-2">Contact {idx + 1}{contact.region ? ` — ${contact.region}` : ""}</div><div className="grid grid-cols-2 gap-2">{[["Name", contact.name || "—"], ["Phone", contact.phone || "—"], ["Email", contact.email || "—"], ["Region", contact.region || "—"]].map(([label, val]) => (<div key={String(label)}><div className="text-xs text-gray-400">{label}</div><div className="text-xs font-semibold text-[#0a1f44] break-all">{val}</div></div>))}</div></div>))}</div></div>)}
                           {lender.typeOfLenders && lender.typeOfLenders.length > 0 && (<div><div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Type of Lender</div><div className="flex flex-wrap gap-2">{lender.typeOfLenders.map((t) => <span key={t} className="px-3 py-1 rounded-full text-xs bg-[#0a1f44] text-white font-medium">{t}</span>)}</div></div>)}
                           {lender.typeOfLoans && lender.typeOfLoans.length > 0 && (<div><div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Type of Loans</div><div className="flex flex-wrap gap-2">{lender.typeOfLoans.map((t) => <span key={t} className="px-3 py-1 rounded-full text-xs border border-[#0a1f44]/20 text-[#0a1f44] font-medium">{t}</span>)}</div></div>)}
                           {lender.programTypes && lender.programTypes.length > 0 && (<div><div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Program</div><div className="flex flex-wrap gap-2">{lender.programTypes.map((t) => <span key={t} className="px-3 py-1 rounded-full text-xs border border-[#c9a84c]/30 text-[#c9a84c] font-bold">{t}</span>)}</div></div>)}
                           {lender.assets && lender.assets.length > 0 && (<div><div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Property Types</div><div className="flex flex-wrap gap-2">{lender.assets.map((t) => <span key={t} className="px-3 py-1 rounded-full text-xs bg-gray-100 text-gray-600 border border-gray-200">{t}</span>)}</div></div>)}
                           {lender.states && lender.states.length > 0 && (<div><div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Target States ({lender.states.length})</div><div className="flex flex-wrap gap-1.5">{lender.states.includes("Nationwide") ? <span className="px-3 py-1 rounded-full text-xs bg-[#0a1f44] text-white font-medium">Nationwide</span> : lender.states.map((s) => <span key={s} className="px-2 py-0.5 rounded-md text-xs bg-gray-100 text-gray-600 border border-gray-200 font-medium">{s}</span>)}</div></div>)}
                           {lender.sponsorStates && lender.sponsorStates.length > 0 && (<div><div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Sponsor States ({lender.sponsorStates.length})</div><div className="flex flex-wrap gap-1.5">{lender.sponsorStates.map((s) => <span key={s} className="px-2 py-0.5 rounded-md text-xs bg-gray-100 text-gray-600 border border-gray-200 font-medium">{s}</span>)}</div></div>)}
+                          {lender.notes && (<div><div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Notes</div><div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-gray-700 whitespace-pre-wrap">{lender.notes}</div></div>)}
                           <div className="flex gap-3 pt-2 border-t border-gray-100">
                             <button onClick={() => { setEditingLenderId(lender.id); setViewingLenderId(null); }} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80"><Edit2 className="h-3.5 w-3.5" /> Edit Lender</button>
                             <button onClick={() => setViewingLenderId(null)} className="px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">Close</button>
@@ -1180,7 +1304,9 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
                       <div className="mt-6 rounded-xl border border-[#0a1f44]/20 bg-gray-50 p-6">
                         <div className="flex items-center justify-between mb-5">
                           <div><div className="text-xs uppercase tracking-[0.2em] text-[#c9a84c] font-bold mb-1">Editing</div><div className="text-lg font-bold text-[#0a1f44]">{lender.lender}</div></div>
-                          <button onClick={() => { if (window.confirm(`Delete ${lender.lender}? This cannot be undone.`)) { setLenderRecords((prev) => prev.filter((l) => l.id !== lender.id)); setEditingLenderId(null); } }} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-500 border border-red-200 rounded-xl hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /> Delete Lender</button>
+                          <button onClick={() => handleDeleteLender(lender.id)} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-500 border border-red-200 rounded-xl hover:bg-red-50">
+                            <Trash2 className="h-3.5 w-3.5" /> {isAdmin ? "Delete Lender" : "Request Deletion"}
+                          </button>
                         </div>
                         <div className="space-y-5">
                           <div className="grid gap-3 md:grid-cols-3">
@@ -1195,8 +1321,17 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
                             <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Min Loan</label><Input value={lender.minLoan || ""} onChange={(e) => updateLenderField(lender.id, "minLoan", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
                             <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max Loan</label><Input value={lender.maxLoan || ""} onChange={(e) => updateLenderField(lender.id, "maxLoan", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
                             <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max LTV</label><Input value={lender.maxLtv || ""} onChange={(e) => updateLenderField(lender.id, "maxLtv", e.target.value)} className={inputClass} /></div>
-                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Property Types</label><Input value={lender.assets?.join(", ") || ""} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, assets: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } : l))} className={inputClass} /></div>
-                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Loan Terms</label><Input value={lender.loanTerms || ""} onChange={(e) => updateLenderField(lender.id, "loanTerms", e.target.value)} className={inputClass} /></div>
+                            {lender.type === "C&I" ? (
+                              <>
+                                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Property Types</label><Input value={lender.assets?.join(", ") || ""} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, assets: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } : l))} className={inputClass} /></div>
+                                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Loan Terms</label><Input value={lender.loanTerms || ""} onChange={(e) => updateLenderField(lender.id, "loanTerms", e.target.value)} className={inputClass} /></div>
+                              </>
+                            ) : (
+                              <>
+                                <DropdownCheckbox label="Property Types" options={lenderPropertyTypeOptions} selected={lender.assets || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, assets: v } : l))} />
+                                <DropdownCheckbox label="Loan Terms" options={loanTermOptions} selected={lender.loanTerms ? lender.loanTerms.split(",").map(s => s.trim()).filter(Boolean) : []} onChange={(v) => updateLenderField(lender.id, "loanTerms", v.join(", "))} />
+                              </>
+                            )}
                             <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Recourse</label><Select value={lender.recourse || "CASE BY CASE"} onValueChange={(v) => updateLenderField(lender.id, "recourse", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
                           </div>
                           <CheckboxGroup label="Type of Lender" options={typeOfLenderOptions} selected={lender.typeOfLenders || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, typeOfLenders: v } : l))} />
@@ -1204,10 +1339,9 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
                           <CheckboxGroup label="Program" options={programTypeOptions} selected={lender.programTypes || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, programTypes: v } : l))} />
                           <StateSelector label="Target States" selected={lender.states || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, states: v } : l))} />
                           <StateSelector label="Sponsor States" selected={lender.sponsorStates || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, sponsorStates: v } : l))} />
-                          {/* Additional Contacts */}
                           <div>
                             <div className="flex items-center justify-between mb-3">
-                              <div><label className="text-xs text-gray-500 font-bold uppercase tracking-wide">Additional Contacts</label><p className="text-xs text-gray-400 mt-0.5">Add multiple contacts with their geographic coverage</p></div>
+                              <div><label className="text-xs text-gray-500 font-bold uppercase tracking-wide">Additional Contacts</label><p className="text-xs text-gray-400 mt-0.5">Add multiple contacts with geographic coverage</p></div>
                               <button onClick={() => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: [...(l.contacts || []), { id: Date.now(), name: "", phone: "", email: "", region: "" }] } : l))} className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-[#0a1f44] text-white rounded-lg hover:bg-[#0a1f44]/80"><Plus className="h-3 w-3" /> Add Contact</button>
                             </div>
                             {(!lender.contacts || lender.contacts.length === 0) ? (
@@ -1218,15 +1352,19 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
                                   <div key={contact.id} className="rounded-xl border border-gray-200 bg-white p-4">
                                     <div className="flex items-center justify-between mb-3"><span className="text-xs font-bold text-[#0a1f44]">Contact {cidx + 1}</span><button onClick={() => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).filter((c) => c.id !== contact.id) } : l))} className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button></div>
                                     <div className="grid gap-2 md:grid-cols-2">
-                                      <div><label className="text-xs text-gray-400 mb-1 block">Contact Name</label><Input value={contact.name} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, name: e.target.value } : c) } : l))} placeholder="Full name" className={inputClass} /></div>
-                                      <div><label className="text-xs text-gray-400 mb-1 block">Phone Number</label><Input value={contact.phone} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, phone: e.target.value } : c) } : l))} placeholder="(555) 000-0000" className={inputClass} /></div>
-                                      <div><label className="text-xs text-gray-400 mb-1 block">Email Address</label><Input value={contact.email} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, email: e.target.value } : c) } : l))} placeholder="email@example.com" className={inputClass} /></div>
-                                      <div><label className="text-xs text-gray-400 mb-1 block">Geographic Region</label><Input value={contact.region} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, region: e.target.value } : c) } : l))} placeholder="e.g. Southeast, NY/NJ" className={inputClass} /></div>
+                                      <div><label className="text-xs text-gray-400 mb-1 block">Name</label><Input value={contact.name} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, name: e.target.value } : c) } : l))} placeholder="Full name" className={inputClass} /></div>
+                                      <div><label className="text-xs text-gray-400 mb-1 block">Phone</label><Input value={contact.phone} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, phone: e.target.value } : c) } : l))} placeholder="(555) 000-0000" className={inputClass} /></div>
+                                      <div><label className="text-xs text-gray-400 mb-1 block">Email</label><Input value={contact.email} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, email: e.target.value } : c) } : l))} placeholder="email@example.com" className={inputClass} /></div>
+                                      <div><label className="text-xs text-gray-400 mb-1 block">Region</label><Input value={contact.region} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, contacts: (l.contacts || []).map((c) => c.id === contact.id ? { ...c, region: e.target.value } : c) } : l))} placeholder="e.g. Southeast" className={inputClass} /></div>
                                     </div>
                                   </div>
                                 ))}
                               </div>
                             )}
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase tracking-wide">Notes</label>
+                            <textarea value={lender.notes || ""} onChange={(e) => updateLenderField(lender.id, "notes", e.target.value)} placeholder="Add any notes about this lender — deal history, preferences, spreadsheet notes, etc." rows={4} className="w-full px-4 py-3 text-sm bg-white border border-gray-300 rounded-xl text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#0a1f44] resize-none" />
                           </div>
                           <div className="flex gap-3 pt-2 border-t border-gray-200">
                             <button onClick={() => setEditingLenderId(null)} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Done</button>
@@ -1239,14 +1377,16 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
                 </div>
               )}
 
-              {activeTab === "add-lender" && (
-                <AddLenderPage onSave={handleSaveLender} onCancel={() => setActiveTab("lenders")} existingLenders={lenderRecords} inputClass={inputClass} selectTriggerClass={selectTriggerClass} />
+              {activeTab === "add-lender" && <AddLenderPage onSave={handleSaveLender} onCancel={() => setActiveTab("lenders")} existingLenders={lenderRecords} inputClass={inputClass} selectTriggerClass={selectTriggerClass} />}
+
+              {activeTab === "matcher" && <DealMatcher lenderRecords={lenderRecords} teamMembers={teamMembers} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />}
+
+              {/* Deal Team Tab */}
+              {activeTab === "deal-team" && (
+                <DealTeamTab teamMembers={teamMembers} setTeamMembers={setTeamMembers} currentUserId={session?.user.teamMemberId || -1} isAdmin={isAdmin} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />
               )}
 
-              {activeTab === "matcher" && (
-                <DealMatcher lenderRecords={lenderRecords} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />
-              )}
-
+              {/* Submitted Deals */}
               {activeTab === "submitted-deals" && (
                 <div className={cardClass + " p-6"}>
                   <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Incoming</div>
@@ -1255,55 +1395,54 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
                     <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">No deals submitted yet. Capital seekers will appear here once they submit a deal.</div>
                   ) : (
                     <div className="space-y-4">
-                      {submittedDeals.map((deal) => (
-                        <div key={deal.id} className="rounded-xl border border-gray-200 bg-gray-50 p-5">
-                          <div className="flex items-start justify-between mb-4">
-                            <div>
-                              <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Deal #{deal.id}</div>
-                              <div className="text-base font-bold text-[#0a1f44]">{deal.seekerName}</div>
-                              <div className="text-xs text-gray-500 mt-0.5">Submitted: {deal.submittedAt}</div>
-                            </div>
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${deal.status === "pending" ? "bg-amber-50 text-amber-600 border border-amber-200" : deal.status === "assigned" ? "bg-blue-50 text-blue-600 border border-blue-200" : "bg-emerald-50 text-emerald-600 border border-emerald-200"}`}>
-                              {deal.status.charAt(0).toUpperCase() + deal.status.slice(1)}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                            {[["Capital Type", deal.capitalType], ["Assets", `${deal.assets.length} asset${deal.assets.length > 1 ? "s" : ""}`], ["Loan Amount", deal.assets[0]?.loanAmount || "—"], ["Asset Type", deal.assets[0]?.assetType || "—"]].map(([label, val]) => (
-                              <div key={String(label)} className="rounded-lg bg-white border border-gray-200 p-3">
-                                <div className="text-xs text-gray-400 mb-1">{label}</div>
-                                <div className="text-sm font-bold text-[#0a1f44]">{val}</div>
+                      {submittedDeals.map((deal) => {
+                        const advisors = teamMembers.filter((m) => deal.assignedAdvisorIds.includes(m.id));
+                        return (
+                          <div key={deal.id} className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+                            <div className="flex items-start justify-between mb-4">
+                              <div>
+                                <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Deal #{deal.id}</div>
+                                <div className="text-base font-bold text-[#0a1f44]">{deal.seekerName}</div>
+                                <div className="text-xs text-gray-500 mt-0.5">Submitted: {deal.submittedAt}</div>
                               </div>
-                            ))}
-                          </div>
-                          {deal.assets.map((asset, idx) => asset.address?.city ? (
-                            <div key={idx} className="text-xs text-gray-500 mt-1">Asset {idx + 1}: {asset.address.street ? `${asset.address.street}, ` : ""}{asset.address.city}, {asset.address.state} {asset.address.zip}</div>
-                          ) : null)}
-                          {/* Assigned Deal Team */}
-                          <div className="mt-4 pt-4 border-t border-gray-200">
-                            <div className="text-xs uppercase tracking-[0.15em] text-[#0a1f44] font-bold mb-3">Assigned Deal Team</div>
-                            <div className="flex gap-4">
-                              {[
-                                { name: "Louis Palumbo", title: "VP of Capital Advisory", email: "lpalumbo@capmoon.com", phone: "305-401-0076", photo: "/louis.jpg" },
-                                { name: "Shuvo Hussain", title: "VP of Capital Advisory", email: "shussain@capmoon.com", phone: "347-993-5545", photo: "/Shuvo.jpeg" },
-                              ].map((advisor) => (
-                                <div key={advisor.email} className="flex items-center gap-3 bg-[#0a1f44] rounded-xl px-4 py-3">
-                                  <img src={advisor.photo} alt={advisor.name} className="h-10 w-10 rounded-lg object-cover border border-[#c9a84c]/30 flex-shrink-0" />
-                                  <div>
-                                    <div className="text-xs font-bold text-white">{advisor.name}</div>
-                                    <div className="text-xs text-[#c9a84c]">{advisor.title}</div>
-                                    <div className="text-xs text-gray-400 mt-0.5">{advisor.phone}</div>
-                                  </div>
-                                </div>
+                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${deal.status === "pending" ? "bg-amber-50 text-amber-600 border border-amber-200" : deal.status === "assigned" ? "bg-blue-50 text-blue-600 border border-blue-200" : "bg-emerald-50 text-emerald-600 border border-emerald-200"}`}>
+                                {deal.status.charAt(0).toUpperCase() + deal.status.slice(1)}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                              {[["Capital Type", deal.capitalType], ["Assets", `${deal.assets.length} asset${deal.assets.length > 1 ? "s" : ""}`], ["Loan Amount", deal.assets[0]?.loanAmount || "—"], ["Asset Type", deal.assets[0]?.assetType || "—"]].map(([label, val]) => (
+                                <div key={String(label)} className="rounded-lg bg-white border border-gray-200 p-3"><div className="text-xs text-gray-400 mb-1">{label}</div><div className="text-sm font-bold text-[#0a1f44]">{val}</div></div>
                               ))}
                             </div>
+                            {deal.assets.map((asset, idx) => asset.address?.city ? (
+                              <div key={idx} className="text-xs text-gray-500 mt-1">Asset {idx + 1}: {asset.address.street ? `${asset.address.street}, ` : ""}{asset.address.city}, {asset.address.state} {asset.address.zip}</div>
+                            ) : null)}
+                            {advisors.length > 0 && (
+                              <div className="mt-4 pt-4 border-t border-gray-200">
+                                <div className="text-xs uppercase tracking-[0.15em] text-[#0a1f44] font-bold mb-3">Assigned Advisor{advisors.length > 1 ? "s" : ""}</div>
+                                <div className="flex gap-3 flex-wrap">
+                                  {advisors.map((advisor) => (
+                                    <div key={advisor.id} className="flex items-center gap-3 bg-[#0a1f44] rounded-xl px-4 py-3">
+                                      <img src={advisor.photo || "/logo1.JPEG"} alt={advisor.name} className="h-10 w-10 rounded-lg object-cover border border-[#c9a84c]/30 flex-shrink-0" />
+                                      <div>
+                                        <div className="text-xs font-bold text-white">{advisor.name}</div>
+                                        <div className="text-xs text-[#c9a84c]">{advisor.title}</div>
+                                        <div className="text-xs text-gray-400 mt-0.5">{advisor.phone}</div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
               )}
 
+              {/* Uploads */}
               {activeTab === "uploads" && (
                 <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
                   <div className={cardClass + " p-6"}>
@@ -1319,35 +1458,33 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
                   <div className={cardClass + " p-6"}>
                     <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Preview</div>
                     <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">Detected Schema</h2>
-                    <div className="flex flex-wrap gap-2 mb-5">{["Program Name", "Contact Person", "Email Address", "Phone Number", "Website", "Type of Lender", "Type of Loans", "Program", "Property Types", "Loan Terms", "Min Loan Size", "Max Loan Size", "Max LTV", "Target States", "Sponsor States", "Recourse", "Capital Type", "Source Tag"].map((field) => (<span key={field} className="px-3 py-1 rounded-full text-xs border border-[#0a1f44]/20 text-[#0a1f44] font-medium">{field}</span>))}</div>
+                    <div className="flex flex-wrap gap-2 mb-5">{["Program Name", "Contact Person", "Email Address", "Phone Number", "Website", "Type of Lender", "Type of Loans", "Program", "Property Types", "Loan Terms", "Min Loan Size", "Max Loan Size", "Max LTV", "Target States", "Sponsor States", "Recourse", "Capital Type", "Notes", "Source Tag"].map((field) => (<span key={field} className="px-3 py-1 rounded-full text-xs border border-[#0a1f44]/20 text-[#0a1f44] font-medium">{field}</span>))}</div>
                     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">All fields above are automatically mapped when a spreadsheet is uploaded.</div>
                   </div>
                 </div>
               )}
 
-              {/* User Management */}
-              {activeTab === "user-management" && (
+              {/* User Management (admin only) */}
+              {activeTab === "user-management" && isAdmin && (
                 <div className="space-y-6">
                   <div className={cardClass + " p-6"}>
                     <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Admin</div>
                     <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">User Management</h2>
-                    {/* Add user form */}
                     <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-5 mb-6">
                       <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-4">Add New User</div>
                       <div className="grid gap-3 md:grid-cols-4">
-                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Full Name</label><Input value={newUserForm.name} onChange={(e) => setNewUserForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="John Smith" className={inputClass} /></div>
-                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Username</label><Input value={newUserForm.username} onChange={(e) => setNewUserForm((prev) => ({ ...prev, username: e.target.value }))} placeholder="john.smith" className={inputClass} /></div>
-                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Password</label><Input value={newUserForm.password} onChange={(e) => setNewUserForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="••••••••" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Full Name</label><Input value={newUserForm.name} onChange={(e) => setNewUserForm((p) => ({ ...p, name: e.target.value }))} placeholder="John Smith" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Email / Username</label><Input value={newUserForm.username} onChange={(e) => setNewUserForm((p) => ({ ...p, username: e.target.value }))} placeholder="john@capmoon.com" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Password</label><Input value={newUserForm.password} onChange={(e) => setNewUserForm((p) => ({ ...p, password: e.target.value }))} placeholder="••••••••" className={inputClass} /></div>
                         <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Role</label>
-                          <Select value={newUserForm.role} onValueChange={(v) => setNewUserForm((prev) => ({ ...prev, role: v as AppUser["role"] }))}>
+                          <Select value={newUserForm.role} onValueChange={(v) => setNewUserForm((p) => ({ ...p, role: v as AppUser["role"] }))}>
                             <SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger>
-                            <SelectContent><SelectItem value="client">Client</SelectItem><SelectItem value="capital-seeker">Capital Seeker</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
+                            <SelectContent><SelectItem value="capital-seeker">Capital Seeker</SelectItem><SelectItem value="advisor">Advisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
                           </Select>
                         </div>
                       </div>
                       <button onClick={addUser} className="mt-4 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Add User</button>
                     </div>
-                    {/* Users list */}
                     <div className="space-y-4">
                       {users.map((user) => (
                         <div key={user.id} className="rounded-xl border border-gray-200 bg-gray-50 p-5">
@@ -1357,16 +1494,14 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
                               <div className="text-xs text-gray-500 mt-0.5">@{user.username} · <span className="capitalize">{user.role}</span></div>
                             </div>
                             <div className="flex gap-2">
-                              {user.id !== 1 && (
-                                <button onClick={() => deleteUser(user.id)} className="px-3 py-1 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
-                              )}
-                              {user.id === 1 && <span className="px-3 py-1 text-xs bg-[#c9a84c]/10 text-[#c9a84c] border border-[#c9a84c]/20 rounded-lg font-bold">Admin</span>}
+                              {user.id !== 1 && (<button onClick={() => setUsers(users.filter((u) => u.id !== user.id))} className="px-3 py-1 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50">Remove</button>)}
+                              {user.id === 1 && <span className="px-3 py-1 text-xs bg-[#c9a84c]/10 text-[#c9a84c] border border-[#c9a84c]/20 rounded-lg font-bold">Master Admin</span>}
                             </div>
                           </div>
                           {user.role !== "admin" && (
                             <div>
                               <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Lender Access Control</div>
-                              <div className="text-xs text-gray-500 mb-3">Check boxes to block this user from seeing specific lenders:</div>
+                              <div className="text-xs text-gray-500 mb-3">Check to block this user from seeing specific lenders:</div>
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                                 {lenderRecords.map((lender) => (
                                   <label key={lender.id} className="flex items-center gap-2 text-xs cursor-pointer p-2 rounded-lg hover:bg-gray-100">
@@ -1375,15 +1510,43 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
                                   </label>
                                 ))}
                               </div>
-                              {user.blockedLenderIds.length > 0 && (
-                                <div className="mt-2 text-xs text-red-500 font-medium">{user.blockedLenderIds.length} lender{user.blockedLenderIds.length > 1 ? "s" : ""} blocked for this user</div>
-                              )}
+                              {user.blockedLenderIds.length > 0 && (<div className="mt-2 text-xs text-red-500 font-medium">{user.blockedLenderIds.length} lender{user.blockedLenderIds.length > 1 ? "s" : ""} blocked</div>)}
                             </div>
                           )}
                         </div>
                       ))}
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Delete Queue (admin only) */}
+              {activeTab === "delete-queue" && isAdmin && (
+                <div className={cardClass + " p-6"}>
+                  <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Admin Approval</div>
+                  <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">Lender Delete Requests</h2>
+                  {deleteRequests.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">No delete requests pending.</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {deleteRequests.map((req) => (
+                        <div key={req.id} className="rounded-xl border border-gray-200 bg-gray-50 p-5 flex items-center justify-between">
+                          <div>
+                            <div className="text-sm font-bold text-[#0a1f44]">{req.lenderName}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">Requested by <span className="font-medium">{req.requestedBy}</span> · {req.requestedAt}</div>
+                          </div>
+                          {req.status === "pending" ? (
+                            <div className="flex gap-2">
+                              <button onClick={() => handleDeleteRequestAction(req.id, "approved")} className="px-4 py-2 text-xs font-semibold bg-red-500 text-white rounded-xl hover:bg-red-600">Approve & Delete</button>
+                              <button onClick={() => handleDeleteRequestAction(req.id, "denied")} className="px-4 py-2 text-xs border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-100">Deny</button>
+                            </div>
+                          ) : (
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${req.status === "approved" ? "bg-red-50 text-red-500 border border-red-200" : "bg-gray-100 text-gray-500 border border-gray-200"}`}>{req.status === "approved" ? "Approved & Deleted" : "Denied"}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1399,15 +1562,17 @@ function AdminPortal({ session, onLogout, submittedDeals, users: initialUsersPro
 
 export default function Home() {
   const [session, setSession] = useState<AuthSession>(null);
-  const [submittedDeals, setSubmittedDeals] = useState<SubmittedDeal[]>([]);
   const [users, setUsers] = useState<AppUser[]>(initialUsers);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(initialTeamMembers);
+  const [submittedDeals, setSubmittedDeals] = useState<SubmittedDeal[]>([]);
+  const [deleteRequests, setDeleteRequests] = useState<DeleteRequest[]>([]);
 
   function handleSubmitDeal(deal: SubmittedDeal) { setSubmittedDeals((prev) => [...prev, deal]); }
   function handleLogout() { setSession(null); }
 
-  if (!session) return <LoginWall onLogin={setSession} />;
+  if (!session) return <LoginWall onLogin={setSession} users={users} />;
   if (session.user.role === "capital-seeker") {
-    return <CapitalSeekerPortal lenderRecords={seedLenders} onLogout={handleLogout} onSubmitDeal={handleSubmitDeal} session={session} />;
+    return <CapitalSeekerPortal lenderRecords={seedLenders} onLogout={handleLogout} onSubmitDeal={handleSubmitDeal} session={session} teamMembers={teamMembers} />;
   }
-  return <AdminPortal session={session} onLogout={handleLogout} submittedDeals={submittedDeals} users={users} setUsers={setUsers} />;
+  return <MainPortal session={session} onLogout={handleLogout} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals} users={users} setUsers={setUsers} teamMembers={teamMembers} setTeamMembers={setTeamMembers} deleteRequests={deleteRequests} setDeleteRequests={setDeleteRequests} />;
 }
