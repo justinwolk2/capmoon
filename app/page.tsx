@@ -819,6 +819,12 @@ function formatCurrencyInput(v: string) {
   return `$${decimal !== undefined ? `${Number(whole||0).toLocaleString("en-US")}.${decimal.slice(0,2)}` : Number(whole||0).toLocaleString("en-US")}`;
 }
 function formatPercent(v: number) { if (!Number.isFinite(v) || !isFinite(v) || v === 0) return "—"; return `${v.toFixed(1)}%`; }
+function matchLabel(score: number): { label: string; color: string; bg: string; border: string } {
+  if (score >= 80) return { label: "Excellent Match", color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" };
+  if (score >= 60) return { label: "Strong Match", color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200" };
+  if (score >= 40) return { label: "Good Match", color: "text-[#c9a84c]", bg: "bg-[#c9a84c]/10", border: "border-[#c9a84c]/30" };
+  return { label: "Possible Match", color: "text-gray-500", bg: "bg-gray-50", border: "border-gray-200" };
+}
 function normalizeRecourse(v: string) { return v === "SELECTIVE" || !v ? "CASE BY CASE" : v; }
 function blankAddress(): AssetAddress { return { street: "", unit: "", city: "", state: "", zip: "" }; }
 function blankAsset(id: number): AssetData {
@@ -1391,7 +1397,8 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
         } else { score += 15; } // no loan amount entered, give partial
         if (l.assets.includes(primary.assetType)) score += 22;
         else if (l.assets.length === 0) score += 8;
-        if (l.type === capitalType) score += 25;
+        if (l.type && l.type.split(",").map((s: string) => s.trim()).includes(capitalType)) score += 25;
+        else if (!l.type) score += 8;
         if (stateSet.length === 0 || stateSet.some((s) => l.states.includes(s))) score += 15;
         if (nr === primary.recourseType || nr === "CASE BY CASE" || !primary.recourseType) score += 8;
         if (l.maxLtv) {
@@ -1400,7 +1407,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
           if (dealLtv > 0 && lenderMaxLtv > 0) { if (dealLtv <= lenderMaxLtv) score += 5; else score -= 10; }
         }
         return { ...l, score, nr };
-      }).filter((l) => l.score > 15).sort((a, b) => b.score - a.score).slice(0, 6);
+      }).filter((l) => l.score > 25).sort((a, b) => b.score - a.score).slice(0, 6);
     }
     return assets.flatMap((asset) => {
       const m = calcMetrics(asset, capitalType);
@@ -1413,7 +1420,8 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
         } else { score += 15; }
         if (l.assets.includes(asset.assetType)) score += 22;
         else if (l.assets.length === 0) score += 8;
-        if (l.type === capitalType) score += 25;
+        if (l.type && l.type.split(",").map((s: string) => s.trim()).includes(capitalType)) score += 25;
+        else if (!l.type) score += 8;
         if (asset.selectedStates.length === 0 || asset.selectedStates.some((s) => l.states.includes(s))) score += 15;
         if (nr === asset.recourseType || nr === "CASE BY CASE" || !asset.recourseType) score += 8;
         if (l.maxLtv) {
@@ -1421,7 +1429,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
           if (m.seniorLtv > 0 && lenderMaxLtv > 0) { if (m.seniorLtv <= lenderMaxLtv) score += 5; else score -= 10; }
         }
         return { ...l, score, nr, assetId: asset.id };
-      }).filter((l) => l.score > 15).sort((a, b) => b.score - a.score).slice(0, 4);
+      }).filter((l) => l.score > 25).sort((a, b) => b.score - a.score).slice(0, 4);
     });
   }, [matcherStep, assets, capitalType, marketScope, collateralMode, assetMode, lenderRecords, capitalSeekerMode]);
 
@@ -1675,12 +1683,21 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                       <div className="text-sm font-bold text-[#0a1f44] mb-3 flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-[#0a1f44] text-white flex items-center justify-center text-xs font-bold">{asset.id}</div>Asset {asset.id} — {asset.assetType}{asset.address?.city ? ` · ${asset.address.city}, ${asset.address.state}` : ""}</div>
                       {assetMatches.length === 0 ? (<div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-400">No matches for this asset.</div>) : (
                         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                          {assetMatches.map((match: any) => (
-                            <div key={String(match.id) + "-" + asset.id} className="rounded-xl border border-gray-200 bg-white p-4 hover:border-[#0a1f44]/30 transition-all">
-                              <div className="flex items-start justify-between gap-2 mb-3"><div><div className="text-sm font-bold text-[#0a1f44]">{match.lender}</div><div className="text-xs text-gray-500 mt-0.5">{match.program}</div></div><div className="text-right"><div className="text-xs text-gray-400">Match</div><div className="text-lg font-bold text-[#0a1f44]">{match.score}%</div></div></div>
-                              <div className="grid grid-cols-2 gap-2">{[["Capital", match.type], ["Contact", match.email || "—"]].map(([label, val]) => (<div key={String(label)} className="rounded-lg bg-gray-50 border border-gray-100 p-2"><div className="text-xs uppercase text-[#0a1f44] font-bold mb-0.5">{label}</div><div className="text-xs text-gray-600 break-all">{val}</div></div>))}</div>
-                            </div>
-                          ))}
+                          {assetMatches.map((match: any) => {
+                            const ml = matchLabel(match.score);
+                            return (
+                              <div key={String(match.id) + "-" + asset.id} className={`rounded-xl border bg-white p-4 hover:shadow-sm transition-all ${ml.border}`}>
+                                <div className="flex items-start justify-between gap-2 mb-3">
+                                  <div><div className="text-sm font-bold text-[#0a1f44]">{match.lender}</div><div className="text-xs text-gray-500 mt-0.5">{match.program}</div></div>
+                                  <div className="text-right flex-shrink-0">
+                                    <div className="text-lg font-bold text-[#0a1f44]">{match.score}</div>
+                                    <div className={`text-xs font-semibold px-2 py-0.5 rounded-full border mt-1 ${ml.bg} ${ml.color} ${ml.border}`}>{ml.label}</div>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">{[["Capital", match.type], ["Contact", match.email || "—"]].map(([label, val]) => (<div key={String(label)} className="rounded-lg bg-gray-50 border border-gray-100 p-2"><div className="text-xs uppercase text-[#0a1f44] font-bold mb-0.5">{label}</div><div className="text-xs text-gray-600 break-all">{val}</div></div>))}</div>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -1688,12 +1705,25 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                 })
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {matchResults.map((match: any, idx: number) => (
-                    <div key={match.id} className="rounded-xl border border-gray-200 bg-white p-5 hover:border-[#0a1f44]/30 transition-all">
-                      <div className="flex items-start justify-between gap-2 mb-4"><div><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">#{idx + 1} Match</div><div className="text-base font-bold text-[#0a1f44]">{match.lender}</div><div className="text-xs text-gray-500 mt-0.5">{match.program}</div></div><div className="text-right"><div className="text-xs text-gray-400">Score</div><div className="text-2xl font-bold text-[#0a1f44]">{match.score}%</div></div></div>
-                      <div className="grid grid-cols-2 gap-2">{[["Capital", match.type], ["Range", `${match.minLoan}–${match.maxLoan}`], ["Recourse", match.nr], ["Contact", match.email || "—"]].map(([label, val]) => (<div key={String(label)} className="rounded-lg bg-gray-50 border border-gray-100 p-2"><div className="text-xs uppercase text-[#0a1f44] font-bold mb-0.5">{label}</div><div className="text-xs text-gray-600 break-all">{val}</div></div>))}</div>
-                    </div>
-                  ))}
+                  {matchResults.map((match: any, idx: number) => {
+                    const ml = matchLabel(match.score);
+                    return (
+                      <div key={match.id} className={`rounded-xl border bg-white p-5 hover:shadow-sm transition-all ${ml.border}`}>
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div>
+                            <div className={`text-xs font-bold px-2 py-0.5 rounded-full border inline-block mb-2 ${ml.bg} ${ml.color} ${ml.border}`}>{ml.label}</div>
+                            <div className="text-base font-bold text-[#0a1f44]">{match.lender}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">{match.program}</div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="text-xs text-gray-400 mb-0.5">Score</div>
+                            <div className="text-2xl font-bold text-[#0a1f44]">{match.score}</div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">{[["Capital", match.type], ["Range", `${match.minLoan}–${match.maxLoan}`], ["Recourse", match.nr], ["Contact", match.email || "—"]].map(([label, val]) => (<div key={String(label)} className="rounded-lg bg-gray-50 border border-gray-100 p-2"><div className="text-xs uppercase text-[#0a1f44] font-bold mb-0.5">{label}</div><div className="text-xs text-gray-600 break-all">{val}</div></div>))}</div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -2275,8 +2305,17 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                               <TableRow className="border-0">
                                 <TableCell colSpan={4} className="p-0">
                                   <div className="border-t border-[#0a1f44]/10 bg-white p-5">
+                                    {/* Capital Type badges */}
+                                    <div className="mb-4">
+                                      <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Capital Type</div>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {(item.type ? item.type.split(",").map(s => s.trim()) : []).map((t) => (
+                                          <span key={t} className="px-3 py-1 rounded-full text-xs font-bold bg-[#0a1f44] text-white border border-[#0a1f44]">{t}</span>
+                                        ))}
+                                      </div>
+                                    </div>
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                                      {[["Capital Type", item.type], ["Min Loan", item.minLoan || "—"], ["Max Loan", item.maxLoan || "—"], ["Max LTV", item.maxLtv || "—"], ["Recourse", item.recourse || "—"], ["Contact", item.contactPerson || "—"], ["Email", item.email || "—"], ["Phone", item.phone || "—"]].map(([label, val]) => (
+                                      {[["Min Loan", item.minLoan || "—"], ["Max Loan", item.maxLoan || "—"], ["Max LTV", item.maxLtv || "—"], ["Recourse", item.recourse || "—"], ["Contact", item.contactPerson || "—"], ["Email", item.email || "—"], ["Phone", item.phone || "—"]].map(([label, val]) => (
                                         <div key={String(label)} className="rounded-lg bg-gray-50 border border-gray-100 p-2.5">
                                           <div className="text-xs text-[#c9a84c] font-bold uppercase tracking-wide mb-0.5">{label}</div>
                                           <div className="text-xs font-semibold text-[#0a1f44] break-all">{val}</div>
@@ -2320,6 +2359,12 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                         <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Website</label><Input value={item.website || ""} onChange={(e) => updateLenderField(item.id, "website", e.target.value)} className={inputClass} /></div>
                                         <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Status</label><Select value={item.status} onValueChange={(v) => updateLenderField(item.id, "status", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent></Select></div>
                                       </div>
+                                      <CheckboxGroup
+                                        label="Capital Type"
+                                        options={capitalTypes}
+                                        selected={item.type ? item.type.split(",").map(s => s.trim()).filter(Boolean) : []}
+                                        onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, type: v.join(", ") } : l))}
+                                      />
                                       <div className="grid gap-3 md:grid-cols-3">
                                         <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Min Loan</label><Input value={item.minLoan || ""} onChange={(e) => updateLenderField(item.id, "minLoan", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
                                         <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max Loan</label><Input value={item.maxLoan || ""} onChange={(e) => updateLenderField(item.id, "maxLoan", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
@@ -2580,7 +2625,32 @@ export default function Home() {
   const [session, setSession] = useState<AuthSession>(null);
   const [users, setUsers] = useState<AppUser[]>(initialUsers);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>(initialTeamMembers);
-  const [submittedDeals, setSubmittedDeals] = useState<SubmittedDeal[]>([]);
+  const [submittedDeals, setSubmittedDeals] = useState<SubmittedDeal[]>([
+    {
+      id: 1001, submittedAt: "3/10/2026, 9:15:00 AM", seekerName: "Marcus Bellfield",
+      capitalType: "Senior", assetMode: "single", collateralMode: "",
+      status: "pending", assignedAdvisorIds: [1],
+      assets: [{ id: 1, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "Apartments", loanAmount: "$18,500,000", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "$26,000,000", purchasePrice: "$25,500,000", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "$1,200,000", manualLtv: "", dscr: "1.28", selectedStates: ["FL"], recourseType: "CASE BY CASE", numUnits: "220", numBuildings: "4", numAcres: "", retailUnits: [], address: { street: "4801 Biscayne Blvd", unit: "", city: "Miami", state: "FL", zip: "33137" } }]
+    },
+    {
+      id: 1002, submittedAt: "3/11/2026, 2:30:00 PM", seekerName: "Diana Okafor",
+      capitalType: "Senior", assetMode: "single", collateralMode: "",
+      status: "pending", assignedAdvisorIds: [1],
+      assets: [{ id: 1, ownershipStatus: "Refinance", dealType: "Bridge", refinanceType: "Cash Out-Value Add", assetType: "Office", loanAmount: "$32,000,000", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "$48,000,000", purchasePrice: "", currentLoanAmount: "$24,000,000", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "$2,400,000", manualLtv: "", dscr: "1.35", selectedStates: ["NY"], recourseType: "NON RECOURSE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [], address: { street: "1221 Avenue of the Americas", unit: "15th Floor", city: "New York", state: "NY", zip: "10020" } }]
+    },
+    {
+      id: 1003, submittedAt: "3/12/2026, 11:00:00 AM", seekerName: "Trevor Sandoval",
+      capitalType: "Preferred Equity", assetMode: "single", collateralMode: "",
+      status: "pending", assignedAdvisorIds: [2],
+      assets: [{ id: 1, ownershipStatus: "Acquisition", dealType: "New Development", refinanceType: "Cash Out to Borrower", assetType: "Apartments", loanAmount: "$12,000,000", seniorLoanAmount: "$55,000,000", subordinateAmount: "$12,000,000", propertyValue: "$82,000,000", purchasePrice: "$68,000,000", currentLoanAmount: "", landCost: "$14,000,000", softCosts: "$8,500,000", originationClosingCosts: "$1,200,000", hardCosts: "$38,000,000", carryingCosts: "$2,800,000", borrowerEquity: "$9,500,000", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dscr: "", selectedStates: ["TX"], recourseType: "NON RECOURSE", numUnits: "312", numBuildings: "2", numAcres: "", retailUnits: [], address: { street: "3200 Main Street", unit: "", city: "Houston", state: "TX", zip: "77002" } }]
+    },
+    {
+      id: 1004, submittedAt: "3/13/2026, 4:45:00 PM", seekerName: "Rachel Kim",
+      capitalType: "Mezzanine", assetMode: "single", collateralMode: "",
+      status: "pending", assignedAdvisorIds: [2],
+      assets: [{ id: 1, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "Hotel/Hospitality", loanAmount: "$9,500,000", seniorLoanAmount: "$38,000,000", subordinateAmount: "$9,500,000", propertyValue: "$62,000,000", purchasePrice: "$58,000,000", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "$3,100,000", manualLtv: "", dscr: "1.42", selectedStates: ["GA"], recourseType: "CASE BY CASE", numUnits: "185", numBuildings: "1", numAcres: "", retailUnits: [], address: { street: "265 Peachtree Center Ave", unit: "", city: "Atlanta", state: "GA", zip: "30303" } }]
+    },
+  ]);
   const [deleteRequests, setDeleteRequests] = useState<DeleteRequest[]>([]);
   const [dbLoaded, setDbLoaded] = useState(false);
 
