@@ -322,6 +322,7 @@ export default function Home() {
   const [selectedCapitalFilter, setSelectedCapitalFilter] = useState("All");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState("All");
   const [editingLenderId, setEditingLenderId] = useState<number | null>(null);
+  const [viewingLenderId, setViewingLenderId] = useState<number | null>(null);
   const [tenantDatabase, setTenantDatabase] = useState<string[]>([]);
   const [aiDescription, setAiDescription] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -553,21 +554,143 @@ export default function Home() {
                           <TableRow key={item.id} className="border-gray-100 hover:bg-gray-50">
                             <TableCell><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${item.source === "Spreadsheet" ? "bg-gray-100 text-gray-600 border border-gray-200" : "bg-emerald-50 text-emerald-600 border border-emerald-200"}`}>{item.source}</span></TableCell>
                             <TableCell className="text-gray-400 text-xs">{item.spreadsheetRow}</TableCell>
-                            <TableCell className="font-semibold text-[#0a1f44] text-sm">{item.lender}</TableCell>
+                            <TableCell>
+                              <button onClick={() => setViewingLenderId(item.id === viewingLenderId ? null : item.id)} className="font-semibold text-[#0a1f44] text-sm hover:text-[#c9a84c] hover:underline transition-colors text-left">{item.lender}</button>
+                            </TableCell>
                             <TableCell className="text-gray-600 text-xs">{item.program}</TableCell>
                             <TableCell className="text-gray-600 text-xs">{item.type}</TableCell>
                             <TableCell className="text-gray-400 text-xs">{item.contactPerson || "—"}</TableCell>
                             <TableCell className="text-gray-400 text-xs">{item.phone || "—"}</TableCell>
                             <TableCell><span className="px-2 py-0.5 rounded-full text-xs border border-gray-200 text-gray-500">{item.status}</span></TableCell>
                             <TableCell className="text-right"><div className="flex justify-end gap-2">
-                              <button onClick={() => setEditingLenderId(item.id === editingLenderId ? null : item.id)} className="px-3 py-1 text-xs border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/10 font-medium">{item.id === editingLenderId ? "Close" : "Edit"}</button>
-                              <button onClick={() => toggleLenderStatus(item.id)} className="px-3 py-1 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-100">{item.status === "Inactive" ? "Activate" : "Deactivate"}</button>
+                              <button onClick={() => { setEditingLenderId(item.id === editingLenderId ? null : item.id); setViewingLenderId(null); }} className="px-3 py-1 text-xs border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/10 font-medium">{item.id === editingLenderId ? "Close" : "Edit"}</button>
                             </div></TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   </div>
+                  {viewingLenderId && (() => {
+                    const lender = lenderRecords.find((l) => l.id === viewingLenderId);
+                    if (!lender) return null;
+                    return (
+                      <div className="mt-6 rounded-xl border border-[#c9a84c]/20 bg-white shadow-sm overflow-hidden">
+                        {/* Header */}
+                        <div className="bg-[#0a1f44] px-6 py-5 flex items-start justify-between">
+                          <div>
+                            <div className="text-xs uppercase tracking-[0.25em] text-[#c9a84c] font-bold mb-1">Lender Profile</div>
+                            <div className="font-display text-2xl font-bold text-white">{lender.lender}</div>
+                            <div className="text-sm text-gray-300 mt-1">{lender.program}</div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${lender.status === "Active" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-gray-500/20 text-gray-300 border border-gray-500/30"}`}>{lender.status}</span>
+                            <button onClick={() => setViewingLenderId(null)} className="text-gray-400 hover:text-white transition-colors text-lg font-bold">✕</button>
+                          </div>
+                        </div>
+
+                        <div className="p-6 space-y-6">
+                          {/* Key stats */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {[["Capital Type", lender.type], ["Min Loan", lender.minLoan], ["Max Loan", lender.maxLoan], ["Max LTV", lender.maxLtv], ["Recourse", lender.recourse || "—"], ["Source", lender.source], ["Row", lender.spreadsheetRow], ["Loan Terms", lender.loanTerms || "—"]].map(([label, val]) => (
+                              <div key={String(label)} className="rounded-xl bg-gray-50 border border-gray-100 p-3">
+                                <div className="text-xs uppercase tracking-[0.12em] text-[#c9a84c] font-bold mb-1">{label}</div>
+                                <div className="text-sm font-semibold text-[#0a1f44]">{val}</div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Primary contact */}
+                          <div>
+                            <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-3">Primary Contact</div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                              {[["Name", lender.contactPerson || "—"], ["Email", lender.email || "—"], ["Phone", lender.phone || "—"], ["Website", lender.website || "—"]].map(([label, val]) => (
+                                <div key={String(label)} className="rounded-xl bg-gray-50 border border-gray-100 p-3">
+                                  <div className="text-xs text-gray-400 mb-1">{label}</div>
+                                  <div className="text-sm font-medium text-[#0a1f44] break-all">{val}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Additional contacts */}
+                          {lender.contacts && lender.contacts.length > 0 && (
+                            <div>
+                              <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-3">Additional Contacts</div>
+                              <div className="grid gap-3 md:grid-cols-2">
+                                {lender.contacts.map((contact, idx) => (
+                                  <div key={contact.id} className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4">
+                                    <div className="text-xs font-bold text-[#0a1f44] mb-2">Contact {idx + 1}{contact.region ? ` — ${contact.region}` : ""}</div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {[["Name", contact.name || "—"], ["Phone", contact.phone || "—"], ["Email", contact.email || "—"], ["Region", contact.region || "—"]].map(([label, val]) => (
+                                        <div key={String(label)}>
+                                          <div className="text-xs text-gray-400">{label}</div>
+                                          <div className="text-xs font-semibold text-[#0a1f44] break-all">{val}</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Type of Lender */}
+                          {lender.typeOfLenders && lender.typeOfLenders.length > 0 && (
+                            <div>
+                              <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Type of Lender</div>
+                              <div className="flex flex-wrap gap-2">{lender.typeOfLenders.map((t) => <span key={t} className="px-3 py-1 rounded-full text-xs bg-[#0a1f44] text-white font-medium">{t}</span>)}</div>
+                            </div>
+                          )}
+
+                          {/* Type of Loans */}
+                          {lender.typeOfLoans && lender.typeOfLoans.length > 0 && (
+                            <div>
+                              <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Type of Loans</div>
+                              <div className="flex flex-wrap gap-2">{lender.typeOfLoans.map((t) => <span key={t} className="px-3 py-1 rounded-full text-xs border border-[#0a1f44]/20 text-[#0a1f44] font-medium">{t}</span>)}</div>
+                            </div>
+                          )}
+
+                          {/* Program */}
+                          {lender.programTypes && lender.programTypes.length > 0 && (
+                            <div>
+                              <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Program</div>
+                              <div className="flex flex-wrap gap-2">{lender.programTypes.map((t) => <span key={t} className="px-3 py-1 rounded-full text-xs border border-[#c9a84c]/30 text-[#c9a84c] font-bold">{t}</span>)}</div>
+                            </div>
+                          )}
+
+                          {/* Property Types */}
+                          {lender.assets && lender.assets.length > 0 && (
+                            <div>
+                              <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Property Types</div>
+                              <div className="flex flex-wrap gap-2">{lender.assets.map((t) => <span key={t} className="px-3 py-1 rounded-full text-xs bg-gray-100 text-gray-600 border border-gray-200">{t}</span>)}</div>
+                            </div>
+                          )}
+
+                          {/* Target States */}
+                          {lender.states && lender.states.length > 0 && (
+                            <div>
+                              <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Target States ({lender.states.length})</div>
+                              <div className="flex flex-wrap gap-1.5">{lender.states.includes("Nationwide") ? <span className="px-3 py-1 rounded-full text-xs bg-[#0a1f44] text-white font-medium">Nationwide</span> : lender.states.map((s) => <span key={s} className="px-2 py-0.5 rounded-md text-xs bg-gray-100 text-gray-600 border border-gray-200 font-medium">{s}</span>)}</div>
+                            </div>
+                          )}
+
+                          {/* Sponsor States */}
+                          {lender.sponsorStates && lender.sponsorStates.length > 0 && (
+                            <div>
+                              <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-2">Sponsor States ({lender.sponsorStates.length})</div>
+                              <div className="flex flex-wrap gap-1.5">{lender.sponsorStates.map((s) => <span key={s} className="px-2 py-0.5 rounded-md text-xs bg-gray-100 text-gray-600 border border-gray-200 font-medium">{s}</span>)}</div>
+                            </div>
+                          )}
+
+                          {/* Actions */}
+                          <div className="flex gap-3 pt-2 border-t border-gray-100">
+                            <button onClick={() => { setEditingLenderId(lender.id); setViewingLenderId(null); }} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all"><Edit2 className="h-3.5 w-3.5" /> Edit Lender</button>
+                            <button onClick={() => setViewingLenderId(null)} className="px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50 transition-all">Close</button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {editingLenderId && (() => {
                     const lender = lenderRecords.find((l) => l.id === editingLenderId);
                     if (!lender) return null;
