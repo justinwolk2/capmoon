@@ -244,7 +244,7 @@ export default function Home() {
       boxes.push(["Cash Out", formatCurrencyInput(String(cashOut))]);
     }
     boxes.push([
-      isSubordinateCapital ? "Subordinated LTV - Last Dollar" : "Last $ LTV",
+      isSubordinateCapital ? "Subordinated LTV - Last Dollar" : "Subordinated LTV-Last $",
       isSubordinateCapital ? formatPercent(autoLtv) : "N/A"
     ]);
     boxes.push(["Total Capital", formatCurrencyInput(String(totalCapitalNumeric || 0))]);
