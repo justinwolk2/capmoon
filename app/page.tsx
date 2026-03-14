@@ -2122,6 +2122,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const [selectedSourceFilter, setSelectedSourceFilter] = useState("All");
   const [selectedCapitalFilter, setSelectedCapitalFilter] = useState("All");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState("All");
+  const [selectedLetter, setSelectedLetter] = useState("All");
   const [editingLenderId, setEditingLenderId] = useState<number | null>(null);
   const [viewingLenderId, setViewingLenderId] = useState<number | null>(null);
   const [newUserForm, setNewUserForm] = useState({ name: "", username: "", password: "", role: "capital-seeker" as AppUser["role"] });
@@ -2244,12 +2245,24 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     setUsers(users.map((u) => u.id !== userId ? u : { ...u, blockedLenderIds: u.blockedLenderIds.includes(lenderId) ? u.blockedLenderIds.filter((id) => id !== lenderId) : [...u.blockedLenderIds, lenderId] }));
   }
 
-  const filteredLenders = useMemo(() => lenderRecords.filter((l) =>
-    (selectedSourceFilter === "All" || l.source === selectedSourceFilter) &&
-    (selectedCapitalFilter === "All" || l.type === selectedCapitalFilter) &&
-    (selectedStatusFilter === "All" || l.status === selectedStatusFilter) &&
-    (search === "" || l.lender.toLowerCase().includes(search.toLowerCase()) || l.program.toLowerCase().includes(search.toLowerCase()))
-  ), [lenderRecords, selectedSourceFilter, selectedCapitalFilter, selectedStatusFilter, search]);
+  const filteredLenders = useMemo(() => {
+    const terms = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    return lenderRecords.filter((l) => {
+      if (selectedSourceFilter !== "All" && l.source !== selectedSourceFilter) return false;
+      if (selectedCapitalFilter !== "All" && !l.type?.split(",").map((s: string) => s.trim()).includes(selectedCapitalFilter)) return false;
+      if (selectedStatusFilter !== "All" && l.status !== selectedStatusFilter) return false;
+      if (selectedLetter !== "All" && l.lender[0]?.toUpperCase() !== selectedLetter) return false;
+      if (terms.length === 0) return true;
+      const searchable = [
+        l.lender, l.program, l.type, l.contactPerson, l.email, l.phone, l.notes,
+        l.recourse, l.minLoan, l.maxLoan, l.maxLtv, l.loanTerms,
+        ...(l.assets || []), ...(l.states || []),
+        ...(l.typeOfLoans || []), ...(l.typeOfLenders || []),
+        ...(l.programTypes || []), ...(l.sponsorStates || []),
+      ].filter(Boolean).join(" ").toLowerCase();
+      return terms.every(term => searchable.includes(term));
+    });
+  }, [lenderRecords, selectedSourceFilter, selectedCapitalFilter, selectedStatusFilter, selectedLetter, search]);
   const sortedLenders = useMemo(() => [...filteredLenders].sort((a, b) => a.lender.localeCompare(b.lender)), [filteredLenders]);
 
   const spreadsheetCount = lenderRecords.filter((l) => l.source === "Spreadsheet").length;
@@ -2274,12 +2287,21 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
       <div className="min-h-screen bg-[#f0f2f5] text-gray-800">
         <div className="grid min-h-screen lg:grid-cols-[260px_1fr]">
           <aside className="border-r border-[#c9a84c]/10 bg-[#0a1f44] flex flex-col">
-            <div className="px-6 py-8 border-b border-[#c9a84c]/20">
+            <div className="px-6 py-6 border-b border-[#c9a84c]/20">
               <div className="flex items-center gap-3 mb-2">
                 <img src="/logo1.JPEG" alt="CapMoon" className="h-12 w-12 object-contain rounded-full" />
                 <div><div className="font-display text-2xl font-bold text-white">CapMoon</div><div className="text-xs text-gray-400 tracking-wide">Lender Intelligence Platform</div></div>
               </div>
-              <div className="text-xs uppercase tracking-[0.35em] text-[#c9a84c] font-bold mt-3">Investment Banking</div>
+              <div className="text-xs uppercase tracking-[0.35em] text-[#c9a84c] font-bold mt-2 mb-3">Investment Banking</div>
+              {/* AutoMatch + user info moved here */}
+              <div className="rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/10 p-3 mb-3">
+                <div className="flex items-center gap-2 mb-1"><ShieldCheck className="h-3.5 w-3.5 text-[#c9a84c]" /><span className="text-xs font-bold text-[#c9a84c] tracking-wide uppercase">Auto-Match Engine</span></div>
+                <p className="text-xs text-gray-300 leading-relaxed">Spreadsheet-driven criteria plus dashboard lenders.</p>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gray-400">Signed in as <span className="text-white font-medium">{session?.user.name}</span></div>
+                <button onClick={onLogout} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><LogOut className="h-3 w-3" /> Out</button>
+              </div>
             </div>
             <nav className="space-y-1 p-4 flex-1 overflow-y-auto">
               {navItems.map(([key, label, Icon, type]) => (
@@ -2290,16 +2312,6 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                 </button>
               ))}
             </nav>
-            <div className="p-4 space-y-3 border-t border-[#c9a84c]/20">
-              <div className="rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/10 p-4">
-                <div className="flex items-center gap-2 mb-2"><ShieldCheck className="h-4 w-4 text-[#c9a84c]" /><span className="text-xs font-bold text-[#c9a84c] tracking-wide uppercase">Auto-Match Engine</span></div>
-                <p className="text-xs text-gray-300 leading-relaxed">Spreadsheet-driven criteria plus dashboard lenders.</p>
-              </div>
-              <div className="flex items-center justify-between px-2">
-                <div className="text-xs text-gray-400">Signed in as <span className="text-white font-medium">{session?.user.name}</span></div>
-                <button onClick={onLogout} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><LogOut className="h-3 w-3" /> Out</button>
-              </div>
-            </div>
           </aside>
 
           <main className="p-6 md:p-8 overflow-auto">
@@ -2372,13 +2384,40 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                     </div>
                     <button onClick={() => setActiveTab("add-lender")} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80"><Plus className="h-4 w-4" /> Add Lender</button>
                   </div>
-                  <div className="grid gap-3 md:grid-cols-4 mb-4">
-                    <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." className="w-full pl-9 px-3 py-2 text-sm bg-white border border-gray-300 rounded-xl text-gray-800 focus:outline-none focus:border-[#0a1f44]" /></div>
-                    <Select value={selectedSourceFilter} onValueChange={setSelectedSourceFilter}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="All">All Sources</SelectItem><SelectItem value="Spreadsheet">Spreadsheet</SelectItem><SelectItem value="Dashboard">Dashboard</SelectItem></SelectContent></Select>
-                    <Select value={selectedCapitalFilter} onValueChange={setSelectedCapitalFilter}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="All">All Capital</SelectItem>{capitalTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
+
+                  {/* Search + filters */}
+                  <div className="grid gap-3 md:grid-cols-4 mb-3">
+                    <div className="md:col-span-2 relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <input value={search} onChange={(e) => { setSearch(e.target.value); setSelectedLetter("All"); }} placeholder="Search by name, state, asset type, capital type, mezzanine, Florida…" className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-gray-300 rounded-xl text-gray-800 focus:outline-none focus:border-[#0a1f44]" />
+                    </div>
+                    <Select value={selectedCapitalFilter} onValueChange={setSelectedCapitalFilter}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="All">All Capital Types</SelectItem>{capitalTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
                     <Select value={selectedStatusFilter} onValueChange={setSelectedStatusFilter}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="All">All Statuses</SelectItem><SelectItem value="Active">Active</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent></Select>
                   </div>
-                  <div className="flex flex-wrap gap-2 mb-4">{[`Spreadsheet: ${spreadsheetCount}`, `Dashboard: ${dashboardCount}`, `Showing: ${filteredLenders.length}`].map((t) => (<span key={t} className="px-3 py-1 rounded-full text-xs border border-[#c9a84c]/30 text-[#c9a84c] font-bold">{t}</span>))}</div>
+
+                  {/* A-Z filter */}
+                  <div className="mb-3">
+                    <div className="flex flex-wrap gap-1">
+                      {["All", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("")].map((letter) => (
+                        <button
+                          key={letter}
+                          onClick={() => { setSelectedLetter(letter); setSearch(""); }}
+                          className={`px-2 py-1 text-xs font-bold rounded-lg transition-all ${selectedLetter === letter ? "bg-[#0a1f44] text-white" : "bg-gray-100 text-gray-500 hover:bg-[#0a1f44]/10 hover:text-[#0a1f44]"}`}
+                        >
+                          {letter}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {[`Showing: ${sortedLenders.length} of ${lenderRecords.length}`, `Spreadsheet: ${spreadsheetCount}`, `Dashboard: ${dashboardCount}`].map((t) => (
+                      <span key={t} className="px-3 py-1 rounded-full text-xs border border-[#c9a84c]/30 text-[#c9a84c] font-bold">{t}</span>
+                    ))}
+                    {(search || selectedLetter !== "All") && (
+                      <button onClick={() => { setSearch(""); setSelectedLetter("All"); }} className="px-3 py-1 rounded-full text-xs border border-gray-200 text-gray-500 hover:bg-gray-50">Clear filters ✕</button>
+                    )}
+                  </div>
                   <div className="overflow-hidden rounded-xl border border-gray-200">
                     <Table>
                       <TableHeader>
