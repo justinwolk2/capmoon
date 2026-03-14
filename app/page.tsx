@@ -1084,19 +1084,25 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
 
       {/* New Development + Refinance extra fields */}
       {m.isRefinance && asset.dealType === "New Development" && (() => {
-        const curLoan     = parseCurrency(asset.currentLoanAmount);
-        const hardCosts   = parseCurrency(asset.hardCosts || "");
-        const softCosts   = parseCurrency(asset.softCosts || "");
-        const closingCosts= parseCurrency(asset.originationClosingCosts || "");
-        const carryCosts  = parseCurrency(asset.carryingCosts || "");
-        const addlEquity  = parseCurrency(asset.additionalEquity || "");
-        const curPropVal  = parseCurrency(asset.currentPropertyValue || "");
-        const arv         = parseCurrency(asset.propertyValue || "");
-        const newLoanCalc = curLoan + hardCosts + softCosts + closingCosts + carryCosts + addlEquity;
-        const totalCosts  = hardCosts + softCosts + closingCosts + carryCosts;
-        const curEquity   = curPropVal > 0 ? curPropVal - curLoan : null;
-        const ltc         = totalCosts > 0 && newLoanCalc > 0 ? (newLoanCalc / (curLoan + totalCosts)) * 100 : 0;
-        const ltv         = arv > 0 && newLoanCalc > 0 ? (newLoanCalc / arv) * 100 : 0;
+        const purchasePrice = parseCurrency(asset.purchasePrice);
+        const curLoan       = parseCurrency(asset.currentLoanAmount);
+        const hardCosts     = parseCurrency(asset.hardCosts || "");
+        const softCosts     = parseCurrency(asset.softCosts || "");
+        const closingCosts  = parseCurrency(asset.originationClosingCosts || "");
+        const carryCosts    = parseCurrency(asset.carryingCosts || "");
+        const addlEquity    = parseCurrency(asset.additionalEquity || "");
+        const curPropVal    = parseCurrency(asset.currentPropertyValue || "");
+        const arv           = parseCurrency(asset.propertyValue || "");
+        // Total project cost minus equity contributions
+        const totalProjectCost = purchasePrice + hardCosts + softCosts + closingCosts + carryCosts;
+        const netCost          = totalProjectCost - addlEquity;
+        const suggestedLoan    = Math.max(0, netCost);
+        const curLoanAmt       = parseCurrency(asset.loanAmount || "");
+        // LTC = New Loan / (Purchase Price + Hard + Soft + Closing + Carry - Additional Equity)
+        const ltc = netCost > 0 && curLoanAmt > 0 ? (curLoanAmt / netCost) * 100 : 0;
+        const ltv = arv > 0 && curLoanAmt > 0 ? (curLoanAmt / arv) * 100 : 0;
+        const curEquity = curPropVal > 0 ? curPropVal - curLoan : null;
+
         return (
           <div className="md:col-span-2 rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/5 p-5 space-y-4">
             <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold">New Development — Project Details</div>
@@ -1131,55 +1137,73 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
 
             <div className="grid gap-3 md:grid-cols-2">
               <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Property Value</label><Input value={asset.currentPropertyValue || ""} onChange={(e) => upd("currentPropertyValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
-              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Additional Equity Contributions</label><Input value={asset.additionalEquity || ""} onChange={(e) => upd("additionalEquity", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Additional Equity Contributions</label>
+                <Input value={asset.additionalEquity || ""} onChange={(e) => {
+                  const val = formatCurrencyInput(e.target.value);
+                  upd("additionalEquity", val);
+                }} placeholder="$0" className={inputClass} />
+                <div className="text-xs text-gray-400 mt-1">Subtracted from total project cost</div>
+              </div>
             </div>
 
             {/* Current Equity */}
-            {curPropVal > 0 && curLoan > 0 && (() => {
-              const equity = curEquity!;
-              return (
-                <div className={`rounded-xl border p-4 ${equity >= 0 ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className={`text-xs font-bold uppercase tracking-wide mb-1 ${equity >= 0 ? "text-emerald-700" : "text-red-600"}`}>Current Equity in Property</div>
-                      <div className="text-xs text-gray-500">Current Value ({formatCurrencyInput(String(curPropVal))}) − Current Indebtedness ({formatCurrencyInput(String(curLoan))})</div>
-                    </div>
-                    <div className={`text-2xl font-bold ${equity >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-                      {equity >= 0 ? formatCurrencyInput(String(equity)) : `(${formatCurrencyInput(String(Math.abs(equity)))})`}
-                    </div>
+            {curPropVal > 0 && curLoan > 0 && (
+              <div className={`rounded-xl border p-4 ${curEquity! >= 0 ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className={`text-xs font-bold uppercase tracking-wide mb-1 ${curEquity! >= 0 ? "text-emerald-700" : "text-red-600"}`}>Current Equity in Property</div>
+                    <div className="text-xs text-gray-500">Current Value ({formatCurrencyInput(String(curPropVal))}) − Current Indebtedness ({formatCurrencyInput(String(curLoan))})</div>
+                  </div>
+                  <div className={`text-2xl font-bold ${curEquity! >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                    {curEquity! >= 0 ? formatCurrencyInput(String(curEquity!)) : `(${formatCurrencyInput(String(Math.abs(curEquity!)))})`}
                   </div>
                 </div>
-              );
-            })()}
+              </div>
+            )}
 
-            {/* New Loan Amount — auto-calculated */}
-            {newLoanCalc > 0 && (
+            {/* Suggested loan breakdown */}
+            {totalProjectCost > 0 && (
               <div className="rounded-xl border-2 border-[#0a1f44]/20 bg-white p-4">
-                <div className="text-xs font-bold uppercase tracking-wide text-[#c9a84c] mb-3">Calculated New Loan Amount</div>
+                <div className="text-xs font-bold uppercase tracking-wide text-[#c9a84c] mb-3">Total New Development Loan Calculation</div>
                 <div className="space-y-1.5 mb-3">
                   {[
-                    ["Current Loan Payoff", curLoan],
+                    ["Purchase Price", purchasePrice],
                     ["Total Hard Costs", hardCosts],
                     ["Total Soft Costs", softCosts],
                     ["Total Closing Costs", closingCosts],
                     ["Total Carry Costs", carryCosts],
-                    ["Additional Equity", addlEquity],
                   ].filter(([, v]) => (v as number) > 0).map(([label, val]) => (
                     <div key={String(label)} className="flex justify-between text-xs">
                       <span className="text-gray-500">{label}</span>
-                      <span className="font-medium text-[#0a1f44]">{formatCurrencyInput(String(val))}</span>
+                      <span className="font-medium text-[#0a1f44]">+ {formatCurrencyInput(String(val))}</span>
                     </div>
                   ))}
+                  {addlEquity > 0 && (
+                    <div className="flex justify-between text-xs text-emerald-700">
+                      <span className="font-medium">Additional Equity (deducted)</span>
+                      <span className="font-bold">− {formatCurrencyInput(String(addlEquity))}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm font-bold text-[#0a1f44] pt-2 border-t border-gray-200">
-                    <span>New Loan Amount</span>
-                    <span className="text-[#c9a84c]">{formatCurrencyInput(String(newLoanCalc))}</span>
+                    <span>Suggested Loan Amount</span>
+                    <span className="text-[#c9a84c]">{formatCurrencyInput(String(suggestedLoan))}</span>
                   </div>
                 </div>
-                {/* Ratios */}
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
-                  {ltc > 0 && <div className="rounded-lg bg-gray-50 p-2 text-center"><div className="text-xs text-gray-400 mb-0.5">LTC</div><div className="text-sm font-bold text-[#0a1f44]">{ltc.toFixed(1)}%</div></div>}
-                  {ltv > 0 && <div className="rounded-lg bg-gray-50 p-2 text-center"><div className="text-xs text-gray-400 mb-0.5">LTV (on ARV)</div><div className="text-sm font-bold text-[#0a1f44]">{ltv.toFixed(1)}%</div></div>}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => upd("loanAmount", formatCurrencyInput(String(suggestedLoan)))}
+                  className="w-full py-2 text-xs font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 mb-3"
+                >
+                  Use This Amount ↓
+                </button>
+                {/* LTC / LTV */}
+                {curLoanAmt > 0 && (
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+                    {ltc > 0 && <div className="rounded-lg bg-gray-50 p-2 text-center"><div className="text-xs text-gray-400 mb-0.5">LTC</div><div className="text-sm font-bold text-[#0a1f44]">{ltc.toFixed(1)}%</div><div className="text-xs text-gray-400">Loan ÷ (Costs − Equity)</div></div>}
+                    {ltv > 0 && <div className="rounded-lg bg-gray-50 p-2 text-center"><div className="text-xs text-gray-400 mb-0.5">LTV (on ARV)</div><div className="text-sm font-bold text-[#0a1f44]">{ltv.toFixed(1)}%</div></div>}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1195,7 +1219,15 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
           </div>
         </div>
       )}
-      {!m.isSubCap && !(m.isConstruction && m.isAcquisition) && (<div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">{m.isRefinance ? "New Loan Amount" : "Loan Amount"}</label><Input value={asset.loanAmount} onChange={(e) => upd("loanAmount", formatCurrencyInput(e.target.value))} className={inputClass} /></div>)}
+      {!m.isSubCap && !(m.isConstruction && m.isAcquisition) && (
+        <div className="md:col-span-2">
+          <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">
+            {m.isRefinance && asset.dealType === "New Development" ? "Total New Development Loan" : m.isRefinance ? "New Loan Amount" : "Loan Amount"}
+          </label>
+          <Input value={asset.loanAmount} onChange={(e) => upd("loanAmount", formatCurrencyInput(e.target.value))} placeholder={m.isRefinance && asset.dealType === "New Development" ? "Auto-filled above or enter manually" : "$0"} className={inputClass} />
+          {m.isRefinance && asset.dealType === "New Development" && <div className="text-xs text-gray-400 mt-1">Pre-filled from calculation above — edit to override.</div>}
+        </div>
+      )}
       {m.isSubCap && (<><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Senior Loan Amount</label><Input value={asset.seniorLoanAmount} onChange={(e) => upd("seniorLoanAmount", formatCurrencyInput(e.target.value))} className={inputClass} /></div><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">{subordinateLabel(capitalType)}</label><Input value={asset.subordinateAmount} onChange={(e) => upd("subordinateAmount", formatCurrencyInput(e.target.value))} className={inputClass} /></div><div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500">Stack: Senior {asset.seniorLoanAmount || "$0"} + {subordinateLabel(capitalType)} {asset.subordinateAmount || "$0"}</div></>)}
       <div className="md:col-span-2">
         <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">States</label>
