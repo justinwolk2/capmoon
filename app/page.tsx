@@ -26,6 +26,7 @@ type AssetData = {
 };
 type NewLenderForm = {
   programName: string; contactPerson: string; email: string; phone: string; website: string;
+  typeOfLenders: string[];
   typeOfLoans: string[]; programTypes: string[]; propertyTypes: string; loanTerms: string;
   minLoan: string; maxLoan: string; maxLtv: string; targetStates: string[];
   sponsorStates: string[]; recourse: string; capitalType: string; status: string;
@@ -68,7 +69,7 @@ function blankAsset(id: number): AssetData {
   return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "Apartments", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dscr: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }] };
 }
 function blankLenderForm(): NewLenderForm {
-  return { programName: "", contactPerson: "", email: "", phone: "", website: "", typeOfLoans: [], programTypes: [], propertyTypes: "", loanTerms: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalType: "Senior", status: "Active" };
+  return { programName: "", contactPerson: "", email: "", phone: "", website: "",typeOfLenders: [], typeOfLoans: [], programTypes: [], propertyTypes: "", loanTerms: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalType: "Senior", status: "Active" };
 }
 function subordinateLabel(ct: string) {
   if (ct === "Mezzanine") return "Mezzanine Amount";
@@ -222,6 +223,7 @@ function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTr
             <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Property Types</label><Input value={form.propertyTypes} onChange={(e) => upd("propertyTypes", e.target.value)} placeholder="e.g. Apartments, Office, Retail" className={inputClass} /></div>
             <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Loan Terms</label><Input value={form.loanTerms} onChange={(e) => upd("loanTerms", e.target.value)} placeholder="e.g. 12-36 months" className={inputClass} /></div>
           </div>
+          <CheckboxGroup label="Type of Lender" options={["Bridge", "Conventional", "Local Bank", "CMBS", "Fannie/Freddie", "Small Balance", "Family Office", "Private Lender", "Hard Money", "C&I", "JV", "Non-conventional", "Regional Bank", "Balance Sheet", "Investment Bank"]} selected={form.typeOfLenders} onChange={(v) => upd("typeOfLenders", v)} />
           <CheckboxGroup label="Type of Loans" options={typeOfLoanOptions} selected={form.typeOfLoans} onChange={(v) => upd("typeOfLoans", v)} />
           <CheckboxGroup label="Program" options={programTypeOptions} selected={form.programTypes} onChange={(v) => upd("programTypes", v)} />
           <StateSelector label="Target States" selected={form.targetStates} onChange={(v) => upd("targetStates", v)} />
