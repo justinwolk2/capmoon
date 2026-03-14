@@ -3,19 +3,13 @@ import { neon } from "@neondatabase/serverless";
 
 const getDb = () => neon(process.env.DATABASE_URL!);
 
-// GET /api/data?type=lenders|users|deals|team|deletes
 export async function GET(req: NextRequest) {
   const sql = getDb();
   const type = req.nextUrl.searchParams.get("type");
-
   try {
     switch (type) {
-      case "lenders": {
-        const rows = await sql`SELECT data FROM lenders ORDER BY (data->>'id')::int`;
-        return NextResponse.json(rows.map((r: any) => r.data));
-      }
       case "users": {
-        const rows = await sql`SELECT data FROM users ORDER BY (data->>'id')::int`;
+        const rows = await sql`SELECT data FROM users ORDER BY id`;
         return NextResponse.json(rows.map((r: any) => r.data));
       }
       case "deals": {
@@ -23,7 +17,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json(rows.map((r: any) => r.data));
       }
       case "team": {
-        const rows = await sql`SELECT data FROM team_members ORDER BY (data->>'id')::int`;
+        const rows = await sql`SELECT data FROM team_members ORDER BY id`;
         return NextResponse.json(rows.map((r: any) => r.data));
       }
       case "deletes": {
@@ -35,60 +29,48 @@ export async function GET(req: NextRequest) {
     }
   } catch (err: any) {
     console.error("DB GET error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json([], { status: 200 }); // return empty array on error, never crash
   }
 }
 
-// POST /api/data — save entire dataset
 export async function POST(req: NextRequest) {
   const sql = getDb();
   const body = await req.json();
   const { type, data } = body;
 
+  // Safety check — never wipe with empty data
+  if (!Array.isArray(data) || data.length === 0) {
+    console.warn(`Refusing to save empty ${type} array`);
+    return NextResponse.json({ success: false, reason: "empty data refused" });
+  }
+
   try {
     switch (type) {
-      case "lenders": {
-        await sql`DELETE FROM lenders`;
-        if (data.length > 0) {
-          for (const item of data) {
-            await sql`INSERT INTO lenders (data) VALUES (${JSON.stringify(item)})`;
-          }
-        }
-        return NextResponse.json({ success: true });
-      }
       case "users": {
         await sql`DELETE FROM users`;
-        if (data.length > 0) {
-          for (const item of data) {
-            await sql`INSERT INTO users (data) VALUES (${JSON.stringify(item)})`;
-          }
+        for (const item of data) {
+          await sql`INSERT INTO users (data) VALUES (${JSON.stringify(item)})`;
         }
         return NextResponse.json({ success: true });
       }
       case "deals": {
         await sql`DELETE FROM submitted_deals`;
-        if (data.length > 0) {
-          for (const item of data) {
-            await sql`INSERT INTO submitted_deals (data) VALUES (${JSON.stringify(item)})`;
-          }
+        for (const item of data) {
+          await sql`INSERT INTO submitted_deals (data) VALUES (${JSON.stringify(item)})`;
         }
         return NextResponse.json({ success: true });
       }
       case "team": {
         await sql`DELETE FROM team_members`;
-        if (data.length > 0) {
-          for (const item of data) {
-            await sql`INSERT INTO team_members (data) VALUES (${JSON.stringify(item)})`;
-          }
+        for (const item of data) {
+          await sql`INSERT INTO team_members (data) VALUES (${JSON.stringify(item)})`;
         }
         return NextResponse.json({ success: true });
       }
       case "deletes": {
         await sql`DELETE FROM delete_requests`;
-        if (data.length > 0) {
-          for (const item of data) {
-            await sql`INSERT INTO delete_requests (data) VALUES (${JSON.stringify(item)})`;
-          }
+        for (const item of data) {
+          await sql`INSERT INTO delete_requests (data) VALUES (${JSON.stringify(item)})`;
         }
         return NextResponse.json({ success: true });
       }

@@ -2717,8 +2717,9 @@ export default function Home() {
     loadData();
   }, []);
 
-  // Save helpers
+  // Save helpers — never save empty arrays
   async function saveToDb(type: string, data: any[]) {
+    if (!data || data.length === 0) return; // never wipe DB with empty data
     try { await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, data }) }); }
     catch (e) { console.error("DB save failed:", e); }
   }
@@ -2730,10 +2731,10 @@ export default function Home() {
   function handleRegisterCapitalSeeker(newUser: AppUser) {
     setUsers((prev) => { const next = [...prev, newUser]; saveToDb("users", next); return next; });
   }
-  function handleSetUsers(newUsers: AppUser[]) { setUsers(newUsers); saveToDb("users", newUsers); }
-  function handleSetTeamMembers(newTeam: TeamMember[]) { setTeamMembers(newTeam); saveToDb("team", newTeam); }
-  function handleSetSubmittedDeals(newDeals: SubmittedDeal[]) { setSubmittedDeals(newDeals); saveToDb("deals", newDeals); }
-  function handleSetDeleteRequests(newReqs: DeleteRequest[]) { setDeleteRequests(newReqs); saveToDb("deletes", newReqs); }
+  function handleSetUsers(newUsers: AppUser[]) { if (newUsers.length > 0) { setUsers(newUsers); saveToDb("users", newUsers); } }
+  function handleSetTeamMembers(newTeam: TeamMember[]) { if (newTeam.length > 0) { setTeamMembers(newTeam); saveToDb("team", newTeam); } }
+  function handleSetSubmittedDeals(newDeals: SubmittedDeal[]) { setSubmittedDeals(newDeals); if (newDeals.length > 0) saveToDb("deals", newDeals); }
+  function handleSetDeleteRequests(newReqs: DeleteRequest[]) { setDeleteRequests(newReqs); if (newReqs.length > 0) saveToDb("deletes", newReqs); }
 
   if (!dbLoaded) return (
     <div className="min-h-screen bg-[#f0f2f5] flex items-center justify-center">
