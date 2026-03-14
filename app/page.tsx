@@ -231,6 +231,8 @@ function DropdownCheckbox({ label, options, selected, onChange }: { label: strin
     </div>
   );
 }
+
+function StateSelector({ label, selected, onChange }: { label: string; selected: string[]; onChange: (v: string[]) => void }) {
   return (
     <div>
       <label className="text-xs text-gray-500 mb-2 block font-bold uppercase tracking-wide">{label}</label>
