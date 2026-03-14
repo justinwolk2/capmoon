@@ -24,12 +24,16 @@ export async function GET(req: NextRequest) {
         const rows = await sql`SELECT data FROM delete_requests ORDER BY created_at DESC`;
         return NextResponse.json(rows.map((r: any) => r.data));
       }
+      case "lenders": {
+        const rows = await sql`SELECT data FROM lenders ORDER BY id`;
+        return NextResponse.json(rows.map((r: any) => r.data));
+      }
       default:
         return NextResponse.json({ error: "Unknown type" }, { status: 400 });
     }
   } catch (err: any) {
     console.error("DB GET error:", err);
-    return NextResponse.json([], { status: 200 }); // return empty array on error, never crash
+    return NextResponse.json([], { status: 200 });
   }
 }
 
@@ -38,7 +42,6 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { type, data } = body;
 
-  // Safety check — never wipe with empty data
   if (!Array.isArray(data) || data.length === 0) {
     console.warn(`Refusing to save empty ${type} array`);
     return NextResponse.json({ success: false, reason: "empty data refused" });
@@ -71,6 +74,14 @@ export async function POST(req: NextRequest) {
         await sql`DELETE FROM delete_requests`;
         for (const item of data) {
           await sql`INSERT INTO delete_requests (data) VALUES (${JSON.stringify(item)})`;
+        }
+        return NextResponse.json({ success: true });
+      }
+      case "lenders": {
+        // Only saves dashboard-added lenders (source === "Dashboard")
+        await sql`DELETE FROM lenders`;
+        for (const item of data) {
+          await sql`INSERT INTO lenders (data) VALUES (${JSON.stringify(item)})`;
         }
         return NextResponse.json({ success: true });
       }

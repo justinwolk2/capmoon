@@ -2065,6 +2065,30 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const [activeTab, setActiveTab] = useState("overview");
   const [prefillDeal, setPrefillDeal] = useState<SubmittedDeal | null>(null);
   const [lenderRecords, setLenderRecords] = useState<LenderRecord[]>(seedLenders);
+
+  // Load dashboard lenders from DB on mount and merge with seed lenders
+  React.useEffect(() => {
+    async function loadDashboardLenders() {
+      try {
+        const res = await fetch("/api/data?type=lenders");
+        const dbLenders: LenderRecord[] = await res.json();
+        if (Array.isArray(dbLenders) && dbLenders.length > 0) {
+          // Merge: seed lenders + dashboard lenders, avoid duplicates by id
+          setLenderRecords([...seedLenders, ...dbLenders]);
+        }
+      } catch (e) { console.error("Failed to load dashboard lenders:", e); }
+    }
+    loadDashboardLenders();
+  }, []);
+
+  // Save only dashboard-added lenders to DB
+  async function saveLendersToDb(records: LenderRecord[]) {
+    const dashboardLenders = records.filter(l => l.source === "Dashboard");
+    if (dashboardLenders.length === 0) return;
+    try {
+      await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: dashboardLenders }) });
+    } catch (e) { console.error("Failed to save lenders:", e); }
+  }
   const [search, setSearch] = useState("");
   const [selectedSourceFilter, setSelectedSourceFilter] = useState("All");
   const [selectedCapitalFilter, setSelectedCapitalFilter] = useState("All");
@@ -2084,7 +2108,11 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     if (!lender) return;
     if (isAdmin) {
       if (window.confirm(`Delete ${lender.lender}? This cannot be undone.`)) {
-        setLenderRecords((prev) => prev.filter((l) => l.id !== id));
+        setLenderRecords((prev) => {
+          const next = prev.filter((l) => l.id !== id);
+          saveLendersToDb(next);
+          return next;
+        });
         setEditingLenderId(null);
       }
     } else {
@@ -2100,8 +2128,20 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     setDeleteRequests(deleteRequests.map((r) => r.id === reqId ? { ...r, status: action } : r));
   }
 
-  function updateLenderField(id: number, field: keyof LenderRecord, value: string) { setLenderRecords((prev) => prev.map((l) => l.id === id ? { ...l, [field]: value } : l)); }
-  function toggleLenderStatus(id: number) { setLenderRecords((prev) => prev.map((l) => l.id !== id ? l : { ...l, status: l.status === "Inactive" ? "Active" : "Inactive" })); }
+  function updateLenderField(id: number, field: keyof LenderRecord, value: string) {
+    setLenderRecords((prev) => {
+      const next = prev.map((l) => l.id === id ? { ...l, [field]: value } : l);
+      saveLendersToDb(next);
+      return next;
+    });
+  }
+  function toggleLenderStatus(id: number) {
+    setLenderRecords((prev) => {
+      const next = prev.map((l) => l.id !== id ? l : { ...l, status: l.status === "Inactive" ? "Active" : "Inactive" });
+      saveLendersToDb(next);
+      return next;
+    });
+  }
   function handleSaveLender(form: NewLenderForm) {
     if (!form.programName.trim()) { alert("Please enter a program/lender name."); return; }
     if (form.capitalTypes.length === 0) { alert("Please select at least one Capital Type."); return; }
@@ -2126,7 +2166,11 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
       typeOfLoans: form.typeOfLoans, programTypes: form.programTypes,
       typeOfLenders: form.typeOfLenders, notes: form.notes,
     };
-    setLenderRecords((prev) => [...prev, newLender]);
+    setLenderRecords((prev) => {
+      const next = [...prev, newLender];
+      saveLendersToDb(next);
+      return next;
+    });
     setActiveTab("lenders");
   }
   function addUser() {
