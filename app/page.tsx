@@ -24,7 +24,8 @@ type AssetData = {
   propertyValue: string; purchasePrice: string; currentLoanAmount: string;
   landCost: string; softCosts: string; originationClosingCosts: string;
   hardCosts: string; carryingCosts: string; borrowerEquity: string;
-  ltvMode: string; currentNetIncome: string; manualLtv: string; dscr: string;
+  ltvMode: string; currentNetIncome: string; manualLtv: string; dscr: string; currentRate: string;
+  purchaseYear?: string; fullyEntitled?: "yes" | "no"; currentPropertyValue?: string; additionalEquity?: string;
   selectedStates: string[]; recourseType: string;
   numUnits: string; numBuildings: string; numAcres: string; retailUnits: RetailUnit[];
   address: AssetAddress;
@@ -69,6 +70,7 @@ type LenderChangeRequest = {
 };
 type AuthSession = { user: AppUser; } | null;
 type MatcherStep = "ai-prompt" | "start" | "asset-count" | "asset-form" | "review" | "results" | "hybrid-count" | "hybrid-form";
+type HybridSubLayer = { id: number; type: string; amount: string; };
 type HybridProperty = {
   id: number;
   ownershipStatus: "Acquisition" | "Refinance";
@@ -76,10 +78,20 @@ type HybridProperty = {
   purchasePrice: string;
   currentValue: string;
   seniorLoan: string;
-  subCapital: string;
-  subCapitalType: string;
+  subLayers: HybridSubLayer[];
   borrowerEquity: string;
-  currentLoan: string; // for refinance
+  currentLoan: string;
+  // Full property details
+  address: AssetAddress;
+  dealType: string;
+  numUnits: string;
+  numBuildings: string;
+  numAcres: string;
+  currentNetIncome: string;
+  dscr: string;
+  selectedStates: string[];
+  recourseType: string;
+  notes: string;
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -823,7 +835,7 @@ const refinanceTypes = ["Cash Out to Borrower", "Cash Out-Value Add", "Rate and 
 const recourseOptions = ["FULL", "NON RECOURSE", "CASE BY CASE"];
 const marketOptions = ["US", "INTERNATIONAL"];
 const allStates = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
-const unitAssets = ["Apartments", "Condos", "Hotel/Hospitality", "Gaming"];
+const unitAssets = ["Apartments", "Condos", "Hotel/Hospitality", "Hotel/Hospitality-Flag Required", "Hotel/Hospitality-Private or No Flag", "Gaming", "Casino/Gaming", "Student Housing", "Self-storage"];
 const retailAssets = ["Retail - Multi Tenant", "Retail - Single Tenant"];
 const typeOfLoanOptions = ["Acquisition", "Construction", "Value add", "New Development", "Redevelopment", "Refinance", "Note on Note", "Loan Purchases", "C&I"];
 const programTypeOptions = ["Refinance", "Acquisition", "Construction", "Land", "Fannie/Freddie", "HUD", "Small Balance", "Interest-only", "Cannabis"];
@@ -852,7 +864,7 @@ function matchLabel(score: number): { label: string; color: string; bg: string; 
 function normalizeRecourse(v: string) { return v === "SELECTIVE" || !v ? "CASE BY CASE" : v; }
 function blankAddress(): AssetAddress { return { street: "", unit: "", city: "", state: "", zip: "" }; }
 function blankAsset(id: number): AssetData {
-  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "Apartments", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dscr: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
+  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "Apartments", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dscr: "", currentRate: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
 }
 function blankLenderForm(): NewLenderForm {
   return { programName: "", contactPerson: "", email: "", phone: "", website: "", typeOfLenders: [], typeOfLoans: [], programTypes: [], propertyTypes: [], loanTerms: [], notes: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalTypes: [], capitalTypePrograms: [], status: "Active" };
@@ -1030,7 +1042,9 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
   const capRate = netIncome > 0 && propVal > 0 ? (netIncome / propVal) * 100 : 0;
   const metricBoxes: [string, string][] = [["Senior LTV", formatPercent(m.seniorLtv)]];
   if (m.isAcqNonConst && parseCurrency(asset.purchasePrice) > 0) metricBoxes.push(["Senior LTC", formatPercent(m.seniorLtc)]);
-  if (m.isRefinance) metricBoxes.push(["Cash Out", formatCurrencyInput(String(m.cashOut))]);
+  if (m.isRefinance && (asset.refinanceType === "Cash Out to Borrower" || asset.refinanceType === "Cash Out-Value Add")) {
+    metricBoxes.push(["Net Cash Out", m.cashOut > 0 ? formatCurrencyInput(String(m.cashOut)) : "—"]);
+  }
   metricBoxes.push([m.isSubCap ? "Subordinated LTV - Last Dollar" : "Subordinated Last $ LTV", m.isSubCap ? formatPercent(m.autoLtv) : "N/A"]);
   metricBoxes.push(["Total Capital", formatCurrencyInput(String(m.totalCap || 0))]);
   metricBoxes.push(["Equity %", formatPercent(m.equityPct)]);
@@ -1051,7 +1065,82 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
         </div>
       )}
       {m.isRefinance && (<div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Loan Amount</label><Input value={asset.currentLoanAmount} onChange={(e) => upd("currentLoanAmount", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>)}
+      {m.isRefinance && (asset.refinanceType === "Cash Out to Borrower" || asset.refinanceType === "Cash Out-Value Add") && asset.currentLoanAmount && asset.loanAmount && (
+        <div className="md:col-span-2">
+          <div className={`rounded-xl border p-4 ${m.cashOut > 0 ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className={`text-xs font-bold uppercase tracking-wide mb-1 ${m.cashOut > 0 ? "text-emerald-700" : "text-red-600"}`}>Net Cash Out to Borrower</div>
+                <div className="text-xs text-gray-500">New Loan ({asset.loanAmount}) − Current Loan ({asset.currentLoanAmount})</div>
+              </div>
+              <div className={`text-2xl font-bold ${m.cashOut > 0 ? "text-emerald-700" : "text-red-600"}`}>
+                {m.cashOut > 0 ? formatCurrencyInput(String(m.cashOut)) : "Negative / No Cash Out"}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {m.isAcqNonConst && (<div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Price</label><Input value={asset.purchasePrice} onChange={(e) => upd("purchasePrice", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>)}
+
+      {/* New Development + Refinance extra fields */}
+      {m.isRefinance && asset.dealType === "New Development" && (
+        <div className="md:col-span-2 rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/5 p-5 space-y-4">
+          <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold">New Development — Project Details</div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Price</label><Input value={asset.purchasePrice} onChange={(e) => upd("purchasePrice", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+            <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Year</label><Input value={asset.purchaseYear || ""} onChange={(e) => upd("purchaseYear", e.target.value)} placeholder="e.g. 2021" className={inputClass} /></div>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Are all units fully entitled?</label>
+            <div className="grid grid-cols-2 gap-3">
+              {(["yes", "no"] as const).map((opt) => (
+                <button key={opt} type="button" onClick={() => upd("fullyEntitled", opt)}
+                  className={`p-3 rounded-xl border-2 text-center font-bold text-sm transition-all ${asset.fullyEntitled === opt ? (opt === "yes" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-red-400 bg-red-50 text-red-600") : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30"}`}>
+                  {opt === "yes" ? "✓ Yes" : "✕ No"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {([
+              ["Total Hard Costs", "hardCosts"],
+              ["Total Soft Costs", "softCosts"],
+              ["Total Closing Costs", "originationClosingCosts"],
+              ["Total Carry Costs", "carryingCosts"],
+            ] as [string, keyof AssetData][]).map(([label, field]) => (
+              <div key={field}><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">{label}</label><Input value={String(asset[field] || "")} onChange={(e) => upd(field, formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+            ))}
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Property Value</label><Input value={asset.currentPropertyValue || ""} onChange={(e) => upd("currentPropertyValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+            <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Additional Equity Contributions</label><Input value={asset.additionalEquity || ""} onChange={(e) => upd("additionalEquity", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+          </div>
+
+          {/* Current Equity calculation */}
+          {asset.currentPropertyValue && asset.currentLoanAmount && (() => {
+            const curVal = parseCurrency(asset.currentPropertyValue || "");
+            const curDebt = parseCurrency(asset.currentLoanAmount);
+            const equity = curVal - curDebt;
+            return (
+              <div className={`rounded-xl border p-4 ${equity >= 0 ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className={`text-xs font-bold uppercase tracking-wide mb-1 ${equity >= 0 ? "text-emerald-700" : "text-red-600"}`}>Current Equity in Property</div>
+                    <div className="text-xs text-gray-500">Current Value ({asset.currentPropertyValue}) − Current Indebtedness ({asset.currentLoanAmount})</div>
+                  </div>
+                  <div className={`text-2xl font-bold ${equity >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                    {equity >= 0 ? formatCurrencyInput(String(equity)) : `(${formatCurrencyInput(String(Math.abs(equity)))})`}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
       {m.isConstruction && (
         <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-4">
           <div className="text-xs uppercase tracking-[0.2em] text-[#c9a84c] font-bold mb-3">Project Estimated Costs</div>
@@ -1072,8 +1161,58 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Property Value / ARV</label><Input value={asset.propertyValue} onChange={(e) => upd("propertyValue", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">LTV Mode</label><Select value={asset.ltvMode} onValueChange={(v) => upd("ltvMode", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="AUTO">Auto Calculate</SelectItem><SelectItem value="MANUAL">Manual Entry</SelectItem></SelectContent></Select></div>
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Net Income</label><Input value={asset.currentNetIncome} onChange={(e) => upd("currentNetIncome", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
-      {asset.ltvMode === "MANUAL" ? <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Manual LTV</label><Input value={asset.manualLtv} onChange={(e) => upd("manualLtv", e.target.value)} className={inputClass} /></div> : <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Calculated LTV</label><div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold text-[#0a1f44]">{formatPercent(m.autoLtv)}</div></div>}
-      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">DSCR</label><Input value={asset.dscr} onChange={(e) => upd("dscr", e.target.value)} className={inputClass} /></div>
+      {m.isRefinance && (
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Interest Rate (%)</label>
+          <Input value={asset.currentRate || ""} onChange={(e) => upd("currentRate", e.target.value)} placeholder="e.g. 6.5" className={inputClass} />
+        </div>
+      )}
+      {m.isRefinance ? (
+        <div>
+          <div className="flex items-center gap-1.5 mb-1">
+            <label className="text-xs text-gray-500 font-medium uppercase">DSCR</label>
+            <div className="relative group">
+              <div className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold cursor-help">i</div>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-[#0a1f44] text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
+                DSCR is calculated based on an interest only payment
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a1f44]" />
+              </div>
+            </div>
+          </div>
+          {(() => {
+            const netIncome = parseCurrency(asset.currentNetIncome);
+            const loanAmt = parseCurrency(asset.loanAmount) || parseCurrency(asset.seniorLoanAmount);
+            const rate = parseFloat(asset.currentRate || "0") / 100;
+            const autoDscr = netIncome > 0 && loanAmt > 0 && rate > 0
+              ? (netIncome / (loanAmt * rate)).toFixed(2)
+              : "";
+            return autoDscr ? (
+              <div className="rounded-xl border border-[#0a1f44]/20 bg-[#0a1f44]/5 px-3 py-2">
+                <div className="text-lg font-bold text-[#0a1f44]">{autoDscr}x</div>
+                <div className="text-xs text-gray-500 mt-0.5">Auto-calculated (I/O)</div>
+              </div>
+            ) : (
+              <Input value={asset.dscr} onChange={(e) => upd("dscr", e.target.value)} placeholder="e.g. 1.25 (enter rate above to auto-calc)" className={inputClass} />
+            );
+          })()}
+        </div>
+      ) : (
+        <div>
+          <div className="flex items-center gap-1.5 mb-1">
+            <label className="text-xs text-gray-500 font-medium uppercase">DSCR</label>
+            <div className="relative group">
+              <div className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold cursor-help">i</div>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-[#0a1f44] text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
+                DSCR is calculated based on an interest only payment
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a1f44]" />
+              </div>
+            </div>
+          </div>
+          <Input value={asset.dscr} onChange={(e) => upd("dscr", e.target.value)} placeholder="e.g. 1.25" className={inputClass} />
+        </div>
+      )}
+      {asset.ltvMode === "MANUAL" && <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Manual LTV</label><Input value={asset.manualLtv} onChange={(e) => upd("manualLtv", e.target.value)} className={inputClass} /></div>}
+      {asset.ltvMode === "AUTO" && <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Calculated LTV</label><div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold text-[#0a1f44]">{formatPercent(m.autoLtv)}</div></div>}
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label><Select value={asset.recourseType} onValueChange={(v) => upd("recourseType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
       <div className="md:col-span-2 grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(metricBoxes.length, 4)}, 1fr)` }}>
         {metricBoxes.map(([label, val]) => (<div key={label} className="rounded-xl border border-gray-200 bg-gray-50 p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">{label}</div><div className="text-sm font-bold text-[#0a1f44]">{val}</div></div>))}
@@ -1353,7 +1492,16 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
   const [hybridIndex, setHybridIndex] = useState(0);
 
   function blankHybridProperty(id: number): HybridProperty {
-    return { id, ownershipStatus: "Acquisition", assetType: "Apartments", purchasePrice: "", currentValue: "", seniorLoan: "", subCapital: "", subCapitalType: "Mezzanine", borrowerEquity: "", currentLoan: "" };
+    return {
+      id, ownershipStatus: "Acquisition", assetType: "Apartments",
+      purchasePrice: "", currentValue: "", seniorLoan: "",
+      subLayers: [{ id: 1, type: "Mezzanine", amount: "" }],
+      borrowerEquity: "", currentLoan: "",
+      address: blankAddress(), dealType: "Value add",
+      numUnits: "", numBuildings: "", numAcres: "",
+      currentNetIncome: "", dscr: "",
+      selectedStates: [], recourseType: "CASE BY CASE", notes: "",
+    };
   }
   function updHybrid(field: keyof HybridProperty, value: string) {
     setHybridProperties(prev => prev.map((p, i) => i === hybridIndex ? { ...p, [field]: value } : p));
@@ -1618,20 +1766,23 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
       {/* Hybrid: property capital stack builder */}
       {matcherStep === "hybrid-form" && hybridProperties.length > 0 && (() => {
         const prop = hybridProperties[hybridIndex];
-        const purchasePrice = parseCurrency(prop.purchasePrice);
-        const currentValue = parseCurrency(prop.currentValue);
-        const seniorLoan = parseCurrency(prop.seniorLoan);
-        const subCapital = parseCurrency(prop.subCapital);
-        const borrowerEquity = parseCurrency(prop.borrowerEquity);
-        const currentLoan = parseCurrency(prop.currentLoan);
         const isAcq = prop.ownershipStatus === "Acquisition";
+        const baseValue = parseCurrency(isAcq ? prop.purchasePrice : prop.currentValue);
+        const seniorLoan = parseCurrency(prop.seniorLoan);
+        const subLayers = prop.subLayers || [];
+        const borrowerEquity = parseCurrency(prop.borrowerEquity);
+        const showUnits = unitAssets.includes(prop.assetType);
+        const showAcres = prop.assetType === "Land";
 
-        // Stack math
-        const totalStack = isAcq ? seniorLoan + subCapital + borrowerEquity : seniorLoan + subCapital + borrowerEquity;
-        const baseValue = isAcq ? purchasePrice : currentValue;
-        const totalDebt = seniorLoan + subCapital;
+        // Last dollar LTV calculations
+        let runningDebt = seniorLoan;
         const seniorLtv = baseValue > 0 ? (seniorLoan / baseValue) * 100 : 0;
-        const totalLtv = baseValue > 0 ? (totalDebt / baseValue) * 100 : 0;
+        const layerLtvs = subLayers.map(layer => {
+          runningDebt += parseCurrency(layer.amount);
+          return baseValue > 0 ? (runningDebt / baseValue) * 100 : 0;
+        });
+        const totalDebt = seniorLoan + subLayers.reduce((s, l) => s + parseCurrency(l.amount), 0);
+        const totalStack = totalDebt + borrowerEquity;
         const stackDiff = baseValue > 0 ? totalStack - baseValue : 0;
         const stackBalanced = Math.abs(stackDiff) < 1000;
 
@@ -1649,9 +1800,9 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
               </div>
 
               <div className="space-y-5 mt-6">
-                {/* Step 1: Acquisition or Refinance */}
+                {/* Acquisition or Refinance */}
                 <div>
-                  <label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Is this an Acquisition or Refinance?</label>
+                  <label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Acquisition or Refinance?</label>
                   <div className="grid grid-cols-2 gap-3">
                     {(["Acquisition", "Refinance"] as const).map((opt) => (
                       <button key={opt} onClick={() => updHybrid("ownershipStatus", opt)} className={`p-3 rounded-xl border-2 text-left transition-all ${prop.ownershipStatus === opt ? "border-[#0a1f44] bg-[#0a1f44]/5" : "border-gray-200 hover:border-[#0a1f44]/30"}`}>
@@ -1661,7 +1812,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   </div>
                 </div>
 
-                {/* Step 2: Type of property */}
+                {/* Type of property */}
                 <div>
                   <label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Type of Property</label>
                   <Select value={prop.assetType} onValueChange={(v) => updHybrid("assetType", v)}>
@@ -1670,42 +1821,66 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   </Select>
                 </div>
 
-                {/* Step 3: Capital Stack */}
+                {/* Capital Stack */}
                 <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-5">
-                  <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-4">
-                    Capital Stack — {isAcq ? "Acquisition" : "Refinance"}
-                  </div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-4">Capital Stack</div>
                   <div className="space-y-3">
-                    {isAcq ? (
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Price</label>
-                        <Input value={prop.purchasePrice} onChange={(e) => updHybrid("purchasePrice", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} />
-                      </div>
-                    ) : (
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Property Value / ARV</label>
-                        <Input value={prop.currentValue} onChange={(e) => updHybrid("currentValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} />
-                      </div>
-                    )}
+                    {/* Base value */}
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">{isAcq ? "Purchase Price" : "Current Property Value / ARV"}</label>
+                      <Input value={isAcq ? prop.purchasePrice : prop.currentValue} onChange={(e) => updHybrid(isAcq ? "purchasePrice" : "currentValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} />
+                    </div>
 
-                    {/* Senior Loan */}
+                    {/* Senior */}
                     <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
                       <label className="text-xs text-blue-700 mb-1 block font-bold uppercase">Senior Loan Amount</label>
                       <Input value={prop.seniorLoan} onChange={(e) => updHybrid("seniorLoan", formatCurrencyInput(e.target.value))} placeholder="$0" className="bg-white border-blue-200 text-gray-800 rounded-xl" />
-                      {seniorLtv > 0 && <div className="text-xs text-blue-600 mt-1 font-medium">Senior LTV: {seniorLtv.toFixed(1)}%</div>}
+                      {seniorLtv > 0 && <div className="text-xs text-blue-600 mt-1.5 font-semibold">Senior LTV: {seniorLtv.toFixed(1)}%</div>}
                     </div>
 
-                    {/* Sub-capital */}
-                    <div className="rounded-xl border border-purple-200 bg-purple-50 p-3">
-                      <div className="flex items-center gap-3 mb-2">
-                        <label className="text-xs text-purple-700 font-bold uppercase">Subordinate Capital</label>
-                        <Select value={prop.subCapitalType} onValueChange={(v) => updHybrid("subCapitalType", v)}>
-                          <SelectTrigger className="bg-white border-purple-200 text-gray-800 rounded-xl h-7 text-xs w-44"><SelectValue /></SelectTrigger>
-                          <SelectContent>{["Mezzanine", "Preferred Equity", "JV Equity"].map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent>
-                        </Select>
+                    {/* Sub-capital layers */}
+                    {subLayers.map((layer, lidx) => (
+                      <div key={layer.id} className="rounded-xl border border-purple-200 bg-purple-50 p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Select value={layer.type} onValueChange={(v) => {
+                              const updated = subLayers.map((l, i) => i === lidx ? { ...l, type: v } : l);
+                              setHybridProperties(prev => prev.map((p, i) => i === hybridIndex ? { ...p, subLayers: updated } : p));
+                            }}>
+                              <SelectTrigger className="bg-white border-purple-200 text-gray-800 rounded-xl h-7 text-xs w-44"><SelectValue /></SelectTrigger>
+                              <SelectContent>{["Mezzanine", "Preferred Equity", "JV Equity", "Stretch Senior"].map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent>
+                            </Select>
+                            <span className="text-xs text-purple-500 font-medium">Layer {lidx + 1}</span>
+                          </div>
+                          {subLayers.length > 1 && (
+                            <button onClick={() => {
+                              const updated = subLayers.filter((_, i) => i !== lidx);
+                              setHybridProperties(prev => prev.map((p, i) => i === hybridIndex ? { ...p, subLayers: updated } : p));
+                            }} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                          )}
+                        </div>
+                        <Input value={layer.amount} onChange={(e) => {
+                          const updated = subLayers.map((l, i) => i === lidx ? { ...l, amount: formatCurrencyInput(e.target.value) } : l);
+                          setHybridProperties(prev => prev.map((p, i) => i === hybridIndex ? { ...p, subLayers: updated } : p));
+                        }} placeholder="$0" className="bg-white border-purple-200 text-gray-800 rounded-xl" />
+                        {layerLtvs[lidx] > 0 && (
+                          <div className="text-xs text-purple-600 mt-1.5 font-semibold">
+                            Last Dollar LTV (thru {layer.type}): {layerLtvs[lidx].toFixed(1)}%
+                          </div>
+                        )}
                       </div>
-                      <Input value={prop.subCapital} onChange={(e) => updHybrid("subCapital", formatCurrencyInput(e.target.value))} placeholder="$0" className="bg-white border-purple-200 text-gray-800 rounded-xl" />
-                    </div>
+                    ))}
+
+                    {/* Add sub-layer button */}
+                    <button
+                      onClick={() => {
+                        const newLayer: HybridSubLayer = { id: Date.now(), type: "Preferred Equity", amount: "" };
+                        setHybridProperties(prev => prev.map((p, i) => i === hybridIndex ? { ...p, subLayers: [...p.subLayers, newLayer] } : p));
+                      }}
+                      className="w-full py-2 text-xs font-semibold border-2 border-dashed border-purple-300 text-purple-500 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition-all"
+                    >
+                      + Add Another Subordinate Layer
+                    </button>
 
                     {/* Borrower equity */}
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
@@ -1715,48 +1890,82 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
 
                     {/* Stack summary */}
                     {baseValue > 0 && (
-                      <div className={`rounded-xl border p-4 ${stackBalanced ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
-                        <div className="text-xs font-bold uppercase tracking-wide mb-3 ${stackBalanced ? 'text-emerald-700' : 'text-red-700'}">
-                          {stackBalanced ? "✓ Stack Balances" : `Stack ${stackDiff > 0 ? "Exceeds" : "Shortfall"}: ${formatCurrencyInput(String(Math.abs(stackDiff)))}`}
+                      <div className={`rounded-xl border p-4 ${stackBalanced ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+                        <div className={`text-xs font-bold uppercase tracking-wide mb-3 ${stackBalanced ? "text-emerald-700" : "text-amber-700"}`}>
+                          {stackBalanced ? "✓ Stack Balances" : `Gap: ${formatCurrencyInput(String(Math.abs(stackDiff)))} ${stackDiff > 0 ? "over" : "under"}`}
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          {[
-                            [isAcq ? "Purchase Price" : "Property Value", formatCurrencyInput(String(baseValue))],
-                            ["Senior Loan", formatCurrencyInput(String(seniorLoan))],
-                            [prop.subCapitalType, formatCurrencyInput(String(subCapital))],
-                            ["Borrower Equity", formatCurrencyInput(String(borrowerEquity))],
-                            ["Total Debt", formatCurrencyInput(String(totalDebt))],
-                            ["Total LTV", `${totalLtv.toFixed(1)}%`],
-                          ].map(([label, val]) => (
-                            <div key={String(label)} className="text-xs">
-                              <span className="text-gray-500">{label}: </span>
-                              <span className="font-bold text-[#0a1f44]">{val}</span>
-                            </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs"><span className="text-gray-500">{isAcq ? "Purchase Price" : "Property Value"}</span><span className="font-bold text-[#0a1f44]">{formatCurrencyInput(String(baseValue))}</span></div>
+                          <div className="flex justify-between text-xs"><span className="text-blue-600">Senior ({seniorLtv.toFixed(1)}% LTV)</span><span className="font-bold text-[#0a1f44]">{prop.seniorLoan || "—"}</span></div>
+                          {subLayers.map((layer, lidx) => (
+                            <div key={layer.id} className="flex justify-between text-xs"><span className="text-purple-600">{layer.type} ({layerLtvs[lidx].toFixed(1)}% last $)</span><span className="font-bold text-[#0a1f44]">{layer.amount || "—"}</span></div>
                           ))}
+                          <div className="flex justify-between text-xs"><span className="text-emerald-600">Borrower Equity</span><span className="font-bold text-[#0a1f44]">{prop.borrowerEquity || "—"}</span></div>
+                          <div className="flex justify-between text-xs pt-1 border-t border-gray-200 mt-1"><span className="font-semibold text-gray-600">Total Debt</span><span className="font-bold text-[#0a1f44]">{formatCurrencyInput(String(totalDebt))}</span></div>
                         </div>
                       </div>
                     )}
+                  </div>
+                </div>
+
+                {/* Full property details */}
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+                  <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-4">Property Details</div>
+                  <div className="space-y-4">
+                    <AddressFields address={prop.address || blankAddress()} onChange={(a) => setHybridProperties(prev => prev.map((p, i) => i === hybridIndex ? { ...p, address: a } : p))} inputClass={inputClass} />
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Deal Type</label>
+                        <Select value={prop.dealType} onValueChange={(v) => updHybrid("dealType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{dealTypes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
+                      </div>
+                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label>
+                        <Select value={prop.recourseType} onValueChange={(v) => updHybrid("recourseType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
+                      </div>
+                    </div>
+                    {showUnits && (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Units</label><Input value={prop.numUnits} onChange={(e) => updHybrid("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Buildings</label><Input value={prop.numBuildings} onChange={(e) => updHybrid("numBuildings", e.target.value)} placeholder="e.g. 4" className={inputClass} /></div>
+                      </div>
+                    )}
+                    {showAcres && <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Acres</label><Input value={prop.numAcres} onChange={(e) => updHybrid("numAcres", e.target.value)} placeholder="e.g. 12.5" className={inputClass} /></div>}
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Net Income (Annual)</label><Input value={prop.currentNetIncome} onChange={(e) => updHybrid("currentNetIncome", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">DSCR</label><Input value={prop.dscr} onChange={(e) => updHybrid("dscr", e.target.value)} placeholder="e.g. 1.25" className={inputClass} /></div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Target States</label>
+                      <div className="mb-2 flex gap-2">
+                        <button type="button" onClick={() => setHybridProperties(prev => prev.map((p, i) => i === hybridIndex ? { ...p, selectedStates: allStates } : p))} className="px-3 py-1 text-xs border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/10 font-medium">All States</button>
+                        <button type="button" onClick={() => setHybridProperties(prev => prev.map((p, i) => i === hybridIndex ? { ...p, selectedStates: [] } : p))} className="px-3 py-1 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-100">Clear</button>
+                      </div>
+                      <div className="grid max-h-32 grid-cols-6 gap-1.5 overflow-auto rounded-xl border border-gray-200 bg-white p-3">
+                        {allStates.map(s => (
+                          <label key={s} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                            <input type="checkbox" checked={(prop.selectedStates || []).includes(s)} onChange={() => {
+                              const cur = prop.selectedStates || [];
+                              const updated = cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s];
+                              setHybridProperties(prev => prev.map((p, i) => i === hybridIndex ? { ...p, selectedStates: updated } : p));
+                            }} className="accent-[#0a1f44]" />
+                            <span className="text-gray-600">{s}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Additional Notes</label>
+                      <textarea value={prop.notes} onChange={(e) => updHybrid("notes", e.target.value)} placeholder="Any additional context about this property or deal..." rows={2} className="w-full px-4 py-3 text-sm bg-white border border-gray-300 rounded-xl text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#0a1f44] resize-none" />
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Navigation */}
               <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
-                <button
-                  onClick={() => { if (hybridIndex > 0) setHybridIndex(i => i - 1); else setMatcherStep("hybrid-count"); }}
-                  className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"
-                >
-                  <ChevronLeft className="h-4 w-4" /> Previous
-                </button>
-                <button
-                  onClick={() => { if (hybridIndex < hybridProperties.length - 1) setHybridIndex(i => i + 1); else setMatcherStep("review"); }}
-                  className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80"
-                >
+                <button onClick={() => { if (hybridIndex > 0) setHybridIndex(i => i - 1); else setMatcherStep("hybrid-count"); }} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Previous</button>
+                <button onClick={() => { if (hybridIndex < hybridProperties.length - 1) setHybridIndex(i => i + 1); else setMatcherStep("review"); }} className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">
                   {hybridIndex < hybridProperties.length - 1 ? <>Next Property <ChevronRight className="h-4 w-4" /></> : <>Review & Confirm <CheckCircle className="h-4 w-4" /></>}
                 </button>
               </div>
-
-              {/* Property mini-nav */}
               {hybridProperties.length > 1 && (
                 <div className="flex gap-2 mt-4 justify-center">
                   {hybridProperties.map((_, idx) => (
@@ -1821,8 +2030,9 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                 {hybridProperties.map((prop, idx) => {
                   const baseVal = parseCurrency(prop.ownershipStatus === "Acquisition" ? prop.purchasePrice : prop.currentValue);
                   const seniorLoan = parseCurrency(prop.seniorLoan);
-                  const subCap = parseCurrency(prop.subCapital);
-                  const totalDebt = seniorLoan + subCap;
+                  const subLayers = prop.subLayers || [];
+                  let runningDebt = seniorLoan;
+                  const totalDebt = seniorLoan + subLayers.reduce((s, l) => s + parseCurrency(l.amount), 0);
                   const totalLtv = baseVal > 0 ? (totalDebt / baseVal) * 100 : 0;
                   return (
                     <div key={prop.id} className="rounded-xl border-2 border-gray-200 p-5 hover:border-[#0a1f44]/30 transition-all">
@@ -1830,16 +2040,30 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                         <div>
                           <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Property {idx + 1}</div>
                           <div className="text-base font-bold text-[#0a1f44]">{prop.assetType}</div>
-                          <div className="text-xs text-gray-500">{prop.ownershipStatus}</div>
+                          <div className="text-xs text-gray-500">{prop.ownershipStatus} · {prop.dealType}</div>
+                          {prop.address?.city && <div className="text-xs text-gray-400 mt-0.5">{prop.address.city}, {prop.address.state}</div>}
                         </div>
                         <button onClick={() => { setHybridIndex(idx); setMatcherStep("hybrid-form"); }} className="flex items-center gap-1 px-3 py-1.5 text-xs border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/10"><Edit2 className="h-3 w-3" /> Edit</button>
                       </div>
                       <div className="space-y-1.5">
                         <div className="flex justify-between text-xs"><span className="text-gray-400">{prop.ownershipStatus === "Acquisition" ? "Purchase Price" : "Property Value"}</span><span className="font-bold text-[#0a1f44]">{prop.ownershipStatus === "Acquisition" ? prop.purchasePrice || "—" : prop.currentValue || "—"}</span></div>
-                        <div className="flex justify-between text-xs"><span className="text-blue-500 font-medium">Senior Loan</span><span className="font-bold text-[#0a1f44]">{prop.seniorLoan || "—"}</span></div>
-                        <div className="flex justify-between text-xs"><span className="text-purple-500 font-medium">{prop.subCapitalType}</span><span className="font-bold text-[#0a1f44]">{prop.subCapital || "—"}</span></div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-blue-500 font-medium">Senior ({baseVal > 0 ? ((seniorLoan/baseVal)*100).toFixed(1) : 0}% LTV)</span>
+                          <span className="font-bold text-[#0a1f44]">{prop.seniorLoan || "—"}</span>
+                        </div>
+                        {subLayers.map((layer) => {
+                          runningDebt += parseCurrency(layer.amount);
+                          const lastDollarLtv = baseVal > 0 ? (runningDebt / baseVal) * 100 : 0;
+                          return (
+                            <div key={layer.id} className="flex justify-between text-xs">
+                              <span className="text-purple-500 font-medium">{layer.type} ({lastDollarLtv.toFixed(1)}% last $)</span>
+                              <span className="font-bold text-[#0a1f44]">{layer.amount || "—"}</span>
+                            </div>
+                          );
+                        })}
                         <div className="flex justify-between text-xs"><span className="text-emerald-600 font-medium">Borrower Equity</span><span className="font-bold text-[#0a1f44]">{prop.borrowerEquity || "—"}</span></div>
                         {totalLtv > 0 && <div className="flex justify-between text-xs pt-1 border-t border-gray-100"><span className="text-gray-400">Total LTV</span><span className="font-bold text-[#0a1f44]">{totalLtv.toFixed(1)}%</span></div>}
+                        {prop.currentNetIncome && <div className="flex justify-between text-xs"><span className="text-gray-400">Net Income</span><span className="font-bold text-[#0a1f44]">{prop.currentNetIncome}</span></div>}
                       </div>
                     </div>
                   );
