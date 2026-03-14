@@ -55,7 +55,7 @@ function formatCurrencyInput(value: string) {
   const formattedWhole = Number(whole || 0).toLocaleString("en-US");
   return `$${decimal !== undefined ? `${formattedWhole}.${decimal.slice(0, 2)}` : formattedWhole}`;
 }
-function formatPercent(value: number) { if (!Number.isFinite(value)) return "—"; return `${value.toFixed(1)}%`; }
+function formatPercent(value: number) { if (!Number.isFinite(value) || !isFinite(value)) return "—"; return `${value.toFixed(1)}%`; }
 function parsePercent(value: string) { return Number(String(value || "0").replace(/[^0-9.]/g, "")); }
 function parseDscr(value: string) { if (value === "N/A") return 0; return Number(String(value || "0").replace(/[^0-9.]/g, "")); }
 function createBlankLender(nextId: number): LenderRecord {
@@ -108,6 +108,8 @@ export default function Home() {
   const [seniorLoanAmount, setSeniorLoanAmount] = useState("$20,000,000");
   const [subordinateAmount, setSubordinateAmount] = useState("$5,000,000");
   const [propertyValue, setPropertyValue] = useState("$40,000,000");
+  const [purchasePrice, setPurchasePrice] = useState("");
+  const [currentLoanAmount, setCurrentLoanAmount] = useState("");
   const [landCost, setLandCost] = useState("");
   const [softCosts, setSoftCosts] = useState("");
   const [originationClosingCosts, setOriginationClosingCosts] = useState("");
@@ -126,25 +128,45 @@ export default function Home() {
   const [recourseType, setRecourseType] = useState("CASE BY CASE");
   const [marketScope, setMarketScope] = useState("US");
 
+  const isRefinance = ownershipStatus === "Refinance";
+  const isAcquisition = ownershipStatus === "Acquisition";
+  const isConstruction = dealType === "Construction";
+  const isAcquisitionNonConstruction = isAcquisition && !isConstruction;
   const isSubordinateCapital = ["Mezzanine", "Preferred Equity", "JV Equity"].includes(capitalType);
-  const isAcquisitionConstruction = ownershipStatus === "Acquisition" && dealType === "Construction";
+
   const projectEstimatedCostsTotal = parseCurrency(landCost) + parseCurrency(softCosts) + parseCurrency(originationClosingCosts) + parseCurrency(hardCosts) + parseCurrency(carryingCosts);
   const acquisitionConstructionLoanAmount = Math.max(0, projectEstimatedCostsTotal - parseCurrency(borrowerEquity));
-  const effectiveAmount = isAcquisitionConstruction ? acquisitionConstructionLoanAmount : isSubordinateCapital ? parseCurrency(subordinateAmount) : parseCurrency(loanAmount);
+  const effectiveAmount = isConstruction && isAcquisition ? acquisitionConstructionLoanAmount : isSubordinateCapital ? parseCurrency(subordinateAmount) : parseCurrency(loanAmount);
   const seniorAmountNumeric = parseCurrency(seniorLoanAmount);
   const propertyValueNumeric = parseCurrency(propertyValue);
+  const purchasePriceNumeric = parseCurrency(purchasePrice);
+  const currentLoanNumeric = parseCurrency(currentLoanAmount);
+  const newLoanNumeric = parseCurrency(loanAmount);
+
   const totalCapitalNumeric = isSubordinateCapital ? seniorAmountNumeric + effectiveAmount : effectiveAmount;
+
+  // Senior LTV = loan amount / property value
+  const seniorLtv = propertyValueNumeric > 0 ? (newLoanNumeric / propertyValueNumeric) * 100 : 0;
   const autoLtv = propertyValueNumeric > 0 ? (totalCapitalNumeric / propertyValueNumeric) * 100 : 0;
-  const seniorLtv = propertyValueNumeric > 0 ? (seniorAmountNumeric / propertyValueNumeric) * 100 : 0;
-  const equityPercent = propertyValueNumeric > 0 ? (parseCurrency(borrowerEquity) / propertyValueNumeric) * 100 : 0;
   const currentLtv = ltvMode === "MANUAL" ? Number(manualLtv || 0) : autoLtv;
+  const equityPercent = propertyValueNumeric > 0 ? (parseCurrency(borrowerEquity) / propertyValueNumeric) * 100 : 0;
+
+  // Cash out = new loan - current loan (only positive values)
+  const cashOut = Math.max(0, newLoanNumeric - currentLoanNumeric);
+
+  // Senior LTC = loan amount / purchase price
+  const seniorLtc = purchasePriceNumeric > 0 ? (newLoanNumeric / purchasePriceNumeric) * 100 : 0;
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return lenderRecords.filter((l) => l.program.toLowerCase().includes(q) || l.lender.toLowerCase().includes(q) || l.type.toLowerCase().includes(q) || l.assets.join(" ").toLowerCase().includes(q) || l.source.toLowerCase().includes(q));
   }, [search, lenderRecords]);
 
-  const registryFiltered = useMemo(() => filtered.filter((l) => (selectedSourceFilter === "All" || l.source === selectedSourceFilter) && (selectedCapitalFilter === "All" || l.type === selectedCapitalFilter) && (selectedStatusFilter === "All" || l.status === selectedStatusFilter)), [filtered, selectedSourceFilter, selectedCapitalFilter, selectedStatusFilter]);
+  const registryFiltered = useMemo(() => filtered.filter((l) =>
+    (selectedSourceFilter === "All" || l.source === selectedSourceFilter) &&
+    (selectedCapitalFilter === "All" || l.type === selectedCapitalFilter) &&
+    (selectedStatusFilter === "All" || l.status === selectedStatusFilter)
+  ), [filtered, selectedSourceFilter, selectedCapitalFilter, selectedStatusFilter]);
 
   const matches = useMemo(() => {
     if (marketScope === "INTERNATIONAL") return [];
@@ -183,7 +205,22 @@ export default function Home() {
   const inputClass = "bg-white border-gray-300 text-gray-800 placeholder:text-gray-400 rounded-xl focus:border-[#0a1f44] focus:ring-0";
   const selectTriggerClass = "bg-white border-gray-300 text-gray-800 rounded-xl focus:border-[#0a1f44]";
   const cardClass = "rounded-2xl border border-gray-200 bg-white shadow-sm";
-  const darkCardClass = "rounded-2xl border border-[#c9a84c]/20 bg-[#0a1f44] shadow-xl";
+
+  // Build metric boxes dynamically based on scenario
+  const metricBoxes = () => {
+    const boxes: [string, string][] = [];
+    boxes.push(["Senior LTV", formatPercent(seniorLtv)]);
+    if (isAcquisitionNonConstruction && purchasePriceNumeric > 0) {
+      boxes.push(["Senior LTC", formatPercent(seniorLtc)]);
+    }
+    if (isRefinance) {
+      boxes.push(["Cash Out", formatCurrencyInput(String(cashOut))]);
+    }
+    boxes.push(["Last $ LTV", formatPercent(autoLtv)]);
+    boxes.push(["Total Capital", formatCurrencyInput(String(totalCapitalNumeric || 0))]);
+    boxes.push(["Equity %", formatPercent(equityPercent)]);
+    return boxes;
+  };
 
   return (
     <>
@@ -202,7 +239,7 @@ export default function Home() {
       <div className="min-h-screen bg-[#f0f2f5] text-gray-800">
         <div className="grid min-h-screen lg:grid-cols-[260px_1fr]">
 
-          {/* Sidebar - stays dark navy */}
+          {/* Sidebar */}
           <aside className="border-r border-[#c9a84c]/10 bg-[#0a1f44] flex flex-col">
             <div className="px-6 py-8 border-b border-[#c9a84c]/20">
               <div className="flex items-center gap-3 mb-2">
@@ -234,11 +271,10 @@ export default function Home() {
             </div>
           </aside>
 
-          {/* Main Content */}
+          {/* Main */}
           <main className="p-6 md:p-8 overflow-auto">
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
 
-              {/* Top Bar */}
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
                 <div>
                   <div className="text-xs uppercase tracking-[0.28em] text-[#0a1f44] font-bold">Institutional Workflow</div>
@@ -253,7 +289,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Stat Cards - dark navy */}
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 mb-8">
                 <StatCard title="Total Lenders" value={String(lenderRecords.length)} detail="Spreadsheet + dashboard records" icon={Building2} />
                 <StatCard title="Spreadsheet" value={String(spreadsheetCount)} detail="Imported criteria rows" icon={FileSpreadsheet} />
@@ -444,14 +479,31 @@ export default function Home() {
                     <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Qualification</div>
                     <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">Deal Matcher</h2>
                     <div className="grid gap-4 md:grid-cols-2">
+
                       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Market</label><Select value={marketScope} onValueChange={setMarketScope}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{marketOptions.map((item) => <SelectItem key={item} value={item}>{item === "US" ? "US" : "International"}</SelectItem>)}</SelectContent></Select></div>
                       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Capital Type</label><Select value={capitalType} onValueChange={setCapitalType}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{capitalTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
                       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Ownership Status</label><Select value={ownershipStatus} onValueChange={setOwnershipStatus}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
                       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Deal Type</label><Select value={dealType} onValueChange={setDealType}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{dealTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
-                      {ownershipStatus === "Refinance" && (<div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Refinance Type</label><Select value={refinanceType} onValueChange={setRefinanceType}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{refinanceTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>)}
+
+                      {isRefinance && (
+                        <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Refinance Type</label><Select value={refinanceType} onValueChange={setRefinanceType}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{refinanceTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
+                      )}
+
                       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Asset Type</label><Select value={assetType} onValueChange={setAssetType}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{assetTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
-{dealType === "Construction" && (
-  <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-4">
+
+                      {/* Refinance: Current Loan Amount */}
+                      {isRefinance && (
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Current Loan Amount</label><Input value={currentLoanAmount} onChange={(e) => setCurrentLoanAmount(formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                      )}
+
+                      {/* Acquisition non-construction: Purchase Price */}
+                      {isAcquisitionNonConstruction && (
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Purchase Price</label><Input value={purchasePrice} onChange={(e) => setPurchasePrice(formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                      )}
+
+                      {/* Construction cost breakdown */}
+                      {isConstruction && (
+                        <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-4">
                           <div className="text-xs uppercase tracking-[0.2em] text-[#c9a84c] font-bold mb-3">Project Estimated Costs</div>
                           <div className="grid gap-3 md:grid-cols-2">
                             {([["Land / Acquisition Cost", landCost, setLandCost], ["Soft Costs", softCosts, setSoftCosts], ["Origination & Closing", originationClosingCosts, setOriginationClosingCosts], ["Hard Costs", hardCosts, setHardCosts], ["Carrying Costs", carryingCosts, setCarryingCosts], ["Borrower Equity", borrowerEquity, setBorrowerEquity]] as [string, string, (v: string) => void][]).map(([label, val, setter]) => (
@@ -460,12 +512,24 @@ export default function Home() {
                           </div>
                         </div>
                       )}
-                      {!isSubordinateCapital && !isAcquisitionConstruction && (<div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Loan Amount</label><Input value={loanAmount} onChange={(e) => setLoanAmount(formatCurrencyInput(e.target.value))} className={inputClass} /></div>)}
+
+                      {/* Loan amount field */}
+                      {!isSubordinateCapital && !(isConstruction && isAcquisition) && (
+                        <div className="md:col-span-2">
+                          <label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">
+                            {isRefinance ? "New Loan Amount" : "Loan Amount"}
+                          </label>
+                          <Input value={loanAmount} onChange={(e) => setLoanAmount(formatCurrencyInput(e.target.value))} className={inputClass} />
+                        </div>
+                      )}
+
                       {isSubordinateCapital && (<>
                         <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Senior Loan Amount</label><Input value={seniorLoanAmount} onChange={(e) => setSeniorLoanAmount(formatCurrencyInput(e.target.value))} className={inputClass} /></div>
                         <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">{subordinateLabel(capitalType)}</label><Input value={subordinateAmount} onChange={(e) => setSubordinateAmount(formatCurrencyInput(e.target.value))} className={inputClass} /></div>
                         <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500">Stack: Senior {seniorLoanAmount || "$0"} + {subordinateLabel(capitalType)} {subordinateAmount || "$0"}</div>
                       </>)}
+
+                      {/* States */}
                       <div className="md:col-span-2">
                         <label className="text-xs text-gray-500 mb-2 block font-medium uppercase tracking-wide">States</label>
                         <div className="mb-2 flex gap-2">
@@ -476,20 +540,27 @@ export default function Home() {
                           {allStates.map((s) => (<label key={s} className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={selectedStates.includes(s)} onChange={() => setSelectedStates((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s])} className="accent-[#0a1f44]" /><span className="text-gray-600">{s}</span></label>))}
                         </div>
                       </div>
+
                       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Property Value / ARV</label><Input value={propertyValue} onChange={(e) => setPropertyValue(formatCurrencyInput(e.target.value))} className={inputClass} /></div>
                       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">LTV Mode</label><Select value={ltvMode} onValueChange={setLtvMode}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="AUTO">Auto Calculate</SelectItem><SelectItem value="MANUAL">Manual Entry</SelectItem></SelectContent></Select></div>
                       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Net Income</label><Input value={currentNetIncome} onChange={(e) => setCurrentNetIncome(formatCurrencyInput(e.target.value))} className={inputClass} /></div>
-                      {ltvMode === "MANUAL" ? <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Manual LTV</label><Input value={manualLtv} onChange={(e) => setManualLtv(e.target.value)} className={inputClass} /></div> : <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Calculated LTV</label><div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold text-[#0a1f44]">{formatPercent(autoLtv)}</div></div>}
+                      {ltvMode === "MANUAL"
+                        ? <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Manual LTV</label><Input value={manualLtv} onChange={(e) => setManualLtv(e.target.value)} className={inputClass} /></div>
+                        : <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Calculated LTV</label><div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold text-[#0a1f44]">{formatPercent(autoLtv)}</div></div>
+                      }
                       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">DSCR</label><Input value={dscr} onChange={(e) => setDscr(e.target.value)} className={inputClass} /></div>
                       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label><Select value={recourseType} onValueChange={setRecourseType}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
-                      <div className="md:col-span-2 grid grid-cols-4 gap-3">
-                        {([["Senior LTV", formatPercent(seniorLtv)], ["Last $ LTV", formatPercent(autoLtv)], ["Total Capital", formatCurrencyInput(String(totalCapitalNumeric || 0))], ["Equity %", formatPercent(equityPercent)]] as [string, string][]).map(([label, val]) => (
+
+                      {/* Dynamic metric boxes */}
+                      <div className={`md:col-span-2 grid gap-3`} style={{ gridTemplateColumns: `repeat(${Math.min(metricBoxes().length, 4)}, 1fr)` }}>
+                        {metricBoxes().map(([label, val]) => (
                           <div key={label} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
                             <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">{label}</div>
                             <div className="text-sm font-bold text-[#0a1f44]">{val}</div>
                           </div>
                         ))}
                       </div>
+
                       {marketScope === "INTERNATIONAL" && (<div className="md:col-span-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">CAPMOON DOES NOT SERVICE INTERNATIONAL LOANS AT THIS TIME</div>)}
                       <div className="md:col-span-2 flex gap-3 pt-2">
                         <button className="px-5 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all">Run Lender Match</button>
@@ -497,6 +568,8 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Ranked Output */}
                   <div className={cardClass + " p-6"}>
                     <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Results</div>
                     <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">Ranked Output</h2>
