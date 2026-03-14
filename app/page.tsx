@@ -51,9 +51,21 @@ type SubmittedDeal = {
   id: number; submittedAt: string; seekerName: string;
   assets: AssetData[]; capitalType: string; assetMode: string; collateralMode: string;
   status: "pending" | "assigned" | "closed"; assignedAdvisorIds: number[];
+  invitedUserIds?: number[];
 };
 type DeleteRequest = {
   id: number; lenderId: number; lenderName: string; requestedBy: string; requestedAt: string; status: "pending" | "approved" | "denied";
+};
+type LenderChangeRequest = {
+  id: number;
+  changeType: "add" | "edit";
+  lenderId?: number; // for edits — the existing lender's id
+  lenderName: string;
+  proposedData: LenderRecord; // full proposed lender record
+  requestedBy: string;
+  requestedById: number;
+  requestedAt: string;
+  status: "pending" | "approved" | "denied";
 };
 type AuthSession = { user: AppUser; } | null;
 type MatcherStep = "ai-prompt" | "start" | "asset-count" | "asset-form" | "review" | "results";
@@ -1953,7 +1965,23 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
 
   function handleSubmit(assets: AssetData[], capitalType: string, assetMode: string, collateralMode: string) {
     const advisors = assignAdvisors(capitalType, teamMembers);
-    onSubmitDeal({ id: Date.now(), submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Guest", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a) => a.id) });
+    const deal: SubmittedDeal = { id: Date.now(), submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Guest", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a) => a.id) };
+    onSubmitDeal(deal);
+    // Push to Pipedrive
+    const advisor = advisors[0];
+    if (advisor) {
+      fetch("/api/pipedrive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_deal",
+          deal,
+          seeker: { name: session?.user.name || "Guest", email: session?.user.email || session?.user.username || "", phone: session?.user.phone || "" },
+          advisorName: advisor.name,
+          advisorEmail: advisor.email,
+        }),
+      }).catch(e => console.error("Pipedrive sync failed:", e));
+    }
   }
 
   return (
@@ -2054,12 +2082,13 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
 
 // ─── Main Portal (Admin + Advisor) ────────────────────────────────────────────
 
-function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, users, setUsers, teamMembers, setTeamMembers, deleteRequests, setDeleteRequests }: {
+function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, users, setUsers, teamMembers, setTeamMembers, deleteRequests, setDeleteRequests, lenderChangeRequests, setLenderChangeRequests }: {
   session: AuthSession; onLogout: () => void;
   submittedDeals: SubmittedDeal[]; setSubmittedDeals: (d: SubmittedDeal[]) => void;
   users: AppUser[]; setUsers: (u: AppUser[]) => void;
   teamMembers: TeamMember[]; setTeamMembers: (m: TeamMember[]) => void;
   deleteRequests: DeleteRequest[]; setDeleteRequests: (r: DeleteRequest[]) => void;
+  lenderChangeRequests: LenderChangeRequest[]; setLenderChangeRequests: (r: LenderChangeRequest[]) => void;
 }) {
   const isAdmin = session?.user.role === "admin";
   const [activeTab, setActiveTab] = useState("overview");
@@ -2102,6 +2131,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const cardClass = "rounded-2xl border border-gray-200 bg-white shadow-sm";
 
   const pendingDeleteCount = deleteRequests.filter((r) => r.status === "pending").length;
+  const pendingLenderChangeCount = lenderChangeRequests.filter((r) => r.status === "pending").length;
 
   function handleDeleteLender(id: number) {
     const lender = lenderRecords.find((l) => l.id === id);
@@ -2129,18 +2159,39 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   }
 
   function updateLenderField(id: number, field: keyof LenderRecord, value: string) {
-    setLenderRecords((prev) => {
-      const next = prev.map((l) => l.id === id ? { ...l, [field]: value } : l);
-      saveLendersToDb(next);
-      return next;
-    });
+    // Always update local state for live preview while editing
+    setLenderRecords((prev) => prev.map((l) => l.id === id ? { ...l, [field]: value } : l));
+    // Admins also persist to DB immediately
+    if (isAdmin) {
+      setLenderRecords((prev) => {
+        const next = prev.map((l) => l.id === id ? { ...l, [field]: value } : l);
+        saveLendersToDb(next);
+        return next;
+      });
+    }
   }
   function toggleLenderStatus(id: number) {
-    setLenderRecords((prev) => {
-      const next = prev.map((l) => l.id !== id ? l : { ...l, status: l.status === "Inactive" ? "Active" : "Inactive" });
-      saveLendersToDb(next);
-      return next;
-    });
+    if (isAdmin) {
+      setLenderRecords((prev) => {
+        const next = prev.map((l) => l.id !== id ? l : { ...l, status: l.status === "Inactive" ? "Active" : "Inactive" });
+        saveLendersToDb(next);
+        return next;
+      });
+    } else {
+      setLenderRecords((prev) => prev.map((l) => l.id !== id ? l : { ...l, status: l.status === "Inactive" ? "Active" : "Inactive" }));
+    }
+  }
+  function submitLenderEditRequest(lender: LenderRecord) {
+    const req: LenderChangeRequest = {
+      id: Date.now(), changeType: "edit", lenderId: lender.id, lenderName: lender.lender,
+      proposedData: { ...lender }, requestedBy: session?.user.name || "Advisor",
+      requestedById: session?.user.id || 0, requestedAt: new Date().toLocaleString(), status: "pending",
+    };
+    const next = [...lenderChangeRequests, req];
+    setLenderChangeRequests(next);
+    saveToDb("lender-changes", next);
+    alert(`Your edit request for "${lender.lender}" has been submitted for admin approval.`);
+    setEditingLenderId(null);
   }
   function handleSaveLender(form: NewLenderForm) {
     if (!form.programName.trim()) { alert("Please enter a program/lender name."); return; }
@@ -2166,12 +2217,21 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
       typeOfLoans: form.typeOfLoans, programTypes: form.programTypes,
       typeOfLenders: form.typeOfLenders, notes: form.notes,
     };
-    setLenderRecords((prev) => {
-      const next = [...prev, newLender];
-      saveLendersToDb(next);
-      return next;
-    });
-    setActiveTab("lenders");
+    if (isAdmin) {
+      // Admin: apply immediately
+      setLenderRecords((prev) => { const next = [...prev, newLender]; saveLendersToDb(next); return next; });
+      setActiveTab("lenders");
+    } else {
+      // Advisor: submit for approval
+      const req: LenderChangeRequest = {
+        id: Date.now(), changeType: "add", lenderName: newLender.lender,
+        proposedData: newLender, requestedBy: session?.user.name || "Advisor",
+        requestedById: session?.user.id || 0, requestedAt: new Date().toLocaleString(), status: "pending",
+      };
+      setLenderChangeRequests([...lenderChangeRequests, req]);
+      alert(`Your request to add "${newLender.lender}" has been submitted for admin approval.`);
+      setActiveTab("lenders");
+    }
   }
   function addUser() {
     if (!newUserForm.name.trim() || !newUserForm.username.trim() || !newUserForm.password.trim()) return;
@@ -2203,6 +2263,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     ["uploads", "Upload Center", Upload],
     ...(isAdmin ? [["user-management", "User Management", Settings] as [string, string, any]] : []),
     ...(isAdmin && pendingDeleteCount > 0 ? [["delete-queue", `Delete Requests (${pendingDeleteCount})`, Bell] as [string, string, any]] : []),
+    ...(isAdmin && pendingLenderChangeCount > 0 ? [["lender-changes", `Lender Changes (${pendingLenderChangeCount})`, Bell] as [string, string, any]] : []),
   ];
 
   return (
@@ -2391,9 +2452,17 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                 <TableCell colSpan={4} className="p-0">
                                   <div className="border-t border-[#0a1f44]/20 bg-gray-50 p-6">
                                     <div className="flex items-center justify-between mb-5">
-                                      <div><div className="text-xs uppercase tracking-[0.2em] text-[#c9a84c] font-bold mb-1">Editing</div><div className="text-lg font-bold text-[#0a1f44]">{item.lender}</div></div>
+                                      <div>
+                                        <div className="text-xs uppercase tracking-[0.2em] text-[#c9a84c] font-bold mb-1">Editing</div>
+                                        <div className="text-lg font-bold text-[#0a1f44]">{item.lender}</div>
+                                        {!isAdmin && <div className="text-xs text-amber-600 mt-1">⚠ Changes require admin approval before going live</div>}
+                                      </div>
                                       <div className="flex gap-2">
-                                        <button onClick={() => setEditingLenderId(null)} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Done</button>
+                                        {isAdmin ? (
+                                          <button onClick={() => { saveLendersToDb(lenderRecords); setEditingLenderId(null); }} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Save Changes</button>
+                                        ) : (
+                                          <button onClick={() => submitLenderEditRequest(item)} className="px-4 py-2 text-sm font-semibold bg-[#c9a84c] text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/80">Submit for Approval</button>
+                                        )}
                                         <button onClick={() => toggleLenderStatus(item.id)} className="px-3 py-2 text-xs border border-gray-200 text-gray-500 rounded-xl hover:bg-white">{item.status === "Inactive" ? "Activate" : "Deactivate"}</button>
                                         <button onClick={() => handleDeleteLender(item.id)} className="flex items-center gap-1 px-3 py-2 text-xs text-red-500 border border-red-200 rounded-xl hover:bg-red-50"><Trash2 className="h-3 w-3" />{isAdmin ? " Delete" : " Request"}</button>
                                       </div>
@@ -2541,69 +2610,150 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
               )}
 
               {/* Submitted Deals */}
-              {activeTab === "submitted-deals" && (
-                <div className={cardClass + " p-6"}>
-                  <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Incoming</div>
-                  <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">Submitted Deals</h2>
-                  {submittedDeals.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">No deals submitted yet. Capital seekers will appear here once they submit a deal.</div>
-                  ) : (
-                    <div className="space-y-4">
-                      {submittedDeals.map((deal) => {
-                        const advisors = teamMembers.filter((m) => deal.assignedAdvisorIds.includes(m.id));
-                        return (
-                          <div key={deal.id} className="rounded-xl border border-gray-200 bg-gray-50 p-5">
-                            <div className="flex items-start justify-between mb-4">
-                              <div>
-                                <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Deal #{deal.id}</div>
-                                <div className="text-base font-bold text-[#0a1f44]">{deal.seekerName}</div>
-                                <div className="text-xs text-gray-500 mt-0.5">Submitted: {deal.submittedAt}</div>
-                              </div>
-                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${deal.status === "pending" ? "bg-amber-50 text-amber-600 border border-amber-200" : deal.status === "assigned" ? "bg-blue-50 text-blue-600 border border-blue-200" : "bg-emerald-50 text-emerald-600 border border-emerald-200"}`}>
-                                {deal.status.charAt(0).toUpperCase() + deal.status.slice(1)}
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                              {[["Capital Type", deal.capitalType], ["Assets", `${deal.assets.length} asset${deal.assets.length > 1 ? "s" : ""}`], ["Loan Amount", deal.assets[0]?.loanAmount || "—"], ["Asset Type", deal.assets[0]?.assetType || "—"]].map(([label, val]) => (
-                                <div key={String(label)} className="rounded-lg bg-white border border-gray-200 p-3"><div className="text-xs text-gray-400 mb-1">{label}</div><div className="text-sm font-bold text-[#0a1f44]">{val}</div></div>
-                              ))}
-                            </div>
-                            {deal.assets.map((asset, idx) => asset.address?.city ? (
-                              <div key={idx} className="text-xs text-gray-500 mt-1">Asset {idx + 1}: {asset.address.street ? `${asset.address.street}, ` : ""}{asset.address.city}, {asset.address.state} {asset.address.zip}</div>
-                            ) : null)}
-                            {advisors.length > 0 && (
-                              <div className="mt-4 pt-4 border-t border-gray-200">
-                                <div className="text-xs uppercase tracking-[0.15em] text-[#0a1f44] font-bold mb-3">Assigned Advisor{advisors.length > 1 ? "s" : ""}</div>
-                                <div className="flex gap-3 flex-wrap">
-                                  {advisors.map((advisor) => (
-                                    <div key={advisor.id} className="flex items-center gap-3 bg-[#0a1f44] rounded-xl px-4 py-3">
-                                      <img src={advisor.photo || "/logo1.JPEG"} alt={advisor.name} className="h-10 w-10 rounded-lg object-cover border border-[#c9a84c]/30 flex-shrink-0" />
-                                      <div>
-                                        <div className="text-xs font-bold text-white">{advisor.name}</div>
-                                        <div className="text-xs text-[#c9a84c]">{advisor.title}</div>
-                                        <div className="text-xs text-gray-400 mt-0.5">{advisor.phone}</div>
-                                      </div>
-                                    </div>
-                                  ))}
+              {activeTab === "submitted-deals" && (() => {
+                const currentTeamMemberId = session?.user.teamMemberId;
+                const visibleDeals = isAdmin
+                  ? submittedDeals
+                  : submittedDeals.filter((d) =>
+                      (currentTeamMemberId && d.assignedAdvisorIds.includes(currentTeamMemberId)) ||
+                      (session?.user.id && (d.invitedUserIds || []).includes(session.user.id))
+                    );
+
+                function DealCard({ deal }: { deal: SubmittedDeal }) {
+                  const [showInvite, setShowInvite] = React.useState(false);
+                  const [inviteUserId, setInviteUserId] = React.useState("");
+                  const advisors = teamMembers.filter((m) => deal.assignedAdvisorIds.includes(m.id));
+                  const invitedUsers = users.filter((u) => (deal.invitedUserIds || []).includes(u.id));
+
+                  function handleInvite() {
+                    if (!inviteUserId) return;
+                    const uid = parseInt(inviteUserId);
+                    if ((deal.invitedUserIds || []).includes(uid)) return;
+                    const updated = submittedDeals.map((d) =>
+                      d.id === deal.id ? { ...d, invitedUserIds: [...(d.invitedUserIds || []), uid] } : d
+                    );
+                    handleSetSubmittedDeals(updated);
+                    setInviteUserId(""); setShowInvite(false);
+                  }
+
+                  function removeInvite(uid: number) {
+                    const updated = submittedDeals.map((d) =>
+                      d.id === deal.id ? { ...d, invitedUserIds: (d.invitedUserIds || []).filter(id => id !== uid) } : d
+                    );
+                    handleSetSubmittedDeals(updated);
+                  }
+
+                  function updateDealStatus(status: SubmittedDeal["status"]) {
+                    const updated = submittedDeals.map((d) => d.id === deal.id ? { ...d, status } : d);
+                    handleSetSubmittedDeals(updated);
+                  }
+
+                  return (
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Deal #{deal.id}</div>
+                          <div className="text-base font-bold text-[#0a1f44]">{deal.seekerName}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">Submitted: {deal.submittedAt}</div>
+                        </div>
+                        <select
+                          value={deal.status}
+                          onChange={(e) => updateDealStatus(e.target.value as SubmittedDeal["status"])}
+                          className={`px-3 py-1 rounded-full text-xs font-semibold border cursor-pointer ${deal.status === "pending" ? "bg-amber-50 text-amber-600 border-amber-200" : deal.status === "assigned" ? "bg-blue-50 text-blue-600 border-blue-200" : "bg-emerald-50 text-emerald-600 border-emerald-200"}`}
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="assigned">Assigned</option>
+                          <option value="closed">Closed</option>
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                        {[["Capital Type", deal.capitalType], ["Assets", `${deal.assets.length} asset${deal.assets.length > 1 ? "s" : ""}`], ["Loan Amount", deal.assets[0]?.loanAmount || "—"], ["Asset Type", deal.assets[0]?.assetType || "—"]].map(([label, val]) => (
+                          <div key={String(label)} className="rounded-lg bg-white border border-gray-200 p-3"><div className="text-xs text-gray-400 mb-1">{label}</div><div className="text-sm font-bold text-[#0a1f44]">{val}</div></div>
+                        ))}
+                      </div>
+                      {deal.assets.map((asset, idx) => asset.address?.city ? (
+                        <div key={idx} className="text-xs text-gray-500 mt-1">Asset {idx + 1}: {asset.address.street ? `${asset.address.street}, ` : ""}{asset.address.city}, {asset.address.state} {asset.address.zip}</div>
+                      ) : null)}
+                      {advisors.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                          <div className="text-xs uppercase tracking-[0.15em] text-[#0a1f44] font-bold mb-3">Assigned Advisor{advisors.length > 1 ? "s" : ""}</div>
+                          <div className="flex gap-3 flex-wrap">
+                            {advisors.map((advisor) => (
+                              <div key={advisor.id} className="flex items-center gap-3 bg-[#0a1f44] rounded-xl px-4 py-3">
+                                <img src={advisor.photo || "/logo1.JPEG"} alt={advisor.name} className="h-10 w-10 rounded-lg object-cover border border-[#c9a84c]/30 flex-shrink-0" />
+                                <div>
+                                  <div className="text-xs font-bold text-white">{advisor.name}</div>
+                                  <div className="text-xs text-[#c9a84c]">{advisor.title}</div>
+                                  <div className="text-xs text-gray-400 mt-0.5">{advisor.phone}</div>
                                 </div>
                               </div>
-                            )}
-                            <div className="mt-4 pt-4 border-t border-gray-200">
-                              <button
-                                onClick={() => { setPrefillDeal(deal); setActiveTab("matcher"); }}
-                                className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all"
-                              >
-                                <Filter className="h-4 w-4" /> Submit to Deal Matcher
-                              </button>
-                              <p className="text-xs text-gray-400 mt-2">Opens Deal Matcher with this deal's data pre-filled — review, adjust, and run the lender match.</p>
-                            </div>
+                            ))}
                           </div>
-                        );
-                      })}
+                        </div>
+                      )}
+                      {invitedUsers.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          <div className="text-xs uppercase tracking-[0.15em] text-[#0a1f44] font-bold mb-2">Collaborators</div>
+                          <div className="flex flex-wrap gap-2">
+                            {invitedUsers.map((u) => (
+                              <div key={u.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#c9a84c]/10 border border-[#c9a84c]/20">
+                                <span className="text-xs font-medium text-[#0a1f44]">{u.name}</span>
+                                <span className="text-xs text-gray-400">· {u.role}</span>
+                                {isAdmin && <button onClick={() => removeInvite(u.id)} className="ml-1 text-gray-400 hover:text-red-500 text-xs font-bold">✕</button>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-2">
+                        <button onClick={() => { setPrefillDeal(deal); setActiveTab("matcher"); }} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">
+                          <Filter className="h-4 w-4" /> Submit to Deal Matcher
+                        </button>
+                        <button onClick={() => setShowInvite(!showInvite)} className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-[#c9a84c]/30 text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/10">
+                          <Users className="h-4 w-4" /> Invite Collaborator
+                        </button>
+                      </div>
+                      {showInvite && (
+                        <div className="mt-3 rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4">
+                          <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-3">Invite a Collaborator</div>
+                          <div className="flex gap-2">
+                            <select value={inviteUserId} onChange={(e) => setInviteUserId(e.target.value)} className="flex-1 px-3 py-2 text-sm bg-white border border-gray-300 rounded-xl text-gray-800 focus:outline-none focus:border-[#0a1f44]">
+                              <option value="">Select a user...</option>
+                              {users.filter((u) => u.id !== session?.user.id && !(deal.invitedUserIds || []).includes(u.id)).map((u) => (
+                                <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                              ))}
+                            </select>
+                            <button onClick={handleInvite} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Invite</button>
+                            <button onClick={() => setShowInvite(false)} className="px-3 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">Cancel</button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
+                  );
+                }
+
+                return (
+                  <div className={cardClass + " p-6"}>
+                    <div className="flex items-center justify-between mb-5">
+                      <div>
+                        <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">{isAdmin ? "All Deals" : "Your Deals"}</div>
+                        <h2 className="font-display text-2xl font-bold text-[#0a1f44]">Submitted Deals</h2>
+                        {!isAdmin && <p className="text-xs text-gray-500 mt-1">Showing deals assigned to you or that you've been invited to.</p>}
+                      </div>
+                      <div className="text-xs text-gray-400">{visibleDeals.length} deal{visibleDeals.length !== 1 ? "s" : ""}</div>
+                    </div>
+                    {visibleDeals.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">
+                        {isAdmin ? "No deals submitted yet." : "No deals assigned to you yet. Ask an admin to invite you to a deal."}
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {visibleDeals.map((deal) => <DealCard key={deal.id} deal={deal} />)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Uploads */}
               {activeTab === "uploads" && (
@@ -2714,6 +2864,114 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                 </div>
               )}
 
+              {/* Lender Change Requests (admin only) */}
+              {activeTab === "lender-changes" && isAdmin && (
+                <div className={cardClass + " p-6"}>
+                  <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Admin Approval</div>
+                  <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">Lender Change Requests</h2>
+                  <p className="text-sm text-gray-500 mb-5">Review and approve or deny lender additions and edits submitted by advisors.</p>
+                  {lenderChangeRequests.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">No lender change requests pending.</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {lenderChangeRequests.map((req) => (
+                        <div key={req.id} className="rounded-xl border border-gray-200 bg-white p-5">
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${req.changeType === "add" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-blue-50 text-blue-600 border-blue-200"}`}>
+                                  {req.changeType === "add" ? "New Lender" : "Edit"}
+                                </span>
+                                <span className="text-sm font-bold text-[#0a1f44]">{req.lenderName}</span>
+                              </div>
+                              <div className="text-xs text-gray-500">Requested by <span className="font-medium">{req.requestedBy}</span> · {req.requestedAt}</div>
+                            </div>
+                            {req.status === "pending" ? (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    // Apply the change
+                                    if (req.changeType === "add") {
+                                      setLenderRecords((prev) => { const next = [...prev, req.proposedData]; saveLendersToDb(next); return next; });
+                                    } else {
+                                      setLenderRecords((prev) => { const next = prev.map((l) => l.id === req.lenderId ? req.proposedData : l); saveLendersToDb(next); return next; });
+                                    }
+                                    const updated = lenderChangeRequests.map((r) => r.id === req.id ? { ...r, status: "approved" as const } : r);
+                                    setLenderChangeRequests(updated);
+                                    saveToDb("lender-changes", updated);
+                                  }}
+                                  className="px-4 py-2 text-xs font-semibold bg-emerald-500 text-white rounded-xl hover:bg-emerald-600"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    // Revert local state if it was an edit
+                                    if (req.changeType === "edit" && req.lenderId) {
+                                      // reload from DB to discard local edits
+                                      fetch("/api/data?type=lenders").then(r => r.json()).then(dbL => {
+                                        if (Array.isArray(dbL) && dbL.length > 0) {
+                                          setLenderRecords([...seedLenders, ...dbL]);
+                                        } else {
+                                          setLenderRecords(seedLenders);
+                                        }
+                                      });
+                                    }
+                                    const updated = lenderChangeRequests.map((r) => r.id === req.id ? { ...r, status: "denied" as const } : r);
+                                    setLenderChangeRequests(updated);
+                                    saveToDb("lender-changes", updated);
+                                  }}
+                                  className="px-4 py-2 text-xs border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"
+                                >
+                                  Deny
+                                </button>
+                              </div>
+                            ) : (
+                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${req.status === "approved" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-gray-100 text-gray-500 border border-gray-200"}`}>
+                                {req.status === "approved" ? "✓ Approved" : "✕ Denied"}
+                              </span>
+                            )}
+                          </div>
+                          {/* Show proposed changes */}
+                          <div className="rounded-xl bg-gray-50 border border-gray-100 p-4">
+                            <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-3">Proposed Data</div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                              {[
+                                ["Lender", req.proposedData.lender],
+                                ["Capital Type", req.proposedData.type],
+                                ["Min Loan", req.proposedData.minLoan || "—"],
+                                ["Max Loan", req.proposedData.maxLoan || "—"],
+                                ["Max LTV", req.proposedData.maxLtv || "—"],
+                                ["Recourse", req.proposedData.recourse || "—"],
+                                ["Contact", req.proposedData.contactPerson || "—"],
+                                ["Email", req.proposedData.email || "—"],
+                              ].map(([label, val]) => (
+                                <div key={String(label)} className="rounded-lg bg-white border border-gray-100 p-2">
+                                  <div className="text-xs text-gray-400 mb-0.5">{label}</div>
+                                  <div className="text-xs font-semibold text-[#0a1f44] break-all">{val}</div>
+                                </div>
+                              ))}
+                            </div>
+                            {req.proposedData.assets && req.proposedData.assets.length > 0 && (
+                              <div className="mt-3">
+                                <div className="text-xs text-gray-400 mb-1.5">Property Types</div>
+                                <div className="flex flex-wrap gap-1">{req.proposedData.assets.map(t => <span key={t} className="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600 border border-gray-200">{t}</span>)}</div>
+                              </div>
+                            )}
+                            {req.proposedData.notes && (
+                              <div className="mt-3 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2">
+                                <div className="text-xs font-bold text-amber-700 mb-0.5">Notes</div>
+                                <div className="text-xs text-gray-700">{req.proposedData.notes}</div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
             </motion.div>
           </main>
         </div>
@@ -2730,29 +2988,30 @@ export default function Home() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [submittedDeals, setSubmittedDeals] = useState<SubmittedDeal[]>([]);
   const [deleteRequests, setDeleteRequests] = useState<DeleteRequest[]>([]);
+  const [lenderChangeRequests, setLenderChangeRequests] = useState<LenderChangeRequest[]>([]);
   const [dbLoaded, setDbLoaded] = useState(false);
 
   // Load data from DB on mount — DB is always source of truth
   React.useEffect(() => {
     async function loadData() {
       try {
-        const [usersRes, dealsRes, teamRes, deletesRes] = await Promise.all([
+        const [usersRes, dealsRes, teamRes, deletesRes, lcrRes] = await Promise.all([
           fetch("/api/data?type=users"),
           fetch("/api/data?type=deals"),
           fetch("/api/data?type=team"),
           fetch("/api/data?type=deletes"),
+          fetch("/api/data?type=lender-changes"),
         ]);
-        const [dbUsers, dbDeals, dbTeam, dbDeletes] = await Promise.all([
-          usersRes.json(), dealsRes.json(), teamRes.json(), deletesRes.json(),
+        const [dbUsers, dbDeals, dbTeam, dbDeletes, dbLcr] = await Promise.all([
+          usersRes.json(), dealsRes.json(), teamRes.json(), deletesRes.json(), lcrRes.json(),
         ]);
-        // Always use DB data — even if empty. Never fall back to hardcoded values.
         if (Array.isArray(dbUsers)) setUsers(dbUsers);
         if (Array.isArray(dbDeals)) setSubmittedDeals(dbDeals);
         if (Array.isArray(dbTeam)) setTeamMembers(dbTeam);
         if (Array.isArray(dbDeletes)) setDeleteRequests(dbDeletes);
+        if (Array.isArray(dbLcr)) setLenderChangeRequests(dbLcr);
       } catch (e) {
         console.error("DB load failed:", e);
-        // Only use hardcoded fallbacks if DB is completely unreachable
         setUsers(initialUsers);
         setTeamMembers(initialTeamMembers);
       }
@@ -2763,7 +3022,7 @@ export default function Home() {
 
   // Save helpers — never save empty arrays
   async function saveToDb(type: string, data: any[]) {
-    if (!data || data.length === 0) return; // never wipe DB with empty data
+    if (!data || data.length === 0) return;
     try { await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, data }) }); }
     catch (e) { console.error("DB save failed:", e); }
   }
@@ -2779,6 +3038,7 @@ export default function Home() {
   function handleSetTeamMembers(newTeam: TeamMember[]) { if (newTeam.length > 0) { setTeamMembers(newTeam); saveToDb("team", newTeam); } }
   function handleSetSubmittedDeals(newDeals: SubmittedDeal[]) { setSubmittedDeals(newDeals); if (newDeals.length > 0) saveToDb("deals", newDeals); }
   function handleSetDeleteRequests(newReqs: DeleteRequest[]) { setDeleteRequests(newReqs); if (newReqs.length > 0) saveToDb("deletes", newReqs); }
+  function handleSetLenderChangeRequests(newReqs: LenderChangeRequest[]) { setLenderChangeRequests(newReqs); saveToDb("lender-changes", newReqs); }
 
   if (!dbLoaded) return (
     <div className="min-h-screen bg-[#f0f2f5] flex items-center justify-center">
@@ -2794,5 +3054,5 @@ export default function Home() {
   if (session.user.role === "capital-seeker") {
     return <CapitalSeekerPortal lenderRecords={seedLenders} onLogout={handleLogout} onSubmitDeal={handleSubmitDeal} session={session} teamMembers={teamMembers} submittedDeals={submittedDeals} />;
   }
-  return <MainPortal session={session} onLogout={handleLogout} submittedDeals={submittedDeals} setSubmittedDeals={handleSetSubmittedDeals} users={users} setUsers={handleSetUsers} teamMembers={teamMembers} setTeamMembers={handleSetTeamMembers} deleteRequests={deleteRequests} setDeleteRequests={handleSetDeleteRequests} />;
+  return <MainPortal session={session} onLogout={handleLogout} submittedDeals={submittedDeals} setSubmittedDeals={handleSetSubmittedDeals} users={users} setUsers={handleSetUsers} teamMembers={teamMembers} setTeamMembers={handleSetTeamMembers} deleteRequests={deleteRequests} setDeleteRequests={handleSetDeleteRequests} lenderChangeRequests={lenderChangeRequests} setLenderChangeRequests={handleSetLenderChangeRequests} />;
 }
