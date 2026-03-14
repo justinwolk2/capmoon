@@ -11,7 +11,7 @@ type LenderRecord = {
   type: string; minLoan: string; maxLoan: string; maxLtv: string; minDscr: string;
   states: string[]; assets: string[]; status: string; email: string; phone: string; recourse: string;
   contactPerson?: string; website?: string; sponsorStates?: string[]; loanTerms?: string;
-  typeOfLoans?: string[]; programTypes?: string[];
+  typeOfLoans?: string[]; programTypes?: string[]; typeOfLenders?: string[];
 };
 type RetailUnit = { id: number; tenant: string; rent: string; sqft: string; };
 type AssetData = {
@@ -26,8 +26,7 @@ type AssetData = {
 };
 type NewLenderForm = {
   programName: string; contactPerson: string; email: string; phone: string; website: string;
-  typeOfLenders: string[];
-  typeOfLoans: string[]; programTypes: string[]; propertyTypes: string; loanTerms: string;
+  typeOfLenders: string[]; typeOfLoans: string[]; programTypes: string[]; propertyTypes: string; loanTerms: string;
   minLoan: string; maxLoan: string; maxLtv: string; targetStates: string[];
   sponsorStates: string[]; recourse: string; capitalType: string; status: string;
 };
@@ -69,7 +68,7 @@ function blankAsset(id: number): AssetData {
   return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "Apartments", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dscr: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }] };
 }
 function blankLenderForm(): NewLenderForm {
-  return { programName: "", contactPerson: "", email: "", phone: "", website: "",typeOfLenders: [], typeOfLoans: [], programTypes: [], propertyTypes: "", loanTerms: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalType: "Senior", status: "Active" };
+  return { programName: "", contactPerson: "", email: "", phone: "", website: "", typeOfLenders: [], typeOfLoans: [], programTypes: [], propertyTypes: "", loanTerms: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalType: "Senior", status: "Active" };
 }
 function subordinateLabel(ct: string) {
   if (ct === "Mezzanine") return "Mezzanine Amount";
@@ -370,7 +369,7 @@ export default function Home() {
     setAiDescription(""); setAiParsed(false); setAiError("");
   }
   function handleSaveLender(form: NewLenderForm) {
-    setLenderRecords((prev) => [...prev, { id: prev.length + 1, source: "Dashboard", spreadsheetRow: "—", program: form.programName, lender: form.programName, type: form.capitalType, minLoan: form.minLoan, maxLoan: form.maxLoan, maxLtv: form.maxLtv, minDscr: "1.20x", states: form.targetStates.length > 0 ? form.targetStates : ["Nationwide"], assets: form.propertyTypes.split(",").map((s) => s.trim()).filter(Boolean), status: form.status, email: form.email, phone: form.phone, recourse: form.recourse, contactPerson: form.contactPerson, website: form.website, sponsorStates: form.sponsorStates, loanTerms: form.loanTerms, typeOfLoans: form.typeOfLoans, programTypes: form.programTypes }]);
+    setLenderRecords((prev) => [...prev, { id: prev.length + 1, source: "Dashboard", spreadsheetRow: "—", program: form.programName, lender: form.programName, type: form.capitalType, minLoan: form.minLoan, maxLoan: form.maxLoan, maxLtv: form.maxLtv, minDscr: "1.20x", states: form.targetStates.length > 0 ? form.targetStates : ["Nationwide"], assets: form.propertyTypes.split(",").map((s) => s.trim()).filter(Boolean), status: form.status, email: form.email, phone: form.phone, recourse: form.recourse, contactPerson: form.contactPerson, website: form.website, sponsorStates: form.sponsorStates, loanTerms: form.loanTerms, typeOfLoans: form.typeOfLoans, programTypes: form.programTypes, typeOfLenders: form.typeOfLenders }]);
     setActiveTab("lenders");
   }
   function updateLenderField(id: number, field: keyof LenderRecord, value: string) { setLenderRecords((prev) => prev.map((l) => l.id === id ? { ...l, [field]: value } : l)); }
@@ -568,16 +567,59 @@ export default function Home() {
                     const lender = lenderRecords.find((l) => l.id === editingLenderId);
                     if (!lender) return null;
                     return (
-                      <div className="mt-6 rounded-xl border border-[#0a1f44]/20 bg-gray-50 p-5">
-                        <div className="text-sm font-bold text-[#0a1f44] mb-4">Editing: {lender.lender}</div>
-                        <div className="grid gap-3 md:grid-cols-3">
-                          <div><label className="text-xs text-gray-500 mb-1 block font-medium">Lender Name</label><Input value={lender.lender} onChange={(e) => updateLenderField(lender.id, "lender", e.target.value)} className={inputClass} /></div>
-                          <div><label className="text-xs text-gray-500 mb-1 block font-medium">Email</label><Input value={lender.email || ""} onChange={(e) => updateLenderField(lender.id, "email", e.target.value)} className={inputClass} /></div>
-                          <div><label className="text-xs text-gray-500 mb-1 block font-medium">Phone</label><Input value={lender.phone || ""} onChange={(e) => updateLenderField(lender.id, "phone", e.target.value)} className={inputClass} /></div>
+                      <div className="mt-6 rounded-xl border border-[#0a1f44]/20 bg-gray-50 p-6">
+                        <div className="flex items-center justify-between mb-5">
+                          <div>
+                            <div className="text-xs uppercase tracking-[0.2em] text-[#c9a84c] font-bold mb-1">Editing</div>
+                            <div className="text-lg font-bold text-[#0a1f44]">{lender.lender}</div>
+                          </div>
+                          <button onClick={() => { if (window.confirm(`Delete ${lender.lender}? This cannot be undone.`)) { setLenderRecords((prev) => prev.filter((l) => l.id !== lender.id)); setEditingLenderId(null); } }} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-500 border border-red-200 rounded-xl hover:bg-red-50 transition-all">
+                            <Trash2 className="h-3.5 w-3.5" /> Delete Lender
+                          </button>
                         </div>
-                        <div className="flex gap-3 mt-4">
-                          <button onClick={() => setEditingLenderId(null)} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Done</button>
-                          <button onClick={() => toggleLenderStatus(lender.id)} className="px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">{lender.status === "Inactive" ? "Activate" : "Deactivate"}</button>
+                        <div className="space-y-5">
+                          {/* Basic info */}
+                          <div className="grid gap-3 md:grid-cols-3">
+                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Lender Name</label><Input value={lender.lender} onChange={(e) => updateLenderField(lender.id, "lender", e.target.value)} className={inputClass} /></div>
+                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Contact Person</label><Input value={lender.contactPerson || ""} onChange={(e) => updateLenderField(lender.id, "contactPerson", e.target.value)} className={inputClass} /></div>
+                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Email</label><Input value={lender.email || ""} onChange={(e) => updateLenderField(lender.id, "email", e.target.value)} className={inputClass} /></div>
+                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Phone</label><Input value={lender.phone || ""} onChange={(e) => updateLenderField(lender.id, "phone", e.target.value)} className={inputClass} /></div>
+                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Website</label><Input value={lender.website || ""} onChange={(e) => updateLenderField(lender.id, "website", e.target.value)} className={inputClass} /></div>
+                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Status</label>
+                              <Select value={lender.status} onValueChange={(v) => updateLenderField(lender.id, "status", v)}>
+                                <SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger>
+                                <SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          {/* Loan sizing */}
+                          <div className="grid gap-3 md:grid-cols-3">
+                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Min Loan</label><Input value={lender.minLoan || ""} onChange={(e) => updateLenderField(lender.id, "minLoan", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
+                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max Loan</label><Input value={lender.maxLoan || ""} onChange={(e) => updateLenderField(lender.id, "maxLoan", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
+                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max LTV</label><Input value={lender.maxLtv || ""} onChange={(e) => updateLenderField(lender.id, "maxLtv", e.target.value)} className={inputClass} /></div>
+                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Property Types</label><Input value={lender.assets?.join(", ") || ""} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, assets: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } : l))} className={inputClass} /></div>
+                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Loan Terms</label><Input value={lender.loanTerms || ""} onChange={(e) => updateLenderField(lender.id, "loanTerms", e.target.value)} className={inputClass} /></div>
+                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Recourse</label>
+                              <Select value={lender.recourse || "CASE BY CASE"} onValueChange={(v) => updateLenderField(lender.id, "recourse", v)}>
+                                <SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger>
+                                <SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          {/* Type of Lender */}
+                          <CheckboxGroup label="Type of Lender" options={["Bridge", "Conventional", "Local Bank", "CMBS", "Fannie/Freddie", "Small Balance", "Family Office", "Private Lender", "Hard Money", "C&I", "JV", "Non-conventional", "Regional Bank", "Balance Sheet", "Investment Bank"]} selected={lender.typeOfLenders || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, typeOfLenders: v } : l))} />
+                          {/* Type of Loans */}
+                          <CheckboxGroup label="Type of Loans" options={typeOfLoanOptions} selected={lender.typeOfLoans || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, typeOfLoans: v } : l))} />
+                          {/* Program */}
+                          <CheckboxGroup label="Program" options={programTypeOptions} selected={lender.programTypes || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, programTypes: v } : l))} />
+                          {/* Target States */}
+                          <StateSelector label="Target States" selected={lender.states || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, states: v } : l))} />
+                          {/* Sponsor States */}
+                          <StateSelector label="Sponsor States" selected={lender.sponsorStates || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === lender.id ? { ...l, sponsorStates: v } : l))} />
+                          <div className="flex gap-3 pt-2 border-t border-gray-200">
+                            <button onClick={() => setEditingLenderId(null)} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Done</button>
+                            <button onClick={() => toggleLenderStatus(lender.id)} className="px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">{lender.status === "Inactive" ? "Activate" : "Deactivate"}</button>
+                          </div>
                         </div>
                       </div>
                     );
