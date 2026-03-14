@@ -202,12 +202,12 @@ export default function Home() {
             <div className="mt-3 text-sm text-slate-500">Lender intelligence and deal matching platform</div>
           </div>
           <nav className="space-y-2 p-4">
-            {[["overview", "Overview", Gauge], ["lenders", "Lender Programs", Landmark], ["matcher", "Deal Matcher", Filter], ["uploads", "Upload Center", FileSpreadsheet]].map(([key, label, Icon]) => (
-              <button key={String(key)} onClick={() => setActiveTab(String(key))} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${activeTab === key ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-100"}`}>
-                <Icon className="h-4 w-4" />
-                <span className="font-medium">{label}</span>
-              </button>
-            ))}
+           {([["overview", "Overview", Gauge], ["lenders", "Lender Programs", Landmark], ["matcher", "Deal Matcher", Filter], ["uploads", "Upload Center", FileSpreadsheet]] as [string, string, any][]).map(([key, label, Icon]) => (
+  <button key={key} onClick={() => setActiveTab(key)} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${activeTab === key ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-100"}`}>
+    <Icon className="h-4 w-4" />
+    <span className="font-medium">{label}</span>
+  </button>
+))}
           </nav>
           <div className="p-4">
             <Card className="rounded-3xl border-slate-200 bg-slate-950 text-white shadow-none">
