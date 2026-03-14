@@ -14,7 +14,7 @@ type LenderRecord = {
   type: string; minLoan: string; maxLoan: string; maxLtv: string; minDscr: string;
   states: string[]; assets: string[]; status: string; email: string; phone: string; recourse: string;
   contactPerson?: string; website?: string; sponsorStates?: string[]; loanTerms?: string;
-  typeOfLoans?: string[]; programTypes?: string[]; typeOfLenders?: string[]; contacts?: LenderContact[]; notes?: string;
+  typeOfLoans?: string[]; programTypes?: string[]; typeOfLenders?: string[]; contacts?: LenderContact[]; notes?: string; capitalTypePrograms?: CapitalTypeProgram[];
 };
 type RetailUnit = { id: number; tenant: string; rent: string; sqft: string; };
 type AssetAddress = { street: string; unit: string; city: string; state: string; zip: string; };
@@ -1192,7 +1192,7 @@ function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTr
             <textarea value={form.notes} onChange={(e) => upd("notes", e.target.value)} placeholder="Add any notes about this lender — deal history, preferences, spreadsheet notes, etc." rows={4} className="w-full px-4 py-3 text-sm bg-white border border-gray-300 rounded-xl text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#0a1f44] resize-none" />
           </div>
           <div className="flex gap-3 pt-4 border-t border-gray-100">
-            <button onClick={() => { if (!form.programName.trim()) return; onSave(form); }} className="px-6 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Save Lender</button>
+            <button onClick={() => onSave(form)} className="px-6 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Save Lender</button>
             <button onClick={() => setForm(blankLenderForm())} className="px-4 py-2.5 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">Reset</button>
             <button onClick={onCancel} className="px-4 py-2.5 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">Cancel</button>
           </div>
@@ -2103,13 +2103,16 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   function updateLenderField(id: number, field: keyof LenderRecord, value: string) { setLenderRecords((prev) => prev.map((l) => l.id === id ? { ...l, [field]: value } : l)); }
   function toggleLenderStatus(id: number) { setLenderRecords((prev) => prev.map((l) => l.id !== id ? l : { ...l, status: l.status === "Inactive" ? "Active" : "Inactive" })); }
   function handleSaveLender(form: NewLenderForm) {
+    if (!form.programName.trim()) { alert("Please enter a program/lender name."); return; }
+    if (form.capitalTypes.length === 0) { alert("Please select at least one Capital Type."); return; }
     const isMulti = form.capitalTypes.length > 1;
-    const primaryType = form.capitalTypes[0] || "Senior";
+    const primaryType = form.capitalTypes[0];
     const primaryProg = isMulti ? form.capitalTypePrograms.find(p => p.capitalType === primaryType) : null;
-    setLenderRecords((prev) => [...prev, {
-      id: prev.length + 1, source: "Dashboard", spreadsheetRow: "—",
+    const newLender: LenderRecord = {
+      id: Date.now(),
+      source: "Dashboard", spreadsheetRow: "—",
       program: form.programName, lender: form.programName,
-      type: primaryType,
+      type: form.capitalTypes.join(", "),
       minLoan: isMulti ? (primaryProg?.minLoan || "") : form.minLoan,
       maxLoan: isMulti ? (primaryProg?.maxLoan || "") : form.maxLoan,
       maxLtv: isMulti ? (primaryProg?.maxLtv || "") : form.maxLtv,
@@ -2122,7 +2125,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
       loanTerms: isMulti ? (primaryProg?.loanTerms.join(", ") || "") : form.loanTerms.join(", "),
       typeOfLoans: form.typeOfLoans, programTypes: form.programTypes,
       typeOfLenders: form.typeOfLenders, notes: form.notes,
-    }]);
+    };
+    setLenderRecords((prev) => [...prev, newLender]);
     setActiveTab("lenders");
   }
   function addUser() {
@@ -2365,23 +2369,78 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                         selected={item.type ? item.type.split(",").map(s => s.trim()).filter(Boolean) : []}
                                         onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, type: v.join(", ") } : l))}
                                       />
-                                      <div className="grid gap-3 md:grid-cols-3">
-                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Min Loan</label><Input value={item.minLoan || ""} onChange={(e) => updateLenderField(item.id, "minLoan", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
-                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max Loan</label><Input value={item.maxLoan || ""} onChange={(e) => updateLenderField(item.id, "maxLoan", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
-                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max LTV</label><Input value={item.maxLtv || ""} onChange={(e) => updateLenderField(item.id, "maxLtv", e.target.value)} className={inputClass} /></div>
-                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Recourse</label><Select value={item.recourse || "CASE BY CASE"} onValueChange={(v) => updateLenderField(item.id, "recourse", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
-                                        {item.type === "C&I" ? (
-                                          <>
-                                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Property Types</label><Input value={item.assets?.join(", ") || ""} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, assets: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } : l))} className={inputClass} /></div>
-                                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Loan Terms</label><Input value={item.loanTerms || ""} onChange={(e) => updateLenderField(item.id, "loanTerms", e.target.value)} className={inputClass} /></div>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <DropdownCheckbox label="Property Types" options={lenderPropertyTypeOptions} selected={item.assets || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, assets: v } : l))} />
-                                            <DropdownCheckbox label="Loan Terms" options={loanTermOptions} selected={item.loanTerms ? item.loanTerms.split(",").map(s => s.trim()).filter(Boolean) : []} onChange={(v) => updateLenderField(item.id, "loanTerms", v.join(", "))} />
-                                          </>
-                                        )}
-                                      </div>
+                                      {/* Loan parameters — single type = flat, multiple = accordion per type */}
+                                      {(() => {
+                                        const types = item.type ? item.type.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
+                                        const isMulti = types.length > 1;
+                                        const progs: CapitalTypeProgram[] = item.capitalTypePrograms || [];
+                                        function updProg(ct: string, field: keyof CapitalTypeProgram, value: any) {
+                                          const existing = progs.filter(p => p.capitalType !== ct);
+                                          const current = progs.find(p => p.capitalType === ct) || { capitalType: ct, minLoan: "", maxLoan: "", maxLtv: "", loanTerms: [], propertyTypes: [] };
+                                          setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, capitalTypePrograms: [...existing, { ...current, [field]: value }] } : l));
+                                        }
+                                        if (!isMulti) return (
+                                          <div className="grid gap-3 md:grid-cols-3">
+                                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Min Loan</label><Input value={item.minLoan || ""} onChange={(e) => updateLenderField(item.id, "minLoan", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
+                                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max Loan</label><Input value={item.maxLoan || ""} onChange={(e) => updateLenderField(item.id, "maxLoan", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
+                                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max LTV</label><Input value={item.maxLtv || ""} onChange={(e) => updateLenderField(item.id, "maxLtv", e.target.value)} className={inputClass} /></div>
+                                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Recourse</label><Select value={item.recourse || "CASE BY CASE"} onValueChange={(v) => updateLenderField(item.id, "recourse", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+                                            {types.includes("C&I") ? (
+                                              <>
+                                                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Property Types</label><Input value={item.assets?.join(", ") || ""} onChange={(e) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, assets: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } : l))} className={inputClass} /></div>
+                                                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Loan Terms</label><Input value={item.loanTerms || ""} onChange={(e) => updateLenderField(item.id, "loanTerms", e.target.value)} className={inputClass} /></div>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <DropdownCheckbox label="Property Types" options={lenderPropertyTypeOptions} selected={item.assets || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, assets: v } : l))} />
+                                                <DropdownCheckbox label="Loan Terms" options={loanTermOptions} selected={item.loanTerms ? item.loanTerms.split(",").map((s: string) => s.trim()).filter(Boolean) : []} onChange={(v) => updateLenderField(item.id, "loanTerms", v.join(", "))} />
+                                              </>
+                                            )}
+                                          </div>
+                                        );
+                                        return (
+                                          <div>
+                                            <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-3">Program Parameters Per Capital Type</div>
+                                            <div className="space-y-2">
+                                              {types.map((ct: string) => {
+                                                const prog = progs.find(p => p.capitalType === ct) || { capitalType: ct, minLoan: item.minLoan || "", maxLoan: item.maxLoan || "", maxLtv: item.maxLtv || "", loanTerms: item.loanTerms ? item.loanTerms.split(",").map((s:string)=>s.trim()) : [], propertyTypes: item.assets || [] };
+                                                return (
+                                                  <div key={ct} className="rounded-xl border border-[#0a1f44]/20 overflow-hidden">
+                                                    <div className="flex items-center gap-2 px-4 py-2.5 bg-[#0a1f44]/5">
+                                                      <div className="w-2 h-2 rounded-full bg-[#c9a84c]" />
+                                                      <span className="text-sm font-bold text-[#0a1f44]">{ct}</span>
+                                                      {prog.minLoan && prog.maxLoan && <span className="text-xs text-gray-400 ml-2">{prog.minLoan} – {prog.maxLoan}</span>}
+                                                    </div>
+                                                    <div className="p-4 space-y-3 bg-white">
+                                                      <div className="grid gap-3 md:grid-cols-3">
+                                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Min Loan</label><Input value={prog.minLoan} onChange={(e) => updProg(ct, "minLoan", formatCurrencyInput(e.target.value))} placeholder="$1,000,000" className={inputClass} /></div>
+                                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max Loan</label><Input value={prog.maxLoan} onChange={(e) => updProg(ct, "maxLoan", formatCurrencyInput(e.target.value))} placeholder="$25,000,000" className={inputClass} /></div>
+                                                        <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max LTV</label><Input value={prog.maxLtv} onChange={(e) => updProg(ct, "maxLtv", e.target.value)} placeholder="75%" className={inputClass} /></div>
+                                                      </div>
+                                                      <div className="grid gap-3 md:grid-cols-2">
+                                                        {ct === "C&I" ? (
+                                                          <>
+                                                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Property Types</label><Input value={prog.propertyTypes.join(", ")} onChange={(e) => updProg(ct, "propertyTypes", e.target.value.split(",").map((s:string)=>s.trim()).filter(Boolean))} className={inputClass} /></div>
+                                                            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Loan Terms</label><Input value={prog.loanTerms.join(", ")} onChange={(e) => updProg(ct, "loanTerms", e.target.value.split(",").map((s:string)=>s.trim()).filter(Boolean))} className={inputClass} /></div>
+                                                          </>
+                                                        ) : (
+                                                          <>
+                                                            <DropdownCheckbox label="Property Types" options={lenderPropertyTypeOptions} selected={prog.propertyTypes} onChange={(v) => updProg(ct, "propertyTypes", v)} />
+                                                            <DropdownCheckbox label="Loan Terms" options={loanTermOptions} selected={prog.loanTerms} onChange={(v) => updProg(ct, "loanTerms", v)} />
+                                                          </>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                            <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                              <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Recourse</label><Select value={item.recourse || "CASE BY CASE"} onValueChange={(v) => updateLenderField(item.id, "recourse", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })()}
                                       <CheckboxGroup label="Type of Lender" options={typeOfLenderOptions} selected={item.typeOfLenders || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, typeOfLenders: v } : l))} />
                                       <CheckboxGroup label="Type of Loans" options={typeOfLoanOptions} selected={item.typeOfLoans || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, typeOfLoans: v } : l))} />
                                       <CheckboxGroup label="Program" options={programTypeOptions} selected={item.programTypes || []} onChange={(v) => setLenderRecords((prev) => prev.map((l) => l.id === item.id ? { ...l, programTypes: v } : l))} />
@@ -2623,38 +2682,13 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
 export default function Home() {
   const [session, setSession] = useState<AuthSession>(null);
-  const [users, setUsers] = useState<AppUser[]>(initialUsers);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(initialTeamMembers);
-  const [submittedDeals, setSubmittedDeals] = useState<SubmittedDeal[]>([
-    {
-      id: 1001, submittedAt: "3/10/2026, 9:15:00 AM", seekerName: "Marcus Bellfield",
-      capitalType: "Senior", assetMode: "single", collateralMode: "",
-      status: "pending", assignedAdvisorIds: [1],
-      assets: [{ id: 1, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "Apartments", loanAmount: "$18,500,000", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "$26,000,000", purchasePrice: "$25,500,000", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "$1,200,000", manualLtv: "", dscr: "1.28", selectedStates: ["FL"], recourseType: "CASE BY CASE", numUnits: "220", numBuildings: "4", numAcres: "", retailUnits: [], address: { street: "4801 Biscayne Blvd", unit: "", city: "Miami", state: "FL", zip: "33137" } }]
-    },
-    {
-      id: 1002, submittedAt: "3/11/2026, 2:30:00 PM", seekerName: "Diana Okafor",
-      capitalType: "Senior", assetMode: "single", collateralMode: "",
-      status: "pending", assignedAdvisorIds: [1],
-      assets: [{ id: 1, ownershipStatus: "Refinance", dealType: "Bridge", refinanceType: "Cash Out-Value Add", assetType: "Office", loanAmount: "$32,000,000", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "$48,000,000", purchasePrice: "", currentLoanAmount: "$24,000,000", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "$2,400,000", manualLtv: "", dscr: "1.35", selectedStates: ["NY"], recourseType: "NON RECOURSE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [], address: { street: "1221 Avenue of the Americas", unit: "15th Floor", city: "New York", state: "NY", zip: "10020" } }]
-    },
-    {
-      id: 1003, submittedAt: "3/12/2026, 11:00:00 AM", seekerName: "Trevor Sandoval",
-      capitalType: "Preferred Equity", assetMode: "single", collateralMode: "",
-      status: "pending", assignedAdvisorIds: [2],
-      assets: [{ id: 1, ownershipStatus: "Acquisition", dealType: "New Development", refinanceType: "Cash Out to Borrower", assetType: "Apartments", loanAmount: "$12,000,000", seniorLoanAmount: "$55,000,000", subordinateAmount: "$12,000,000", propertyValue: "$82,000,000", purchasePrice: "$68,000,000", currentLoanAmount: "", landCost: "$14,000,000", softCosts: "$8,500,000", originationClosingCosts: "$1,200,000", hardCosts: "$38,000,000", carryingCosts: "$2,800,000", borrowerEquity: "$9,500,000", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dscr: "", selectedStates: ["TX"], recourseType: "NON RECOURSE", numUnits: "312", numBuildings: "2", numAcres: "", retailUnits: [], address: { street: "3200 Main Street", unit: "", city: "Houston", state: "TX", zip: "77002" } }]
-    },
-    {
-      id: 1004, submittedAt: "3/13/2026, 4:45:00 PM", seekerName: "Rachel Kim",
-      capitalType: "Mezzanine", assetMode: "single", collateralMode: "",
-      status: "pending", assignedAdvisorIds: [2],
-      assets: [{ id: 1, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "Hotel/Hospitality", loanAmount: "$9,500,000", seniorLoanAmount: "$38,000,000", subordinateAmount: "$9,500,000", propertyValue: "$62,000,000", purchasePrice: "$58,000,000", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "$3,100,000", manualLtv: "", dscr: "1.42", selectedStates: ["GA"], recourseType: "CASE BY CASE", numUnits: "185", numBuildings: "1", numAcres: "", retailUnits: [], address: { street: "265 Peachtree Center Ave", unit: "", city: "Atlanta", state: "GA", zip: "30303" } }]
-    },
-  ]);
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [submittedDeals, setSubmittedDeals] = useState<SubmittedDeal[]>([]);
   const [deleteRequests, setDeleteRequests] = useState<DeleteRequest[]>([]);
   const [dbLoaded, setDbLoaded] = useState(false);
 
-  // Load data from DB on mount
+  // Load data from DB on mount — DB is always source of truth
   React.useEffect(() => {
     async function loadData() {
       try {
@@ -2667,11 +2701,17 @@ export default function Home() {
         const [dbUsers, dbDeals, dbTeam, dbDeletes] = await Promise.all([
           usersRes.json(), dealsRes.json(), teamRes.json(), deletesRes.json(),
         ]);
-        if (Array.isArray(dbUsers) && dbUsers.length > 0) setUsers(dbUsers);
-        if (Array.isArray(dbDeals) && dbDeals.length > 0) setSubmittedDeals(dbDeals);
-        if (Array.isArray(dbTeam) && dbTeam.length > 0) setTeamMembers(dbTeam);
-        if (Array.isArray(dbDeletes) && dbDeletes.length > 0) setDeleteRequests(dbDeletes);
-      } catch (e) { console.log("DB load failed, using defaults", e); }
+        // Always use DB data — even if empty. Never fall back to hardcoded values.
+        if (Array.isArray(dbUsers)) setUsers(dbUsers);
+        if (Array.isArray(dbDeals)) setSubmittedDeals(dbDeals);
+        if (Array.isArray(dbTeam)) setTeamMembers(dbTeam);
+        if (Array.isArray(dbDeletes)) setDeleteRequests(dbDeletes);
+      } catch (e) {
+        console.error("DB load failed:", e);
+        // Only use hardcoded fallbacks if DB is completely unreachable
+        setUsers(initialUsers);
+        setTeamMembers(initialTeamMembers);
+      }
       setDbLoaded(true);
     }
     loadData();
