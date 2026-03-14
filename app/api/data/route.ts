@@ -3,17 +3,21 @@ import { neon } from "@neondatabase/serverless";
 
 const getDb = () => neon(process.env.DATABASE_URL!);
 
+async function safeQuery(sql: any, query: () => Promise<any[]>): Promise<any[]> {
+  try { return await query(); } catch (e) { console.error("DB query error:", e); return []; }
+}
+
 export async function GET(req: NextRequest) {
   const sql = getDb();
   const type = req.nextUrl.searchParams.get("type");
   try {
     switch (type) {
-      case "users": { const rows = await sql`SELECT data FROM users ORDER BY id`; return NextResponse.json(rows.map((r: any) => r.data)); }
-      case "deals": { const rows = await sql`SELECT data FROM submitted_deals ORDER BY created_at DESC`; return NextResponse.json(rows.map((r: any) => r.data)); }
-      case "team": { const rows = await sql`SELECT data FROM team_members ORDER BY id`; return NextResponse.json(rows.map((r: any) => r.data)); }
-      case "deletes": { const rows = await sql`SELECT data FROM delete_requests ORDER BY created_at DESC`; return NextResponse.json(rows.map((r: any) => r.data)); }
-      case "lenders": { const rows = await sql`SELECT data FROM lenders ORDER BY id`; return NextResponse.json(rows.map((r: any) => r.data)); }
-      case "lender-changes": { const rows = await sql`SELECT data FROM lender_change_requests ORDER BY created_at DESC`; return NextResponse.json(rows.map((r: any) => r.data)); }
+      case "users": return NextResponse.json(await safeQuery(sql, async () => { const r = await sql`SELECT data FROM users ORDER BY id`; return r.map((x: any) => x.data); }));
+      case "deals": return NextResponse.json(await safeQuery(sql, async () => { const r = await sql`SELECT data FROM submitted_deals ORDER BY created_at DESC`; return r.map((x: any) => x.data); }));
+      case "team": return NextResponse.json(await safeQuery(sql, async () => { const r = await sql`SELECT data FROM team_members ORDER BY id`; return r.map((x: any) => x.data); }));
+      case "deletes": return NextResponse.json(await safeQuery(sql, async () => { const r = await sql`SELECT data FROM delete_requests ORDER BY created_at DESC`; return r.map((x: any) => x.data); }));
+      case "lenders": return NextResponse.json(await safeQuery(sql, async () => { const r = await sql`SELECT data FROM lenders ORDER BY id`; return r.map((x: any) => x.data); }));
+      case "lender-changes": return NextResponse.json(await safeQuery(sql, async () => { const r = await sql`SELECT data FROM lender_change_requests ORDER BY created_at DESC`; return r.map((x: any) => x.data); }));
       default: return NextResponse.json({ error: "Unknown type" }, { status: 400 });
     }
   } catch (err: any) {

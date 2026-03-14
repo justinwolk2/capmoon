@@ -25,7 +25,7 @@ type AssetData = {
   landCost: string; softCosts: string; originationClosingCosts: string;
   hardCosts: string; carryingCosts: string; borrowerEquity: string;
   ltvMode: string; currentNetIncome: string; manualLtv: string; dscr: string; currentRate: string;
-  purchaseYear?: string; fullyEntitled?: "yes" | "no"; currentPropertyValue?: string; additionalEquity?: string;
+  purchaseYear?: string; fullyEntitled?: "yes" | "no"; currentPropertyValue?: string; additionalEquity?: string; arvNetIncome?: string;
   selectedStates: string[]; recourseType: string;
   numUnits: string; numBuildings: string; numAcres: string; retailUnits: RetailUnit[];
   address: AssetAddress;
@@ -1083,64 +1083,108 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
       {m.isAcqNonConst && (<div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Price</label><Input value={asset.purchasePrice} onChange={(e) => upd("purchasePrice", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>)}
 
       {/* New Development + Refinance extra fields */}
-      {m.isRefinance && asset.dealType === "New Development" && (
-        <div className="md:col-span-2 rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/5 p-5 space-y-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold">New Development — Project Details</div>
+      {m.isRefinance && asset.dealType === "New Development" && (() => {
+        const curLoan     = parseCurrency(asset.currentLoanAmount);
+        const hardCosts   = parseCurrency(asset.hardCosts || "");
+        const softCosts   = parseCurrency(asset.softCosts || "");
+        const closingCosts= parseCurrency(asset.originationClosingCosts || "");
+        const carryCosts  = parseCurrency(asset.carryingCosts || "");
+        const addlEquity  = parseCurrency(asset.additionalEquity || "");
+        const curPropVal  = parseCurrency(asset.currentPropertyValue || "");
+        const arv         = parseCurrency(asset.propertyValue || "");
+        const newLoanCalc = curLoan + hardCosts + softCosts + closingCosts + carryCosts + addlEquity;
+        const totalCosts  = hardCosts + softCosts + closingCosts + carryCosts;
+        const curEquity   = curPropVal > 0 ? curPropVal - curLoan : null;
+        const ltc         = totalCosts > 0 && newLoanCalc > 0 ? (newLoanCalc / (curLoan + totalCosts)) * 100 : 0;
+        const ltv         = arv > 0 && newLoanCalc > 0 ? (newLoanCalc / arv) * 100 : 0;
+        return (
+          <div className="md:col-span-2 rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/5 p-5 space-y-4">
+            <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold">New Development — Project Details</div>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Price</label><Input value={asset.purchasePrice} onChange={(e) => upd("purchasePrice", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
-            <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Year</label><Input value={asset.purchaseYear || ""} onChange={(e) => upd("purchaseYear", e.target.value)} placeholder="e.g. 2021" className={inputClass} /></div>
-          </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Price</label><Input value={asset.purchasePrice} onChange={(e) => upd("purchasePrice", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Year</label><Input value={asset.purchaseYear || ""} onChange={(e) => upd("purchaseYear", e.target.value)} placeholder="e.g. 2021" className={inputClass} /></div>
+            </div>
 
-          <div>
-            <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Are all units fully entitled?</label>
-            <div className="grid grid-cols-2 gap-3">
-              {(["yes", "no"] as const).map((opt) => (
-                <button key={opt} type="button" onClick={() => upd("fullyEntitled", opt)}
-                  className={`p-3 rounded-xl border-2 text-center font-bold text-sm transition-all ${asset.fullyEntitled === opt ? (opt === "yes" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-red-400 bg-red-50 text-red-600") : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30"}`}>
-                  {opt === "yes" ? "✓ Yes" : "✕ No"}
-                </button>
+            <div>
+              <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Are all units fully entitled?</label>
+              <div className="grid grid-cols-2 gap-3">
+                {(["yes", "no"] as const).map((opt) => (
+                  <button key={opt} type="button" onClick={() => upd("fullyEntitled", opt)}
+                    className={`p-3 rounded-xl border-2 text-center font-bold text-sm transition-all ${asset.fullyEntitled === opt ? (opt === "yes" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-red-400 bg-red-50 text-red-600") : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30"}`}>
+                    {opt === "yes" ? "✓ Yes" : "✕ No"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              {([
+                ["Total Hard Costs", "hardCosts"],
+                ["Total Soft Costs", "softCosts"],
+                ["Total Closing Costs", "originationClosingCosts"],
+                ["Total Carry Costs", "carryingCosts"],
+              ] as [string, keyof AssetData][]).map(([label, field]) => (
+                <div key={field}><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">{label}</label><Input value={String(asset[field] || "")} onChange={(e) => upd(field, formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
               ))}
             </div>
-          </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            {([
-              ["Total Hard Costs", "hardCosts"],
-              ["Total Soft Costs", "softCosts"],
-              ["Total Closing Costs", "originationClosingCosts"],
-              ["Total Carry Costs", "carryingCosts"],
-            ] as [string, keyof AssetData][]).map(([label, field]) => (
-              <div key={field}><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">{label}</label><Input value={String(asset[field] || "")} onChange={(e) => upd(field, formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
-            ))}
-          </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Property Value</label><Input value={asset.currentPropertyValue || ""} onChange={(e) => upd("currentPropertyValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Additional Equity Contributions</label><Input value={asset.additionalEquity || ""} onChange={(e) => upd("additionalEquity", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+            </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Property Value</label><Input value={asset.currentPropertyValue || ""} onChange={(e) => upd("currentPropertyValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
-            <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Additional Equity Contributions</label><Input value={asset.additionalEquity || ""} onChange={(e) => upd("additionalEquity", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
-          </div>
-
-          {/* Current Equity calculation */}
-          {asset.currentPropertyValue && asset.currentLoanAmount && (() => {
-            const curVal = parseCurrency(asset.currentPropertyValue || "");
-            const curDebt = parseCurrency(asset.currentLoanAmount);
-            const equity = curVal - curDebt;
-            return (
-              <div className={`rounded-xl border p-4 ${equity >= 0 ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className={`text-xs font-bold uppercase tracking-wide mb-1 ${equity >= 0 ? "text-emerald-700" : "text-red-600"}`}>Current Equity in Property</div>
-                    <div className="text-xs text-gray-500">Current Value ({asset.currentPropertyValue}) − Current Indebtedness ({asset.currentLoanAmount})</div>
-                  </div>
-                  <div className={`text-2xl font-bold ${equity >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-                    {equity >= 0 ? formatCurrencyInput(String(equity)) : `(${formatCurrencyInput(String(Math.abs(equity)))})`}
+            {/* Current Equity */}
+            {curPropVal > 0 && curLoan > 0 && (() => {
+              const equity = curEquity!;
+              return (
+                <div className={`rounded-xl border p-4 ${equity >= 0 ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className={`text-xs font-bold uppercase tracking-wide mb-1 ${equity >= 0 ? "text-emerald-700" : "text-red-600"}`}>Current Equity in Property</div>
+                      <div className="text-xs text-gray-500">Current Value ({formatCurrencyInput(String(curPropVal))}) − Current Indebtedness ({formatCurrencyInput(String(curLoan))})</div>
+                    </div>
+                    <div className={`text-2xl font-bold ${equity >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                      {equity >= 0 ? formatCurrencyInput(String(equity)) : `(${formatCurrencyInput(String(Math.abs(equity)))})`}
+                    </div>
                   </div>
                 </div>
+              );
+            })()}
+
+            {/* New Loan Amount — auto-calculated */}
+            {newLoanCalc > 0 && (
+              <div className="rounded-xl border-2 border-[#0a1f44]/20 bg-white p-4">
+                <div className="text-xs font-bold uppercase tracking-wide text-[#c9a84c] mb-3">Calculated New Loan Amount</div>
+                <div className="space-y-1.5 mb-3">
+                  {[
+                    ["Current Loan Payoff", curLoan],
+                    ["Total Hard Costs", hardCosts],
+                    ["Total Soft Costs", softCosts],
+                    ["Total Closing Costs", closingCosts],
+                    ["Total Carry Costs", carryCosts],
+                    ["Additional Equity", addlEquity],
+                  ].filter(([, v]) => (v as number) > 0).map(([label, val]) => (
+                    <div key={String(label)} className="flex justify-between text-xs">
+                      <span className="text-gray-500">{label}</span>
+                      <span className="font-medium text-[#0a1f44]">{formatCurrencyInput(String(val))}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between text-sm font-bold text-[#0a1f44] pt-2 border-t border-gray-200">
+                    <span>New Loan Amount</span>
+                    <span className="text-[#c9a84c]">{formatCurrencyInput(String(newLoanCalc))}</span>
+                  </div>
+                </div>
+                {/* Ratios */}
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+                  {ltc > 0 && <div className="rounded-lg bg-gray-50 p-2 text-center"><div className="text-xs text-gray-400 mb-0.5">LTC</div><div className="text-sm font-bold text-[#0a1f44]">{ltc.toFixed(1)}%</div></div>}
+                  {ltv > 0 && <div className="rounded-lg bg-gray-50 p-2 text-center"><div className="text-xs text-gray-400 mb-0.5">LTV (on ARV)</div><div className="text-sm font-bold text-[#0a1f44]">{ltv.toFixed(1)}%</div></div>}
+                </div>
               </div>
-            );
-          })()}
-        </div>
-      )}
+            )}
+          </div>
+        );
+      })()}
       {m.isConstruction && (
         <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-4">
           <div className="text-xs uppercase tracking-[0.2em] text-[#c9a84c] font-bold mb-3">Project Estimated Costs</div>
@@ -1160,7 +1204,10 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
       </div>
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Property Value / ARV</label><Input value={asset.propertyValue} onChange={(e) => upd("propertyValue", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">LTV Mode</label><Select value={asset.ltvMode} onValueChange={(v) => upd("ltvMode", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="AUTO">Auto Calculate</SelectItem><SelectItem value="MANUAL">Manual Entry</SelectItem></SelectContent></Select></div>
-      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Net Income</label><Input value={asset.currentNetIncome} onChange={(e) => upd("currentNetIncome", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
+      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Net Income (Annual)</label><Input value={asset.currentNetIncome} onChange={(e) => upd("currentNetIncome", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
+      {m.isRefinance && (
+        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">ARV Net Income (Annual)</label><Input value={asset.arvNetIncome || ""} onChange={(e) => upd("arvNetIncome", formatCurrencyInput(e.target.value))} placeholder="Projected stabilized income" className={inputClass} /></div>
+      )}
       {m.isRefinance && (
         <div>
           <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Interest Rate (%)</label>
@@ -1181,7 +1228,10 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
           </div>
           {(() => {
             const netIncome = parseCurrency(asset.currentNetIncome);
-            const loanAmt = parseCurrency(asset.loanAmount) || parseCurrency(asset.seniorLoanAmount);
+            const isNewDevRefi = m.isRefinance && asset.dealType === "New Development";
+            const loanAmt = isNewDevRefi
+              ? parseCurrency(asset.currentLoanAmount)
+              : parseCurrency(asset.loanAmount) || parseCurrency(asset.seniorLoanAmount);
             const rate = parseFloat(asset.currentRate || "0") / 100;
             const autoDscr = netIncome > 0 && loanAmt > 0 && rate > 0
               ? (netIncome / (loanAmt * rate)).toFixed(2)
@@ -3520,27 +3570,29 @@ export default function Home() {
   // Load data from DB on mount — DB is always source of truth
   React.useEffect(() => {
     async function loadData() {
-      try {
-        const [usersRes, dealsRes, teamRes, deletesRes, lcrRes] = await Promise.all([
-          fetch("/api/data?type=users"),
-          fetch("/api/data?type=deals"),
-          fetch("/api/data?type=team"),
-          fetch("/api/data?type=deletes"),
-          fetch("/api/data?type=lender-changes"),
-        ]);
-        const [dbUsers, dbDeals, dbTeam, dbDeletes, dbLcr] = await Promise.all([
-          usersRes.json(), dealsRes.json(), teamRes.json(), deletesRes.json(), lcrRes.json(),
-        ]);
-        if (Array.isArray(dbUsers)) setUsers(dbUsers);
-        if (Array.isArray(dbDeals)) setSubmittedDeals(dbDeals);
-        if (Array.isArray(dbTeam)) setTeamMembers(dbTeam);
-        if (Array.isArray(dbDeletes)) setDeleteRequests(dbDeletes);
-        if (Array.isArray(dbLcr)) setLenderChangeRequests(dbLcr);
-      } catch (e) {
-        console.error("DB load failed:", e);
-        setUsers(initialUsers);
-        setTeamMembers(initialTeamMembers);
+      async function safeFetch(url: string) {
+        try {
+          const res = await fetch(url);
+          const data = await res.json();
+          return Array.isArray(data) ? data : [];
+        } catch (e) {
+          console.error(`Failed to load ${url}:`, e);
+          return [];
+        }
       }
+      const [dbUsers, dbDeals, dbTeam, dbDeletes, dbLcr] = await Promise.all([
+        safeFetch("/api/data?type=users"),
+        safeFetch("/api/data?type=deals"),
+        safeFetch("/api/data?type=team"),
+        safeFetch("/api/data?type=deletes"),
+        safeFetch("/api/data?type=lender-changes"),
+      ]);
+      // Only fall back to hardcoded if DB returned nothing at all
+      if (dbUsers.length > 0) setUsers(dbUsers); else setUsers(initialUsers);
+      if (dbDeals.length > 0) setSubmittedDeals(dbDeals);
+      if (dbTeam.length > 0) setTeamMembers(dbTeam); else setTeamMembers(initialTeamMembers);
+      if (dbDeletes.length > 0) setDeleteRequests(dbDeletes);
+      if (dbLcr.length > 0) setLenderChangeRequests(dbLcr);
       setDbLoaded(true);
     }
     loadData();
