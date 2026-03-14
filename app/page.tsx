@@ -697,6 +697,9 @@ export default function Home() {
                             {collateralMode === "crossed" && <p className="text-xs text-gray-500 mt-2">All assets will be combined and matched as a single portfolio loan.</p>}
                             {collateralMode === "separate" && <p className="text-xs text-gray-500 mt-2">Each asset will be matched independently with its own lender results.</p>}
                           </div>
+                          <button onClick={() => setMatcherStep("start")} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">
+  <ChevronLeft className="h-4 w-4" /> Previous
+</button>
                           <button onClick={handleAssetCountConfirm} disabled={!collateralMode} className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                             Continue to Asset Details <ChevronRight className="h-4 w-4" />
                           </button>
@@ -821,7 +824,14 @@ export default function Home() {
                           </div>
                           <CheckCircle className="h-5 w-5 text-emerald-500" />
                         </div>
-
+<div className="flex gap-3">
+  <button onClick={() => setMatcherStep("start")} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">
+    <ChevronLeft className="h-4 w-4" /> Previous
+  </button>
+  <button onClick={handleAssetCountConfirm} disabled={!collateralMode} className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+    Continue to Asset Details <ChevronRight className="h-4 w-4" />
+  </button>
+</div>
                         <div className="flex gap-3">
                           <button onClick={() => { setCurrentAssetIndex(0); setMatcherStep("asset-form"); }} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">
                             <ChevronLeft className="h-4 w-4" /> Back to Assets
