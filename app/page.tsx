@@ -2498,14 +2498,62 @@ export default function Home() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>(initialTeamMembers);
   const [submittedDeals, setSubmittedDeals] = useState<SubmittedDeal[]>([]);
   const [deleteRequests, setDeleteRequests] = useState<DeleteRequest[]>([]);
+  const [dbLoaded, setDbLoaded] = useState(false);
 
-  function handleSubmitDeal(deal: SubmittedDeal) { setSubmittedDeals((prev) => [...prev, deal]); }
+  // Load data from DB on mount
+  React.useEffect(() => {
+    async function loadData() {
+      try {
+        const [usersRes, dealsRes, teamRes, deletesRes] = await Promise.all([
+          fetch("/api/data?type=users"),
+          fetch("/api/data?type=deals"),
+          fetch("/api/data?type=team"),
+          fetch("/api/data?type=deletes"),
+        ]);
+        const [dbUsers, dbDeals, dbTeam, dbDeletes] = await Promise.all([
+          usersRes.json(), dealsRes.json(), teamRes.json(), deletesRes.json(),
+        ]);
+        if (Array.isArray(dbUsers) && dbUsers.length > 0) setUsers(dbUsers);
+        if (Array.isArray(dbDeals) && dbDeals.length > 0) setSubmittedDeals(dbDeals);
+        if (Array.isArray(dbTeam) && dbTeam.length > 0) setTeamMembers(dbTeam);
+        if (Array.isArray(dbDeletes) && dbDeletes.length > 0) setDeleteRequests(dbDeletes);
+      } catch (e) { console.log("DB load failed, using defaults", e); }
+      setDbLoaded(true);
+    }
+    loadData();
+  }, []);
+
+  // Save helpers
+  async function saveToDb(type: string, data: any[]) {
+    try { await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, data }) }); }
+    catch (e) { console.error("DB save failed:", e); }
+  }
+
+  function handleSubmitDeal(deal: SubmittedDeal) {
+    setSubmittedDeals((prev) => { const next = [...prev, deal]; saveToDb("deals", next); return next; });
+  }
   function handleLogout() { setSession(null); }
-  function handleRegisterCapitalSeeker(newUser: AppUser) { setUsers((prev) => [...prev, newUser]); }
+  function handleRegisterCapitalSeeker(newUser: AppUser) {
+    setUsers((prev) => { const next = [...prev, newUser]; saveToDb("users", next); return next; });
+  }
+  function handleSetUsers(newUsers: AppUser[]) { setUsers(newUsers); saveToDb("users", newUsers); }
+  function handleSetTeamMembers(newTeam: TeamMember[]) { setTeamMembers(newTeam); saveToDb("team", newTeam); }
+  function handleSetSubmittedDeals(newDeals: SubmittedDeal[]) { setSubmittedDeals(newDeals); saveToDb("deals", newDeals); }
+  function handleSetDeleteRequests(newReqs: DeleteRequest[]) { setDeleteRequests(newReqs); saveToDb("deletes", newReqs); }
+
+  if (!dbLoaded) return (
+    <div className="min-h-screen bg-[#f0f2f5] flex items-center justify-center">
+      <div className="text-center">
+        <img src="/logo1.JPEG" alt="CapMoon" className="h-16 w-16 object-contain rounded-full mx-auto mb-4" />
+        <div className="font-display text-2xl font-bold text-[#0a1f44] mb-2">CapMoon</div>
+        <div className="text-sm text-gray-500">Loading...</div>
+      </div>
+    </div>
+  );
 
   if (!session) return <LoginWall onLogin={setSession} users={users} onRegisterCapitalSeeker={handleRegisterCapitalSeeker} />;
   if (session.user.role === "capital-seeker") {
     return <CapitalSeekerPortal lenderRecords={seedLenders} onLogout={handleLogout} onSubmitDeal={handleSubmitDeal} session={session} teamMembers={teamMembers} submittedDeals={submittedDeals} />;
   }
-  return <MainPortal session={session} onLogout={handleLogout} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals} users={users} setUsers={setUsers} teamMembers={teamMembers} setTeamMembers={setTeamMembers} deleteRequests={deleteRequests} setDeleteRequests={setDeleteRequests} />;
+  return <MainPortal session={session} onLogout={handleLogout} submittedDeals={submittedDeals} setSubmittedDeals={handleSetSubmittedDeals} users={users} setUsers={handleSetUsers} teamMembers={teamMembers} setTeamMembers={handleSetTeamMembers} deleteRequests={deleteRequests} setDeleteRequests={handleSetDeleteRequests} />;
 }
