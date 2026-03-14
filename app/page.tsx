@@ -37,10 +37,7 @@ const seedLenders: LenderRecord[] = [
   { id: 5, source: "Spreadsheet", spreadsheetRow: "A6", program: "Sponsor Credit Facility", lender: "Summit Specialty Lending", type: "Line of Credit", minLoan: "$2,000,000", maxLoan: "$20,000,000", maxLtv: "65%", minDscr: "1.25x", states: ["Nationwide"], assets: ["MIXEDUSE", "Retail-MT", "Lt Industrial"], status: "Inactive", email: "sponsors@summitsl.com", phone: "(615) 555-0133", recourse: "CASE BY CASE" },
 ];
 
-const assetTypes = [
-  "Equipment, Autos, or Other Non Real Estate Products",
-  "Apartments", "Condos", "Senior Housing", "Student Housing", "Gaming", "Assisted Living", "Education Related", "SFR Portfolio", "Mobile Home Park", "Co-living", "Office", "Medical Office", "Manufacturing", "MIXEDUSE", "Lt Industrial", "Cannabis", "Retail-MT", "Retail- ST", "Hotel/Hospitality", "Loan sales", "Land", "Self-storage", "Religious", "Hospital/Health Care", "Distressed Debt", "Other",
-];
+const assetTypes = ["Equipment, Autos, or Other Non Real Estate Products", "Apartments", "Condos", "Senior Housing", "Student Housing", "Gaming", "Assisted Living", "Education Related", "SFR Portfolio", "Mobile Home Park", "Co-living", "Office", "Medical Office", "Manufacturing", "MIXEDUSE", "Lt Industrial", "Cannabis", "Retail-MT", "Retail- ST", "Hotel/Hospitality", "Loan sales", "Land", "Self-storage", "Religious", "Hospital/Health Care", "Distressed Debt", "Other"];
 const capitalTypes = ["Senior", "Mezzanine", "Preferred Equity", "JV Equity", "Line of Credit", "Note on Note"];
 const dealTypes = ["Construction", "Value add", "New Development", "Bridge", "Takeout", "Investment", "C&I"];
 const ownershipStatuses = ["Acquisition", "Refinance"];
@@ -49,12 +46,8 @@ const recourseOptions = ["FULL", "NON RECOURSE", "CASE BY CASE"];
 const marketOptions = ["US", "INTERNATIONAL"];
 const allStates = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
-function normalizeRecourse(value: string) {
-  return value === "SELECTIVE" || !value ? "CASE BY CASE" : value;
-}
-function parseCurrency(value: string) {
-  return Number(String(value || "0").replace(/[^0-9.]/g, ""));
-}
+function normalizeRecourse(value: string) { return value === "SELECTIVE" || !value ? "CASE BY CASE" : value; }
+function parseCurrency(value: string) { return Number(String(value || "0").replace(/[^0-9.]/g, "")); }
 function formatCurrencyInput(value: string) {
   const digits = String(value || "").replace(/[^0-9.]/g, "");
   if (!digits) return "";
@@ -62,17 +55,9 @@ function formatCurrencyInput(value: string) {
   const formattedWhole = Number(whole || 0).toLocaleString("en-US");
   return `$${decimal !== undefined ? `${formattedWhole}.${decimal.slice(0, 2)}` : formattedWhole}`;
 }
-function formatPercent(value: number) {
-  if (!Number.isFinite(value)) return "—";
-  return `${value.toFixed(1)}%`;
-}
-function parsePercent(value: string) {
-  return Number(String(value || "0").replace(/[^0-9.]/g, ""));
-}
-function parseDscr(value: string) {
-  if (value === "N/A") return 0;
-  return Number(String(value || "0").replace(/[^0-9.]/g, ""));
-}
+function formatPercent(value: number) { if (!Number.isFinite(value)) return "—"; return `${value.toFixed(1)}%`; }
+function parsePercent(value: string) { return Number(String(value || "0").replace(/[^0-9.]/g, "")); }
+function parseDscr(value: string) { if (value === "N/A") return 0; return Number(String(value || "0").replace(/[^0-9.]/g, "")); }
 function createBlankLender(nextId: number): LenderRecord {
   return { id: nextId, source: "Dashboard", spreadsheetRow: "—", program: "", lender: "", type: "Senior", minLoan: "$1,000,000", maxLoan: "$25,000,000", maxLtv: "75%", minDscr: "1.20x", states: [], assets: [], status: "Active", email: "", phone: "", recourse: "CASE BY CASE" };
 }
@@ -85,20 +70,28 @@ function subordinateLabel(capitalType: string) {
 
 function StatCard({ title, value, detail, icon: Icon }: { title: string; value: string; detail: string; icon: any }) {
   return (
-    <Card className="rounded-3xl border-slate-200 bg-white shadow-sm">
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-sm uppercase tracking-[0.18em] text-slate-500">{title}</div>
-            <div className="mt-3 text-3xl font-semibold text-slate-950">{value}</div>
-            <div className="mt-2 text-sm text-slate-500">{detail}</div>
-          </div>
-          <div className="rounded-2xl bg-slate-950 p-3 text-white"><Icon className="h-5 w-5" /></div>
+    <div className="relative overflow-hidden rounded-2xl border border-[#c9a84c]/20 bg-[#0a1f44] p-6">
+      <div className="absolute top-0 right-0 w-24 h-24 bg-[#c9a84c]/5 rounded-full -translate-y-8 translate-x-8" />
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold underline">{title}</div>
+          <div className="mt-3 text-3xl font-bold text-white">{value}</div>
+          <div className="mt-2 text-sm text-gray-300">{detail}</div>
         </div>
-      </CardContent>
-    </Card>
+        <div className="rounded-xl bg-[#c9a84c]/10 border border-[#c9a84c]/20 p-3 text-[#c9a84c]">
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+    </div>
   );
 }
+
+const navItems: [string, string, any][] = [
+  ["overview", "Overview", Gauge],
+  ["lenders", "Lender Programs", Landmark],
+  ["matcher", "Deal Matcher", Filter],
+  ["uploads", "Upload Center", FileSpreadsheet],
+];
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -110,7 +103,6 @@ export default function Home() {
   const [selectedCapitalFilter, setSelectedCapitalFilter] = useState("All");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState("All");
   const [editingLenderId, setEditingLenderId] = useState<number | null>(null);
-
   const [capitalType, setCapitalType] = useState("Senior");
   const [loanAmount, setLoanAmount] = useState("$25,000,000");
   const [seniorLoanAmount, setSeniorLoanAmount] = useState("$20,000,000");
@@ -157,23 +149,19 @@ export default function Home() {
   const matches = useMemo(() => {
     if (marketScope === "INTERNATIONAL") return [];
     const currentDscr = Number(dscr || 0);
-    return lenderRecords
-      .map((l) => {
-        let score = 0;
-        const normalizedRecourse = normalizeRecourse(l.recourse);
-        if (effectiveAmount >= parseCurrency(l.minLoan) && effectiveAmount <= parseCurrency(l.maxLoan)) score += 30;
-        if (l.assets.includes(assetType) || (assetType === "Apartments" && l.assets.includes("Student Housing"))) score += 22;
-        if (l.type === capitalType) score += 20;
-        if (selectedStates.some((s) => l.states.includes(s)) || l.states.includes("Nationwide")) score += 15;
-        if (currentLtv <= parsePercent(l.maxLtv)) score += 8;
-        if (currentDscr >= parseDscr(l.minDscr)) score += 5;
-        if (dealType === "Construction" && l.assets.includes("Land")) score += 5;
-        if (normalizedRecourse === recourseType || normalizedRecourse === "CASE BY CASE") score += 10;
-        return { ...l, score, normalizedRecourse };
-      })
-      .filter((l) => l.score > 30)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 4);
+    return lenderRecords.map((l) => {
+      let score = 0;
+      const normalizedRecourse = normalizeRecourse(l.recourse);
+      if (effectiveAmount >= parseCurrency(l.minLoan) && effectiveAmount <= parseCurrency(l.maxLoan)) score += 30;
+      if (l.assets.includes(assetType) || (assetType === "Apartments" && l.assets.includes("Student Housing"))) score += 22;
+      if (l.type === capitalType) score += 20;
+      if (selectedStates.some((s) => l.states.includes(s)) || l.states.includes("Nationwide")) score += 15;
+      if (currentLtv <= parsePercent(l.maxLtv)) score += 8;
+      if (currentDscr >= parseDscr(l.minDscr)) score += 5;
+      if (dealType === "Construction" && l.assets.includes("Land")) score += 5;
+      if (normalizedRecourse === recourseType || normalizedRecourse === "CASE BY CASE") score += 10;
+      return { ...l, score, normalizedRecourse };
+    }).filter((l) => l.score > 30).sort((a, b) => b.score - a.score).slice(0, 4);
   }, [effectiveAmount, currentLtv, dscr, assetType, dealType, selectedStates, recourseType, marketScope, lenderRecords, capitalType]);
 
   const spreadsheetCount = lenderRecords.filter((l) => l.source === "Spreadsheet").length;
@@ -192,270 +180,391 @@ export default function Home() {
     setLenderRecords((prev) => prev.map((l) => (l.id !== id ? l : { ...l, status: l.status === "Inactive" ? "Active" : "Inactive" })));
   }
 
+  const inputClass = "bg-white border-gray-300 text-gray-800 placeholder:text-gray-400 rounded-xl focus:border-[#0a1f44] focus:ring-0";
+  const selectTriggerClass = "bg-white border-gray-300 text-gray-800 rounded-xl focus:border-[#0a1f44]";
+  const cardClass = "rounded-2xl border border-gray-200 bg-white shadow-sm";
+  const darkCardClass = "rounded-2xl border border-[#c9a84c]/20 bg-[#0a1f44] shadow-xl";
+
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-950">
-      <div className="grid min-h-screen lg:grid-cols-[280px_1fr]">
-        <aside className="border-r border-slate-200 bg-white">
-          <div className="border-b border-slate-200 px-7 py-7">
-            <div className="text-xs uppercase tracking-[0.28em] text-slate-500">CapMoon</div>
-            <div className="text-lg font-semibold">Admin Console</div>
-            <div className="mt-3 text-sm text-slate-500">Lender intelligence and deal matching platform</div>
-          </div>
-          <nav className="space-y-2 p-4">
-            {[["overview", "Overview", Gauge], ["lenders", "Lender Programs", Landmark], ["matcher", "Deal Matcher", Filter], ["uploads", "Upload Center", FileSpreadsheet]].map(([key, label, Icon]) => (
-              <button key={String(key)} onClick={() => setActiveTab(String(key))} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${activeTab === key ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-100"}`}>
-                <Icon className="h-4 w-4" />
-                <span className="font-medium">{label}</span>
-              </button>
-            ))}
-          </nav>
-          <div className="p-4">
-            <Card className="rounded-3xl border-slate-200 bg-slate-950 text-white shadow-none">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5" /><div className="font-medium">Auto-Match Engine</div></div>
-                <p className="mt-3 text-sm text-slate-300">Spreadsheet-driven criteria plus dashboard-added lenders, in one clean admin workflow.</p>
-              </CardContent>
-            </Card>
-          </div>
-        </aside>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600&display=swap');
+        * { font-family: 'Montserrat', sans-serif; }
+        .font-display { font-family: 'Cormorant Garamond', serif; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #f0f2f5; }
+        ::-webkit-scrollbar-thumb { background: #c9a84c66; border-radius: 2px; }
+        [data-radix-select-content] { background: white !important; border: 1px solid #e5e7eb !important; color: #1f2937 !important; }
+        [data-radix-select-item] { color: #1f2937 !important; }
+        [data-radix-select-item]:hover, [data-radix-select-item][data-highlighted] { background: #f3f4f6 !important; color: #0a1f44 !important; }
+      `}</style>
 
-        <main className="p-5 md:p-8">
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <div className="text-xs uppercase tracking-[0.25em] text-slate-500">Institutional Workflow</div>
-                <h1 className="mt-2 text-3xl font-semibold tracking-tight">Lender dashboard</h1>
-                <p className="mt-2 max-w-3xl text-sm text-slate-500">Senior LTV, Last Dollar LTV, formatted currency fields, and Equity %.</p>
+      <div className="min-h-screen bg-[#f0f2f5] text-gray-800">
+        <div className="grid min-h-screen lg:grid-cols-[260px_1fr]">
+
+          {/* Sidebar - stays dark navy */}
+          <aside className="border-r border-[#c9a84c]/10 bg-[#0a1f44] flex flex-col">
+            <div className="px-6 py-8 border-b border-[#c9a84c]/20">
+              <div className="flex items-center gap-3 mb-2">
+                <img src="/logo1.JPEG" alt="CapMoon" className="h-12 w-12 object-contain rounded-full" />
+                <div>
+                  <div className="font-display text-2xl font-bold text-white">CapMoon</div>
+                  <div className="text-xs text-gray-400 tracking-wide">Lender Intelligence Platform</div>
+                </div>
               </div>
-              <div className="flex gap-3">
-                <Button variant="outline" className="rounded-2xl border-slate-300 bg-white">Export lender set</Button>
-                <Button className="rounded-2xl bg-slate-950 text-white hover:bg-slate-800" onClick={() => { setActiveTab("lenders"); setShowAddLender(true); }}><Plus className="mr-2 h-4 w-4" /> Add lender</Button>
+              <div className="text-xs uppercase tracking-[0.35em] text-[#c9a84c] font-bold mt-3">Capital Advisory</div>
+            </div>
+            <nav className="space-y-1 p-4 flex-1">
+              {navItems.map(([key, label, Icon]) => (
+                <button key={key} onClick={() => setActiveTab(key)} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-all duration-200 ${activeTab === key ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/30" : "text-gray-300 hover:bg-white/5 hover:text-white border border-transparent"}`}>
+                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  <span className="text-sm font-medium tracking-wide">{label}</span>
+                  {activeTab === key && <div className="ml-auto w-1 h-4 bg-[#c9a84c] rounded-full" />}
+                </button>
+              ))}
+            </nav>
+            <div className="p-4 border-t border-[#c9a84c]/20">
+              <div className="rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/10 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <ShieldCheck className="h-4 w-4 text-[#c9a84c]" />
+                  <span className="text-xs font-bold text-[#c9a84c] tracking-wide uppercase">Auto-Match Engine</span>
+                </div>
+                <p className="text-xs text-gray-300 leading-relaxed">Spreadsheet-driven criteria plus dashboard lenders in one workflow.</p>
               </div>
             </div>
+          </aside>
 
-            <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <StatCard title="Total lenders" value={String(lenderRecords.length)} detail="Spreadsheet + dashboard records" icon={Building2} />
-              <StatCard title="Spreadsheet" value={String(spreadsheetCount)} detail="Imported criteria rows" icon={FileSpreadsheet} />
-              <StatCard title="Dashboard added" value={String(dashboardCount)} detail="Created manually" icon={Users} />
-              <StatCard title="Capital types" value="6" detail="Senior, Mezz, Pref, JV, LOC, Note on Note" icon={BarChart3} />
-            </div>
+          {/* Main Content */}
+          <main className="p-6 md:p-8 overflow-auto">
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
 
-            {activeTab === "overview" && (
-              <div className="mt-8 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-                <Card className="rounded-3xl border-slate-200 bg-white shadow-sm">
-                  <CardHeader><CardTitle>Pipeline snapshot</CardTitle><CardDescription>Admin view for intake, match quality, and lender coverage</CardDescription></CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 md:grid-cols-3">
-                      {[["New deal requests", "18", "This week"], ["Matched this month", "126", "Ranked and exported"], ["Dashboard lenders", String(dashboardCount), "Added manually"]].map(([label, value, detail]) => (
-                        <div key={String(label)} className="rounded-2xl border border-slate-200 p-4">
-                          <div className="text-sm text-slate-500">{label}</div>
-                          <div className="mt-2 text-2xl font-semibold">{value}</div>
-                          <div className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">{detail}</div>
+              {/* Top Bar */}
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.28em] text-[#c9a84c] font-bold">Institutional Workflow</div>
+                  <h1 className="font-display text-4xl font-bold text-[#0a1f44] mt-1">Lender Dashboard</h1>
+                  <p className="mt-1 text-sm text-gray-500">Senior LTV · Last Dollar LTV · Capital Stack · Equity Analysis</p>
+                </div>
+                <div className="flex gap-3">
+                  <button className="px-4 py-2 text-sm font-medium text-[#0a1f44] border border-[#0a1f44]/30 rounded-xl hover:bg-[#0a1f44]/10 transition-all">Export Lender Set</button>
+                  <button onClick={() => { setActiveTab("lenders"); setShowAddLender(true); }} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all">
+                    <Plus className="h-4 w-4" /> Add Lender
+                  </button>
+                </div>
+              </div>
+
+              {/* Stat Cards - dark navy */}
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 mb-8">
+                <StatCard title="Total Lenders" value={String(lenderRecords.length)} detail="Spreadsheet + dashboard records" icon={Building2} />
+                <StatCard title="Spreadsheet" value={String(spreadsheetCount)} detail="Imported criteria rows" icon={FileSpreadsheet} />
+                <StatCard title="Dashboard Added" value={String(dashboardCount)} detail="Created manually" icon={Users} />
+                <StatCard title="Capital Types" value="6" detail="Senior · Mezz · Pref · JV · LOC · Note" icon={BarChart3} />
+              </div>
+
+              {/* Overview Tab */}
+              {activeTab === "overview" && (
+                <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+                  <div className={cardClass + " p-6"}>
+                    <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Pipeline</div>
+                    <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">Snapshot</h2>
+                    <div className="grid gap-4 md:grid-cols-3 mb-6">
+                      {[["New Deal Requests", "18", "This week"], ["Matched This Month", "126", "Ranked & exported"], ["Dashboard Lenders", String(dashboardCount), "Added manually"]].map(([label, value, detail]) => (
+                        <div key={String(label)} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                          <div className="text-xs text-gray-500 mb-1">{label}</div>
+                          <div className="text-2xl font-bold text-[#0a1f44]">{value}</div>
+                          <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mt-1">{detail}</div>
                         </div>
                       ))}
                     </div>
-                    <div className="mt-6 rounded-3xl border border-slate-200 p-5">
-                      <div className="flex items-center justify-between"><div><div className="text-sm font-medium">Platform health</div><div className="text-sm text-slate-500">Coverage across asset type, leverage, geography, and capital stack</div></div><Badge className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700 hover:bg-emerald-100">Healthy</Badge></div>
-                      <div className="mt-5 space-y-4">
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <div className="text-sm font-bold text-[#0a1f44]">Platform Health</div>
+                          <div className="text-xs text-gray-500 mt-0.5">Coverage across asset type, leverage, geography, and capital stack</div>
+                        </div>
+                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200">Healthy</span>
+                      </div>
+                      <div className="space-y-4">
                         {[["Asset class mapping", 94], ["Loan sizing confidence", 88], ["State eligibility coverage", 91], ["Contact completeness", 84]].map(([label, val]) => (
-                          <div key={String(label)}><div className="mb-2 flex items-center justify-between text-sm"><span>{label}</span><span className="text-slate-500">{val}%</span></div><Progress value={Number(val)} className="h-2" /></div>
+                          <div key={String(label)}>
+                            <div className="flex items-center justify-between text-xs mb-2">
+                              <span className="text-gray-600 font-medium">{label}</span>
+                              <span className="text-[#c9a84c] font-bold">{val}%</span>
+                            </div>
+                            <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                              <div className="h-full bg-gradient-to-r from-[#0a1f44] to-[#c9a84c] rounded-full" style={{ width: `${val}%` }} />
+                            </div>
+                          </div>
                         ))}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-3xl border-slate-200 bg-white shadow-sm">
-                  <CardHeader><CardTitle>Top lender matches</CardTitle><CardDescription>Live preview of ranked output for the selected capital stack request</CardDescription></CardHeader>
-                  <CardContent className="space-y-4">
-                    {matches.map((match, index) => (
-                      <div key={match.id} className="rounded-2xl border border-slate-200 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div><div className="text-sm uppercase tracking-[0.18em] text-slate-500">#{index + 1} match</div><div className="mt-1 text-lg font-semibold">{match.lender}</div><div className="mt-1 text-sm text-slate-500">{match.program}</div></div>
-                          <div className="flex items-center gap-2"><Badge variant="outline" className="rounded-full">{match.source}</Badge><Badge className="rounded-full bg-slate-950 px-3 py-1 text-white hover:bg-slate-950">{match.score}% fit</Badge></div>
+                  </div>
+                  <div className={cardClass + " p-6"}>
+                    <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Live Preview</div>
+                    <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">Top Lender Matches</h2>
+                    <div className="space-y-3">
+                      {matches.length === 0 ? (
+                        <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-400">No matches with current criteria.</div>
+                      ) : matches.map((match, index) => (
+                        <div key={match.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4 hover:border-[#0a1f44]/30 transition-all">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">#{index + 1} Match</div>
+                              <div className="text-sm font-semibold text-[#0a1f44]">{match.lender}</div>
+                              <div className="text-xs text-gray-500 mt-0.5">{match.program}</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded-full text-xs border border-gray-200 text-gray-500">{match.source}</span>
+                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#0a1f44]/10 text-[#0a1f44] border border-[#0a1f44]/20">{match.score}%</span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              </div>
-            )}
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
 
-            {activeTab === "lenders" && (
-              <div className="mt-8 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-                <Card className="rounded-3xl border-slate-200 bg-white shadow-sm">
-                  <CardHeader>
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                      <div><CardTitle>Lender Registry</CardTitle><CardDescription>Edit, deactivate, filter, and review lender records.</CardDescription></div>
-                      <Button className="rounded-2xl bg-slate-950 text-white hover:bg-slate-800" onClick={() => setShowAddLender((v) => !v)}><Plus className="mr-2 h-4 w-4" /> {showAddLender ? "Hide form" : "Add lender"}</Button>
+              {/* Lenders Tab */}
+              {activeTab === "lenders" && (
+                <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+                  <div className={cardClass + " p-6"}>
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-5">
+                      <div>
+                        <div className="text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold mb-1">Registry</div>
+                        <h2 className="font-display text-2xl font-bold text-[#0a1f44]">Lender Programs</h2>
+                        <p className="text-xs text-gray-500 mt-0.5">Edit, deactivate, filter, and review lender records.</p>
+                      </div>
+                      <button onClick={() => setShowAddLender((v) => !v)} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all">
+                        <Plus className="h-4 w-4" /> {showAddLender ? "Hide Form" : "Add Lender"}
+                      </button>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="mb-4 grid gap-3 md:grid-cols-4">
-                      <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search lender, program, source" className="rounded-2xl border-slate-300 pl-10" /></div>
-                      <Select value={selectedSourceFilter} onValueChange={setSelectedSourceFilter}><SelectTrigger className="rounded-2xl border-slate-300"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="All">All Sources</SelectItem><SelectItem value="Spreadsheet">Spreadsheet</SelectItem><SelectItem value="Dashboard">Dashboard</SelectItem></SelectContent></Select>
-                      <Select value={selectedCapitalFilter} onValueChange={setSelectedCapitalFilter}><SelectTrigger className="rounded-2xl border-slate-300"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="All">All Capital Types</SelectItem>{capitalTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select>
-                      <Select value={selectedStatusFilter} onValueChange={setSelectedStatusFilter}><SelectTrigger className="rounded-2xl border-slate-300"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="All">All Statuses</SelectItem><SelectItem value="Active">Active</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent></Select>
+                    <div className="grid gap-3 md:grid-cols-4 mb-4">
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." className={inputClass + " pl-9"} />
+                      </div>
+                      <Select value={selectedSourceFilter} onValueChange={setSelectedSourceFilter}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="All">All Sources</SelectItem><SelectItem value="Spreadsheet">Spreadsheet</SelectItem><SelectItem value="Dashboard">Dashboard</SelectItem></SelectContent></Select>
+                      <Select value={selectedCapitalFilter} onValueChange={setSelectedCapitalFilter}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="All">All Capital</SelectItem>{capitalTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select>
+                      <Select value={selectedStatusFilter} onValueChange={setSelectedStatusFilter}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="All">All Statuses</SelectItem><SelectItem value="Active">Active</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent></Select>
                     </div>
-                    <div className="mb-4 flex flex-wrap gap-2"><Badge variant="outline" className="rounded-full">Spreadsheet: {spreadsheetCount}</Badge><Badge variant="outline" className="rounded-full">Dashboard: {dashboardCount}</Badge><Badge variant="outline" className="rounded-full">Showing: {registryFiltered.length}</Badge></div>
-                    <div className="overflow-hidden rounded-3xl border border-slate-200">
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {[`Spreadsheet: ${spreadsheetCount}`, `Dashboard: ${dashboardCount}`, `Showing: ${registryFiltered.length}`].map((t) => (
+                        <span key={t} className="px-3 py-1 rounded-full text-xs border border-[#c9a84c]/30 text-[#c9a84c] font-bold">{t}</span>
+                      ))}
+                    </div>
+                    <div className="overflow-hidden rounded-xl border border-gray-200">
                       <Table>
-                        <TableHeader><TableRow className="bg-slate-50 hover:bg-slate-50"><TableHead>Source</TableHead><TableHead>Row</TableHead><TableHead>Lender</TableHead><TableHead>Program</TableHead><TableHead>Capital</TableHead><TableHead>Phone</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                        <TableHeader>
+                          <TableRow className="border-gray-200 bg-gray-50 hover:bg-gray-50">
+                            {["Source", "Row", "Lender", "Program", "Capital", "Phone", "Status", ""].map((h) => (
+                              <TableHead key={h} className="text-xs uppercase tracking-[0.15em] text-[#0a1f44] font-bold">{h}</TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
                         <TableBody>
                           {registryFiltered.map((item) => (
-                            <TableRow key={item.id}>
-                              <TableCell><Badge className={`rounded-full ${item.source === "Spreadsheet" ? "bg-slate-200 text-slate-800 hover:bg-slate-200" : "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"}`}>{item.source}</Badge></TableCell>
-                              <TableCell>{item.spreadsheetRow}</TableCell>
-                              <TableCell className="font-medium">{item.lender}</TableCell>
-                              <TableCell>{item.program}</TableCell>
-                              <TableCell>{item.type}</TableCell><TableCell>{item.phone || "—"}</TableCell><TableCell><Badge variant="outline" className="rounded-full">{item.status}</Badge></TableCell>
-                              <TableCell className="text-right"><div className="flex justify-end gap-2"><Button variant="outline" className="rounded-xl border-slate-300 bg-white" onClick={() => setEditingLenderId(item.id === editingLenderId ? null : item.id)}>{item.id === editingLenderId ? "Close" : "Edit"}</Button><Button variant="outline" className="rounded-xl border-slate-300 bg-white" onClick={() => toggleLenderStatus(item.id)}>{item.status === "Inactive" ? "Activate" : "Deactivate"}</Button></div></TableCell>
+                            <TableRow key={item.id} className="border-gray-100 hover:bg-gray-50 transition-colors">
+                              <TableCell><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${item.source === "Spreadsheet" ? "bg-gray-100 text-gray-600 border border-gray-200" : "bg-emerald-50 text-emerald-600 border border-emerald-200"}`}>{item.source}</span></TableCell>
+                              <TableCell className="text-gray-400 text-xs">{item.spreadsheetRow}</TableCell>
+                              <TableCell className="font-semibold text-[#0a1f44] text-sm">{item.lender}</TableCell>
+                              <TableCell className="text-gray-600 text-xs">{item.program}</TableCell>
+                              <TableCell className="text-gray-600 text-xs">{item.type}</TableCell>
+                              <TableCell className="text-gray-400 text-xs">{item.phone || "—"}</TableCell>
+                              <TableCell><span className="px-2 py-0.5 rounded-full text-xs border border-gray-200 text-gray-500">{item.status}</span></TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  <button onClick={() => setEditingLenderId(item.id === editingLenderId ? null : item.id)} className="px-3 py-1 text-xs border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/10 transition-all font-medium">{item.id === editingLenderId ? "Close" : "Edit"}</button>
+                                  <button onClick={() => toggleLenderStatus(item.id)} className="px-3 py-1 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-100 transition-all">{item.status === "Inactive" ? "Activate" : "Deactivate"}</button>
+                                </div>
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
                     </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-3xl border-slate-200 bg-white shadow-sm">
-                  <CardHeader><CardTitle>{showAddLender ? "Add lender" : editingLenderId ? "Edit lender" : "Registry Controls"}</CardTitle><CardDescription>{showAddLender ? "Create a lender directly in the dashboard." : editingLenderId ? "Update lender details and keep the registry current." : "Use filters and row mapping to manage lender records."}</CardDescription></CardHeader>
-                  <CardContent className="space-y-5">
+                  </div>
+                  <div className={cardClass + " p-6"}>
+                    <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">{showAddLender ? "New Entry" : editingLenderId ? "Edit Mode" : "Controls"}</div>
+                    <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">{showAddLender ? "Add Lender" : editingLenderId ? "Edit Lender" : "Registry Controls"}</h2>
                     {showAddLender ? (
-                      <div className="space-y-5">
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div className="space-y-2"><label className="text-sm font-medium">Lender Name</label><Input value={newLender.lender} onChange={(e) => setNewLender({ ...newLender, lender: e.target.value })} className="rounded-2xl border-slate-300" /></div>
-                          <div className="space-y-2"><label className="text-sm font-medium">Program Name</label><Input value={newLender.program} onChange={(e) => setNewLender({ ...newLender, program: e.target.value })} className="rounded-2xl border-slate-300" /></div>
-                          <div className="space-y-2"><label className="text-sm font-medium">Capital Type</label><Select value={newLender.type} onValueChange={(value) => setNewLender({ ...newLender, type: value })}><SelectTrigger className="rounded-2xl border-slate-300"><SelectValue /></SelectTrigger><SelectContent>{capitalTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
-                          <div className="space-y-2"><label className="text-sm font-medium">Contact Email</label><Input value={newLender.email} onChange={(e) => setNewLender({ ...newLender, email: e.target.value })} className="rounded-2xl border-slate-300" /></div>
-                          <div className="space-y-2"><label className="text-sm font-medium">Phone Number</label><Input value={newLender.phone} onChange={(e) => setNewLender({ ...newLender, phone: e.target.value })} className="rounded-2xl border-slate-300" /></div>
+                      <div className="space-y-4">
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium">Lender Name</label><Input value={newLender.lender} onChange={(e) => setNewLender({ ...newLender, lender: e.target.value })} className={inputClass} /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium">Program Name</label><Input value={newLender.program} onChange={(e) => setNewLender({ ...newLender, program: e.target.value })} className={inputClass} /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium">Capital Type</label><Select value={newLender.type} onValueChange={(value) => setNewLender({ ...newLender, type: value })}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{capitalTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium">Contact Email</label><Input value={newLender.email} onChange={(e) => setNewLender({ ...newLender, email: e.target.value })} className={inputClass} /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium">Phone Number</label><Input value={newLender.phone} onChange={(e) => setNewLender({ ...newLender, phone: e.target.value })} className={inputClass} /></div>
                         </div>
-                        <div className="flex gap-3 pt-2"><Button className="rounded-2xl bg-slate-950 text-white hover:bg-slate-800" onClick={saveNewLender}>Save lender</Button><Button variant="outline" className="rounded-2xl border-slate-300 bg-white" onClick={() => setNewLender(createBlankLender(lenderRecords.length + 1))}>Reset form</Button></div>
+                        <div className="flex gap-3 pt-2">
+                          <button onClick={saveNewLender} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all">Save Lender</button>
+                          <button onClick={() => setNewLender(createBlankLender(lenderRecords.length + 1))} className="px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50 transition-all">Reset</button>
+                        </div>
                       </div>
                     ) : editingLenderId ? (
                       (() => {
                         const lender = lenderRecords.find((l) => l.id === editingLenderId);
                         if (!lender) return null;
                         return (
-                          <div className="space-y-5">
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Source: {lender.source} · Row Mapping: {lender.spreadsheetRow}</div>
-                            <div className="grid gap-4 md:grid-cols-2">
-                              <div className="space-y-2"><label className="text-sm font-medium">Lender Name</label><Input value={lender.lender} onChange={(e) => updateLenderField(lender.id, "lender", e.target.value)} className="rounded-2xl border-slate-300" /></div>
-                              <div className="space-y-2"><label className="text-sm font-medium">Program Name</label><Input value={lender.program} onChange={(e) => updateLenderField(lender.id, "program", e.target.value)} className="rounded-2xl border-slate-300" /></div>
-                              <div className="space-y-2"><label className="text-sm font-medium">Capital Type</label><Select value={lender.type} onValueChange={(value) => updateLenderField(lender.id, "type", value)}><SelectTrigger className="rounded-2xl border-slate-300"><SelectValue /></SelectTrigger><SelectContent>{capitalTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
-                              <div className="space-y-2"><label className="text-sm font-medium">Status</label><Select value={lender.status} onValueChange={(value) => updateLenderField(lender.id, "status", value)}><SelectTrigger className="rounded-2xl border-slate-300"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent></Select></div>
-                              <div className="space-y-2"><label className="text-sm font-medium">Contact Email</label><Input value={lender.email || ""} onChange={(e) => updateLenderField(lender.id, "email", e.target.value)} className="rounded-2xl border-slate-300" /></div>
-                              <div className="space-y-2"><label className="text-sm font-medium">Phone Number</label><Input value={lender.phone || ""} onChange={(e) => updateLenderField(lender.id, "phone", e.target.value)} className="rounded-2xl border-slate-300" /></div>
+                          <div className="space-y-4">
+                            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500">Source: <span className="text-[#0a1f44] font-bold">{lender.source}</span> · Row: <span className="text-[#0a1f44] font-bold">{lender.spreadsheetRow}</span></div>
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <div><label className="text-xs text-gray-500 mb-1 block font-medium">Lender Name</label><Input value={lender.lender} onChange={(e) => updateLenderField(lender.id, "lender", e.target.value)} className={inputClass} /></div>
+                              <div><label className="text-xs text-gray-500 mb-1 block font-medium">Program Name</label><Input value={lender.program} onChange={(e) => updateLenderField(lender.id, "program", e.target.value)} className={inputClass} /></div>
+                              <div><label className="text-xs text-gray-500 mb-1 block font-medium">Capital Type</label><Select value={lender.type} onValueChange={(value) => updateLenderField(lender.id, "type", value)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{capitalTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
+                              <div><label className="text-xs text-gray-500 mb-1 block font-medium">Status</label><Select value={lender.status} onValueChange={(value) => updateLenderField(lender.id, "status", value)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent></Select></div>
+                              <div><label className="text-xs text-gray-500 mb-1 block font-medium">Email</label><Input value={lender.email || ""} onChange={(e) => updateLenderField(lender.id, "email", e.target.value)} className={inputClass} /></div>
+                              <div><label className="text-xs text-gray-500 mb-1 block font-medium">Phone</label><Input value={lender.phone || ""} onChange={(e) => updateLenderField(lender.id, "phone", e.target.value)} className={inputClass} /></div>
                             </div>
-                            <div className="flex gap-3 pt-2"><Button className="rounded-2xl bg-slate-950 text-white hover:bg-slate-800" onClick={() => setEditingLenderId(null)}>Done</Button><Button variant="outline" className="rounded-2xl border-slate-300 bg-white" onClick={() => toggleLenderStatus(lender.id)}>{lender.status === "Inactive" ? "Activate" : "Deactivate"}</Button></div>
+                            <div className="flex gap-3 pt-2">
+                              <button onClick={() => setEditingLenderId(null)} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all">Done</button>
+                              <button onClick={() => toggleLenderStatus(lender.id)} className="px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50 transition-all">{lender.status === "Inactive" ? "Activate" : "Deactivate"}</button>
+                            </div>
                           </div>
                         );
                       })()
                     ) : (
                       <div className="space-y-3">
-                        <div className="rounded-2xl border border-slate-200 p-4"><div className="text-sm font-semibold">Edit lenders</div><div className="mt-1 text-sm text-slate-500">Click Edit on any row to change lender name, program, status, capital type, or contact email.</div></div>
-                        <div className="rounded-2xl border border-slate-200 p-4"><div className="text-sm font-semibold">Deactivate lenders</div><div className="mt-1 text-sm text-slate-500">Deactivate a lender without deleting it so it stays in the registry but can be excluded operationally.</div></div>
-                        <div className="rounded-2xl border border-slate-200 p-4"><div className="text-sm font-semibold">Spreadsheet row mapping</div><div className="mt-1 text-sm text-slate-500">Spreadsheet lenders retain row mapping like A2–A717, while dashboard lenders display a manual record marker.</div></div>
+                        {[["Edit Lenders", "Click Edit on any row to update lender details."], ["Deactivate Lenders", "Deactivate without deleting — stays in registry but excluded operationally."], ["Row Mapping", "Spreadsheet lenders retain row mapping like A2–A717."]].map(([title, desc]) => (
+                          <div key={String(title)} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                            <div className="text-sm font-bold text-[#0a1f44] mb-1">{title}</div>
+                            <div className="text-xs text-gray-500">{desc}</div>
+                          </div>
+                        ))}
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-              </div>
-            )}
+                  </div>
+                </div>
+              )}
 
-            {activeTab === "matcher" && (
-              <div className="mt-8 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-                <Card className="rounded-3xl border-slate-200 bg-white shadow-sm">
-                  <CardHeader><CardTitle>Deal intake</CardTitle><CardDescription>Capital type and deal type come first and control the amount prompts.</CardDescription></CardHeader>
-                  <CardContent className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2"><label className="text-sm font-medium">Market</label><Select value={marketScope} onValueChange={setMarketScope}><SelectTrigger className="rounded-2xl border-slate-300"><SelectValue /></SelectTrigger><SelectContent>{marketOptions.map((item) => <SelectItem key={item} value={item}>{item === "US" ? "US" : "International"}</SelectItem>)}</SelectContent></Select></div>
-                    <div className="space-y-2"><label className="text-sm font-medium">Capital Type</label><Select value={capitalType} onValueChange={setCapitalType}><SelectTrigger className="rounded-2xl border-slate-300"><SelectValue /></SelectTrigger><SelectContent>{capitalTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
-                    <div className="space-y-2"><label className="text-sm font-medium">Property Ownership Status</label><Select value={ownershipStatus} onValueChange={setOwnershipStatus}><SelectTrigger className="rounded-2xl border-slate-300"><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
-                    <div className="space-y-2"><label className="text-sm font-medium">Deal Type</label><Select value={dealType} onValueChange={setDealType}><SelectTrigger className="rounded-2xl border-slate-300"><SelectValue /></SelectTrigger><SelectContent>{dealTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
-                    {ownershipStatus === "Refinance" && (
-                      <div className="space-y-2 md:col-span-2"><label className="text-sm font-medium">Refinance Type</label><Select value={refinanceType} onValueChange={setRefinanceType}><SelectTrigger className="rounded-2xl border-slate-300"><SelectValue /></SelectTrigger><SelectContent>{refinanceTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
-                    )}
-                    <div className="space-y-2"><label className="text-sm font-medium">Asset Type</label><Select value={assetType} onValueChange={setAssetType}><SelectTrigger className="rounded-2xl border-slate-300"><SelectValue /></SelectTrigger><SelectContent>{assetTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
-                    {isAcquisitionConstruction && (
-                      <div className="md:col-span-2 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                        <div className="mb-4 text-sm font-semibold text-slate-900">Project Estimated Costs</div>
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div className="space-y-2"><label className="text-sm font-medium">Land Cost / Acquisition Cost</label><Input value={landCost} onChange={(e) => setLandCost(formatCurrencyInput(e.target.value))} className="rounded-2xl border-slate-300" /></div>
-                          <div className="space-y-2"><label className="text-sm font-medium">Soft Costs</label><Input value={softCosts} onChange={(e) => setSoftCosts(formatCurrencyInput(e.target.value))} className="rounded-2xl border-slate-300" /></div>
-                          <div className="space-y-2"><label className="text-sm font-medium">Origination and Closing Costs</label><Input value={originationClosingCosts} onChange={(e) => setOriginationClosingCosts(formatCurrencyInput(e.target.value))} className="rounded-2xl border-slate-300" /></div>
-                          <div className="space-y-2"><label className="text-sm font-medium">Hard Costs</label><Input value={hardCosts} onChange={(e) => setHardCosts(formatCurrencyInput(e.target.value))} className="rounded-2xl border-slate-300" /></div>
-                          <div className="space-y-2"><label className="text-sm font-medium">Carrying Costs</label><Input value={carryingCosts} onChange={(e) => setCarryingCosts(formatCurrencyInput(e.target.value))} className="rounded-2xl border-slate-300" /></div>
-                          <div className="space-y-2"><label className="text-sm font-medium">Borrower Equity</label><Input value={borrowerEquity} onChange={(e) => setBorrowerEquity(formatCurrencyInput(e.target.value))} className="rounded-2xl border-slate-300" /></div>
+              {/* Matcher Tab */}
+              {activeTab === "matcher" && (
+                <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+                  <div className={cardClass + " p-6"}>
+                    <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Qualification</div>
+                    <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">Deal Matcher</h2>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Market</label><Select value={marketScope} onValueChange={setMarketScope}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{marketOptions.map((item) => <SelectItem key={item} value={item}>{item === "US" ? "US" : "International"}</SelectItem>)}</SelectContent></Select></div>
+                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Capital Type</label><Select value={capitalType} onValueChange={setCapitalType}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{capitalTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
+                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Ownership Status</label><Select value={ownershipStatus} onValueChange={setOwnershipStatus}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
+                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Deal Type</label><Select value={dealType} onValueChange={setDealType}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{dealTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
+                      {ownershipStatus === "Refinance" && (<div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Refinance Type</label><Select value={refinanceType} onValueChange={setRefinanceType}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{refinanceTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>)}
+                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Asset Type</label><Select value={assetType} onValueChange={setAssetType}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{assetTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
+                      {isAcquisitionConstruction && (
+                        <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                          <div className="text-xs uppercase tracking-[0.2em] text-[#c9a84c] font-bold mb-3">Project Estimated Costs</div>
+                          <div className="grid gap-3 md:grid-cols-2">
+                            {([["Land / Acquisition Cost", landCost, setLandCost], ["Soft Costs", softCosts, setSoftCosts], ["Origination & Closing", originationClosingCosts, setOriginationClosingCosts], ["Hard Costs", hardCosts, setHardCosts], ["Carrying Costs", carryingCosts, setCarryingCosts], ["Borrower Equity", borrowerEquity, setBorrowerEquity]] as [string, string, (v: string) => void][]).map(([label, val, setter]) => (
+                              <div key={label}><label className="text-xs text-gray-500 mb-1 block font-medium">{label}</label><Input value={val} onChange={(e) => setter(formatCurrencyInput(e.target.value))} className={inputClass} /></div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {!isSubordinateCapital && !isAcquisitionConstruction && (<div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase tracking-wide">Loan Amount</label><Input value={loanAmount} onChange={(e) => setLoanAmount(formatCurrencyInput(e.target.value))} className={inputClass} /></div>)}
+                      {isSubordinateCapital && (<>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Senior Loan Amount</label><Input value={seniorLoanAmount} onChange={(e) => setSeniorLoanAmount(formatCurrencyInput(e.target.value))} className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">{subordinateLabel(capitalType)}</label><Input value={subordinateAmount} onChange={(e) => setSubordinateAmount(formatCurrencyInput(e.target.value))} className={inputClass} /></div>
+                        <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500">Stack: Senior {seniorLoanAmount || "$0"} + {subordinateLabel(capitalType)} {subordinateAmount || "$0"}</div>
+                      </>)}
+                      <div className="md:col-span-2">
+                        <label className="text-xs text-gray-500 mb-2 block font-medium uppercase tracking-wide">States</label>
+                        <div className="mb-2 flex gap-2">
+                          <button onClick={() => setSelectedStates(allStates)} className="px-3 py-1 text-xs border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/10 transition-all font-medium">Select All</button>
+                          <button onClick={() => setSelectedStates([])} className="px-3 py-1 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-100 transition-all">Clear</button>
+                        </div>
+                        <div className="grid max-h-40 grid-cols-6 gap-1.5 overflow-auto rounded-xl border border-gray-200 bg-gray-50 p-3">
+                          {allStates.map((s) => (<label key={s} className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={selectedStates.includes(s)} onChange={() => setSelectedStates((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s])} className="accent-[#0a1f44]" /><span className="text-gray-600">{s}</span></label>))}
                         </div>
                       </div>
-                    )}
-                    {!isSubordinateCapital && !isAcquisitionConstruction && <div className="space-y-2 md:col-span-2"><label className="text-sm font-medium">Loan Amount</label><Input value={loanAmount} onChange={(e) => setLoanAmount(formatCurrencyInput(e.target.value))} className="rounded-2xl border-slate-300" /></div>}
-                    {isAcquisitionConstruction && !isSubordinateCapital && <div className="space-y-2 md:col-span-2"><label className="text-sm font-medium">Calculated Loan Amount</label><div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">{formatCurrencyInput(String(acquisitionConstructionLoanAmount))}</div><div className="mt-1 text-xs text-slate-500">Project Estimated Costs less Borrower Equity</div></div>}
-                    {isSubordinateCapital && (
-                      <>
-                        <div className="space-y-2"><label className="text-sm font-medium">Senior Loan Amount</label><Input value={seniorLoanAmount} onChange={(e) => setSeniorLoanAmount(formatCurrencyInput(e.target.value))} className="rounded-2xl border-slate-300" /></div>
-                        <div className="space-y-2"><label className="text-sm font-medium">{subordinateLabel(capitalType)}</label><Input value={subordinateAmount} onChange={(e) => setSubordinateAmount(formatCurrencyInput(e.target.value))} className="rounded-2xl border-slate-300" /></div>
-                        <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">Stack preview: Senior Loan {seniorLoanAmount || "$0"} + {subordinateLabel(capitalType)} {subordinateAmount || "$0"}</div>
-                      </>
-                    )}
-                    <div className="space-y-2 md:col-span-2">
-                      <label className="text-sm font-medium">States</label>
-                      <div className="mb-2 flex items-center gap-2"><button type="button" onClick={() => setSelectedStates(allStates)} className="rounded-md border bg-white px-2 py-1 text-xs">Select All</button><button type="button" onClick={() => setSelectedStates([])} className="rounded-md border bg-white px-2 py-1 text-xs">Clear</button></div>
-                      <div className="grid max-h-40 grid-cols-5 gap-2 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-3">{allStates.map((s) => <label key={s} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={selectedStates.includes(s)} onChange={() => setSelectedStates((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s])} /><span>{s}</span></label>)}</div>
+                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Property Value / ARV</label><Input value={propertyValue} onChange={(e) => setPropertyValue(formatCurrencyInput(e.target.value))} className={inputClass} /></div>
+                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">LTV Mode</label><Select value={ltvMode} onValueChange={setLtvMode}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="AUTO">Auto Calculate</SelectItem><SelectItem value="MANUAL">Manual Entry</SelectItem></SelectContent></Select></div>
+                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Net Income</label><Input value={currentNetIncome} onChange={(e) => setCurrentNetIncome(formatCurrencyInput(e.target.value))} className={inputClass} /></div>
+                      {ltvMode === "MANUAL" ? <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Manual LTV</label><Input value={manualLtv} onChange={(e) => setManualLtv(e.target.value)} className={inputClass} /></div> : <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Calculated LTV</label><div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold text-[#0a1f44]">{formatPercent(autoLtv)}</div></div>}
+                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">DSCR</label><Input value={dscr} onChange={(e) => setDscr(e.target.value)} className={inputClass} /></div>
+                      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label><Select value={recourseType} onValueChange={setRecourseType}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
+                      <div className="md:col-span-2 grid grid-cols-4 gap-3">
+                        {([["Senior LTV", formatPercent(seniorLtv)], ["Last $ LTV", formatPercent(autoLtv)], ["Total Capital", formatCurrencyInput(String(totalCapitalNumeric || 0))], ["Equity %", formatPercent(equityPercent)]] as [string, string][]).map(([label, val]) => (
+                          <div key={label} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                            <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">{label}</div>
+                            <div className="text-sm font-bold text-[#0a1f44]">{val}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {marketScope === "INTERNATIONAL" && (<div className="md:col-span-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">CAPMOON DOES NOT SERVICE INTERNATIONAL LOANS AT THIS TIME</div>)}
+                      <div className="md:col-span-2 flex gap-3 pt-2">
+                        <button className="px-5 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all">Run Lender Match</button>
+                        <button className="px-5 py-2.5 text-sm border border-[#0a1f44]/20 text-[#0a1f44] rounded-xl hover:bg-[#0a1f44]/10 transition-all font-medium">Save Scenario</button>
+                      </div>
                     </div>
-                    <div className="space-y-2"><label className="text-sm font-medium">Appraised Property Value/ARV Value</label><Input value={propertyValue} onChange={(e) => setPropertyValue(formatCurrencyInput(e.target.value))} className="rounded-2xl border-slate-300" /></div>
-                    <div className="space-y-2"><label className="text-sm font-medium">LTV Mode</label><Select value={ltvMode} onValueChange={setLtvMode}><SelectTrigger className="rounded-2xl border-slate-300"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="AUTO">Auto Calculate</SelectItem><SelectItem value="MANUAL">Manual Entry</SelectItem></SelectContent></Select></div>
-                    <div className="space-y-2"><label className="text-sm font-medium">Current Net Income</label><Input value={currentNetIncome} onChange={(e) => setCurrentNetIncome(formatCurrencyInput(e.target.value))} className="rounded-2xl border-slate-300" /></div>
-                    {ltvMode === "MANUAL" ? <div className="space-y-2"><label className="text-sm font-medium">Manual LTV</label><Input value={manualLtv} onChange={(e) => setManualLtv(e.target.value)} className="rounded-2xl border-slate-300" /></div> : <div className="space-y-2"><label className="text-sm font-medium">Calculated LTV - Last Dollar</label><div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">{formatPercent(autoLtv)}</div></div>}
-                    <div className="space-y-2"><label className="text-sm font-medium">DSCR</label><Input value={dscr} onChange={(e) => setDscr(e.target.value)} className="rounded-2xl border-slate-300" /></div>
-                    {isAcquisitionConstruction && <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="grid gap-3 md:grid-cols-3"><div><div className="text-xs uppercase tracking-[0.18em] text-slate-400">Project Estimated Costs</div><div className="mt-1 text-lg font-semibold">{formatCurrencyInput(String(projectEstimatedCostsTotal))}</div></div><div><div className="text-xs uppercase tracking-[0.18em] text-slate-400">Borrower Equity</div><div className="mt-1 text-lg font-semibold">{borrowerEquity || "$0"}</div></div><div><div className="text-xs uppercase tracking-[0.18em] text-slate-400">Calculated Loan Amount</div><div className="mt-1 text-lg font-semibold">{formatCurrencyInput(String(acquisitionConstructionLoanAmount))}</div></div></div></div>}
-                    <div className="md:col-span-2 grid gap-3 md:grid-cols-4">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="text-xs uppercase tracking-[0.18em] text-slate-400">Senior LTV - Basis</div><div className="mt-1 text-lg font-semibold">{formatPercent(seniorLtv)}</div></div>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="text-xs uppercase tracking-[0.18em] text-slate-400">Last Dollar LTV</div><div className="mt-1 text-lg font-semibold">{formatPercent(autoLtv)}</div></div>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="text-xs uppercase tracking-[0.18em] text-slate-400">Total Capital</div><div className="mt-1 text-lg font-semibold">{formatCurrencyInput(String(totalCapitalNumeric || 0))}</div></div>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="text-xs uppercase tracking-[0.18em] text-slate-400">Equity %</div><div className="mt-1 text-lg font-semibold">{formatPercent(equityPercent)}</div></div>
-                    </div>
-                    <div className="space-y-2"><label className="text-sm font-medium">Recourse</label><Select value={recourseType} onValueChange={setRecourseType}><SelectTrigger className="rounded-2xl border-slate-300"><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
-                    {marketScope === "INTERNATIONAL" && <div className="md:col-span-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">CAPMOON DOES NOT SERVICE INTERNATIONAL LOANS AT THIS TIME</div>}
-                    <div className="md:col-span-2 flex gap-3 pt-2"><Button className="rounded-2xl bg-slate-950 text-white hover:bg-slate-800">Run lender match</Button><Button variant="outline" className="rounded-2xl border-slate-300 bg-white">Save scenario</Button></div>
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-3xl border-slate-200 bg-white shadow-sm">
-                  <CardHeader><CardTitle>Ranked output</CardTitle><CardDescription>Preview of match scoring, ready for CRM routing and export</CardDescription></CardHeader>
-                  <CardContent className="space-y-4">
-                    {marketScope === "INTERNATIONAL" ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-6 text-center text-sm font-medium text-red-700">CAPMOON DOES NOT SERVICE INTERNATIONAL LOANS AT THIS TIME</div> : matches.length === 0 ? <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">No lender matches found for the selected criteria.</div> : matches.map((match) => (
-                      <div key={match.id} className="rounded-2xl border border-slate-200 p-5">
-                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"><div><div className="text-lg font-semibold">{match.lender}</div><div className="text-sm text-slate-500">{match.program}</div></div><div className="flex items-center gap-2"><Badge variant="outline" className="rounded-full">{match.source}</Badge><div className="text-right"><div className="text-sm text-slate-500">Match score</div><div className="text-2xl font-semibold">{match.score}%</div></div></div></div>
-                        <div className="mt-4 grid gap-3 md:grid-cols-3">
-                          <div className="rounded-2xl bg-slate-50 p-3"><div className="text-xs uppercase tracking-[0.18em] text-slate-400">Capital</div><div className="mt-1 font-medium">{match.type}</div></div>
-                          <div className="rounded-2xl bg-slate-50 p-3"><div className="text-xs uppercase tracking-[0.18em] text-slate-400">Requested Amount</div><div className="mt-1 font-medium">{isSubordinateCapital ? subordinateAmount : formatCurrencyInput(String(effectiveAmount || 0))}</div><div className="mt-1 text-xs text-slate-500">LTV Used: {formatPercent(currentLtv)}</div></div>
-                          <div className="rounded-2xl bg-slate-50 p-3"><div className="text-xs uppercase tracking-[0.18em] text-slate-400">Contact</div><div className="mt-1 break-all font-medium">{match.email || "—"}</div><div className="mt-1 text-xs text-slate-500">Recourse: {match.normalizedRecourse}</div></div>
+                  </div>
+                  <div className={cardClass + " p-6"}>
+                    <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Results</div>
+                    <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">Ranked Output</h2>
+                    {marketScope === "INTERNATIONAL" ? (
+                      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-8 text-center text-sm font-medium text-red-600">CAPMOON DOES NOT SERVICE INTERNATIONAL LOANS AT THIS TIME</div>
+                    ) : matches.length === 0 ? (
+                      <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-400">No lender matches found for the selected criteria.</div>
+                    ) : matches.map((match) => (
+                      <div key={match.id} className="rounded-xl border border-gray-200 bg-gray-50 p-5 mb-3 hover:border-[#0a1f44]/30 transition-all">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+                          <div>
+                            <div className="text-base font-bold text-[#0a1f44]">{match.lender}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">{match.program}</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-full text-xs border border-gray-200 text-gray-500">{match.source}</span>
+                            <div className="text-right">
+                              <div className="text-xs text-gray-400">Match score</div>
+                              <div className="text-xl font-bold text-[#0a1f44]">{match.score}%</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="grid gap-2 md:grid-cols-3">
+                          {([["Capital", match.type], ["Amount", isSubordinateCapital ? subordinateAmount : formatCurrencyInput(String(effectiveAmount || 0))], ["Contact", match.email || "—"]] as [string, string][]).map(([label, val]) => (
+                            <div key={label} className="rounded-lg bg-white border border-gray-200 p-3">
+                              <div className="text-xs uppercase tracking-[0.15em] text-[#0a1f44] font-bold mb-1">{label}</div>
+                              <div className="text-xs font-medium text-gray-600 break-all">{val}</div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     ))}
-                  </CardContent>
-                </Card>
-              </div>
-            )}
+                  </div>
+                </div>
+              )}
 
-            {activeTab === "uploads" && (
-              <div className="mt-8 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-                <Card className="rounded-3xl border-slate-200 bg-white shadow-sm">
-                  <CardHeader><CardTitle>Workbook ingestion</CardTitle><CardDescription>Admin flow for replacing or refreshing the lender criteria spreadsheet</CardDescription></CardHeader>
-                  <CardContent>
-                    <div className="rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 p-10 text-center"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-white"><Upload className="h-6 w-6" /></div><div className="mt-4 text-lg font-medium">Drop updated lender workbook</div><div className="mt-2 text-sm text-slate-500">Supports .xlsx ingestion, field mapping, validation, and version history.</div><Button className="mt-5 rounded-2xl bg-slate-950 text-white hover:bg-slate-800">Select spreadsheet</Button></div>
-                  </CardContent>
-                </Card>
-                <Card className="rounded-3xl border-slate-200 bg-white shadow-sm">
-                  <CardHeader><CardTitle>Detected schema</CardTitle><CardDescription>Preview of workbook fields powering the dashboard and matching engine</CardDescription></CardHeader>
-                  <CardContent><div className="flex flex-wrap gap-2">{["Program Name", "Lender Name", "Minimum Loan Size", "Maximum Loan Size", "Max LTV", "Min DSCR", "Target States", "Apartments", "Office", "Recourse (BF)", "Source Tag"].map((field) => <Badge key={field} variant="outline" className="rounded-full px-3 py-1">{field}</Badge>)}</div><div className="mt-6 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">Spreadsheet lenders and dashboard-added lenders can coexist in one database with a source tag.</div></CardContent>
-                </Card>
-              </div>
-            )}
-          </motion.div>
-        </main>
+              {/* Uploads Tab */}
+              {activeTab === "uploads" && (
+                <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+                  <div className={cardClass + " p-6"}>
+                    <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Admin</div>
+                    <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">Workbook Ingestion</h2>
+                    <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 p-10 text-center hover:border-[#0a1f44]/40 transition-all">
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-[#0a1f44]/10 border border-[#0a1f44]/20 text-[#0a1f44] mb-4"><Upload className="h-6 w-6" /></div>
+                      <div className="text-base font-bold text-[#0a1f44] mb-1">Drop Updated Lender Workbook</div>
+                      <div className="text-sm text-gray-500 mb-5">Supports .xlsx ingestion, field mapping, validation, and version history.</div>
+                      <button className="px-5 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all">Select Spreadsheet</button>
+                    </div>
+                  </div>
+                  <div className={cardClass + " p-6"}>
+                    <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Preview</div>
+                    <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">Detected Schema</h2>
+                    <div className="flex flex-wrap gap-2 mb-5">
+                      {["Program Name", "Lender Name", "Min Loan Size", "Max Loan Size", "Max LTV", "Min DSCR", "Target States", "Apartments", "Office", "Recourse", "Source Tag"].map((field) => (
+                        <span key={field} className="px-3 py-1 rounded-full text-xs border border-[#0a1f44]/20 text-[#0a1f44] font-medium">{field}</span>
+                      ))}
+                    </div>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
+                      Spreadsheet lenders and dashboard-added lenders coexist in one database with a source tag.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            </motion.div>
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
