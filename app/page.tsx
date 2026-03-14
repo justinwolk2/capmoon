@@ -212,7 +212,7 @@ export default function Home() {
                   <div className="text-xs text-gray-400 tracking-wide">Lender Intelligence Platform</div>
                 </div>
               </div>
-              <div className="text-xs uppercase tracking-[0.35em] text-[#c9a84c] font-bold mt-3">Capital Advisory</div>
+              <div className="text-xs uppercase tracking-[0.35em] text-[#c9a84c] font-bold mt-3">Investment Banking</div>
             </div>
             <nav className="space-y-1 p-4 flex-1">
               {navItems.map(([key, label, Icon]) => (
@@ -241,7 +241,7 @@ export default function Home() {
               {/* Top Bar */}
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
                 <div>
-                  <div className="text-xs uppercase tracking-[0.28em] text-[#c9a84c] font-bold">Institutional Workflow</div>
+                  <div className="text-xs uppercase tracking-[0.28em] text-[#0a1f44] font-bold">Institutional Workflow</div>
                   <h1 className="font-display text-4xl font-bold text-[#0a1f44] mt-1">Lender Dashboard</h1>
                   <p className="mt-1 text-sm text-gray-500">Senior LTV · Last Dollar LTV · Capital Stack · Equity Analysis</p>
                 </div>
