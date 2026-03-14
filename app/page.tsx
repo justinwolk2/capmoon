@@ -224,7 +224,7 @@ export default function Home() {
           <aside className="border-r border-[#c9a84c]/10 bg-[#080d1a] flex flex-col">
             <div className="px-6 py-8 border-b border-[#c9a84c]/10">
              <div className="flex items-center gap-3">
-  <img src="/logo1.jpeg" alt="CapMoon" className="h-12 w-12 object-contain rounded-full" />
+  <img src="/logo1.JPEG" alt="CapMoon" className="h-12 w-12 object-contain rounded-full" />
   <div>
     <div className="font-display text-2xl font-bold gold-gradient">CapMoon</div>
     <div className="text-xs text-gray-500 tracking-wide">Lender Intelligence Platform</div>
