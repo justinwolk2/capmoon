@@ -738,7 +738,7 @@ export default function Home() {
                         />
 
                         <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
-                          <button onClick={handlePrevAsset} disabled={currentAssetIndex === 0} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">
+                          <button onClick={() => { if (currentAssetIndex === 0) { setMatcherStep(assetMode === "multiple" ? "asset-count" : "start"); } else { handlePrevAsset(); } }}className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">
                             <ChevronLeft className="h-4 w-4" /> Previous
                           </button>
                           <button onClick={handleNextAsset} className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">
