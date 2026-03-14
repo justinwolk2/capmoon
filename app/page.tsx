@@ -591,7 +591,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
             {aiError && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{aiError}</div>}
             <div className="flex gap-3">
               <button onClick={handleAiSubmit} disabled={aiLoading || !aiDescription.trim()} className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 disabled:opacity-40 disabled:cursor-not-allowed">
-                {aiLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing...</> : <><Sparkles className="h-4 w-4" /> Find Matching Lenders</>}
+                {aiLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing...</> : <><Sparkles className="h-4 w-4" /> {capitalSeekerMode ? "Find My Financing" : "Find Matching Lenders"}</>}
               </button>
             </div>
             <div className="flex items-center gap-4 my-6"><div className="flex-1 h-px bg-gray-200" /><span className="text-xs text-gray-400 font-medium">or</span><div className="flex-1 h-px bg-gray-200" /></div>
