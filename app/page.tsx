@@ -1830,6 +1830,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     (selectedStatusFilter === "All" || l.status === selectedStatusFilter) &&
     (search === "" || l.lender.toLowerCase().includes(search.toLowerCase()) || l.program.toLowerCase().includes(search.toLowerCase()))
   ), [lenderRecords, selectedSourceFilter, selectedCapitalFilter, selectedStatusFilter, search]);
+  const sortedLenders = useMemo(() => [...filteredLenders].sort((a, b) => a.lender.localeCompare(b.lender)), [filteredLenders]);
 
   const spreadsheetCount = lenderRecords.filter((l) => l.source === "Spreadsheet").length;
   const dashboardCount = lenderRecords.filter((l) => l.source === "Dashboard").length;
@@ -1968,7 +1969,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredLenders.map((item) => (
+                        {sortedLenders.map((item) => (
                           <React.Fragment key={item.id}>
                             <TableRow className={`border-gray-100 ${viewingLenderId === item.id || editingLenderId === item.id ? "bg-[#0a1f44]/5 border-l-2 border-l-[#c9a84c]" : "hover:bg-gray-50"}`}>
                               <TableCell>
