@@ -727,7 +727,15 @@ export default function Home() {
                       {["AI Search", "Setup", assetMode === "multiple" ? "Asset Count" : null, "Asset Details", "Review", "Results"].filter(Boolean).map((step, idx, arr) => (
                         <React.Fragment key={String(step)}>
                           <div className="flex items-center gap-1.5">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx <= ["AI Search", "Setup", assetMode === "multiple" ? "Asset Count" : null, "Asset Details", "Review", "Results"].filter(Boolean).indexOf(matcherStep === "ai-prompt" ? "AI Search" : matcherStep === "start" ? "Setup" : matcherStep === "asset-count" ? "Asset Count" : matcherStep === "asset-form" ? "Asset Details" : matcherStep === "review" ? "Review" : "Results") ? "bg-[#0a1f44] text-white" : "bg-gray-200 text-gray-500"}`}>{idx + 1}</div>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx <= ["AI Search", "Setup", assetMode === "multiple" ? "Asset Count" : null, "Asset Details", "Review", "Results"].filter(Boolean).indexOf(<div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx <= (matcherStep === "start" ? 1 : matcherStep === "asset-count" ? 2 : matcherStep === "asset-form" ? 3 : matcherStep === "review" ? 4 : 5) ? "bg-[#0a1f44] text-white" : "bg-gray-200 text-gray-500"}`}>{idx + 1}</div>
+```
+
+Save with **Cmd + S** then push:
+```
+git add .
+git commit -m "fix progress bar type error"
+git push
+Let me know when it's live! Sonnet 4.6Claude is AI and can make mistakes. Please double-check responses.Page · TSXCopymatcherStep === "start" ? "Setup" : matcherStep === "asset-count" ? "Asset Count" : matcherStep === "asset-form" ? "Asset Details" : matcherStep === "review" ? "Review" : "Results") ? "bg-[#0a1f44] text-white" : "bg-gray-200 text-gray-500"}`}>{idx + 1}</div>
                             <span className="text-xs text-gray-500 font-medium hidden sm:block">{step}</span>
                           </div>
                           {idx < arr.length - 1 && <ChevronRight className="h-3 w-3 text-gray-300" />}
