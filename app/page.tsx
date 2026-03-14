@@ -1273,10 +1273,26 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
     if (!aiDescription.trim()) return;
     setAiLoading(true); setAiError("");
     try {
-      const parsed = await parseDeadWithAI(aiDescription, capitalType);
-      if (Object.keys(parsed).length === 0) { setAiError("Couldn't parse the deal. Try being more specific or use manual entry."); }
-      else { setAssets([{ ...blankAsset(1), ...parsed }]); setAiParsed(true); setAssetMode("single"); setMatcherStep("asset-form"); }
-    } catch { setAiError("Something went wrong. Please try again."); }
+      const response = await fetch("/api/parse-deal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: aiDescription, capitalType }),
+      });
+      if (!response.ok) {
+        const errText = await response.text();
+        setAiError(`Server error (${response.status}): ${errText.slice(0, 100)}. Please use manual entry.`);
+        setAiLoading(false); return;
+      }
+      const parsed = await response.json();
+      if (!parsed || Object.keys(parsed).length === 0) {
+        setAiError("AI returned no data. Please use manual entry below.");
+        setAiLoading(false); return;
+      }
+      setAssets([{ ...blankAsset(1), ...parsed }]);
+      setAiParsed(true); setAssetMode("single"); setMatcherStep("asset-form");
+    } catch (err: any) {
+      setAiError(`Connection error: ${err?.message || "unknown"}. Please use manual entry.`);
+    }
     setAiLoading(false);
   }
 
