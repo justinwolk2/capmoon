@@ -1,9 +1,9 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart3, Building2, FileSpreadsheet, Filter, Gauge, Landmark, Plus, Search, ShieldCheck, Upload, Users, Trash2, ChevronRight, ChevronLeft, CheckCircle, Edit2 } from "lucide-react";
+import { BarChart3, Building2, FileSpreadsheet, Filter, Gauge, Landmark, Plus, Search, ShieldCheck, Upload, Users, Trash2, ChevronRight, ChevronLeft, CheckCircle, Edit2, Sparkles, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -58,19 +58,8 @@ const marketOptions = ["US", "INTERNATIONAL"];
 const allStates = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 const unitAssets = ["Apartments", "Condos", "Hotel/Hospitality", "Gaming"];
 const retailAssets = ["Retail - Multi Tenant", "Retail - Single Tenant"];
-
 const typeOfLoanOptions = ["Acquisition", "Construction", "Value add", "New Development", "Redevelopment", "Refinance", "Note on Note", "Loan Purchases", "C&I"];
 const programTypeOptions = ["Refinance", "Acquisition", "Construction", "Land", "Fannie/Freddie", "HUD", "Small Balance", "Interest-only", "Cannabis"];
-
-const spreadsheetFieldMap: Record<string, keyof NewLenderForm> = {
-  "Program Name": "programName", "Lender Name": "programName", "Contact Person": "contactPerson",
-  "Contact Name": "contactPerson", "Email": "email", "Email Address": "email",
-  "Phone": "phone", "Phone Number": "phone", "Website": "website",
-  "Min Loan": "minLoan", "Minimum Loan": "minLoan", "Minimum Loan Size": "minLoan",
-  "Max Loan": "maxLoan", "Maximum Loan": "maxLoan", "Maximum Loan Size": "maxLoan",
-  "Max LTV": "maxLtv", "Recourse": "recourse", "Capital Type": "capitalType",
-  "Loan Terms": "loanTerms", "Property Types": "propertyTypes",
-};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -138,6 +127,44 @@ function calcMetrics(asset: AssetData, capitalType: string) {
   return { effectiveAmt, totalCap, seniorLtv, autoLtv, currentLtv, equityPct, cashOut, seniorLtc, isSubCap, isConstruction, isAcquisition, isRefinance, isAcqNonConst, acqConstLoan };
 }
 
+// ─── AI Deal Parser ───────────────────────────────────────────────────────────
+
+async function parseDeadWithAI(description: string, capitalTypeHint: string): Promise<Partial<AssetData>> {
+  const systemPrompt = `You are a commercial real estate loan intake specialist. Parse the user's deal description and extract structured loan parameters. Return ONLY a valid JSON object with these exact fields (use empty string "" if not mentioned):
+{
+  "ownershipStatus": "Acquisition" or "Refinance",
+  "dealType": one of ["Construction", "Value add", "New Development", "Bridge", "Takeout", "Investment", "C&I"],
+  "assetType": one of ["Apartments", "Condos", "Senior Housing", "Student Housing", "Gaming", "Office", "Medical Office", "Manufacturing", "Mixed Use", "Lt Industrial", "Cannabis", "Retail - Multi Tenant", "Retail - Single Tenant", "Hotel/Hospitality", "Land", "Self-storage", "Other"],
+  "loanAmount": dollar amount as string like "$15,000,000",
+  "propertyValue": dollar amount as string like "$20,000,000",
+  "selectedStates": array of 2-letter state codes like ["FL", "TX"],
+  "recourseType": "FULL" or "NON RECOURSE" or "CASE BY CASE",
+  "dscr": number as string like "1.25",
+  "numUnits": number as string if mentioned,
+  "numBuildings": number as string if mentioned
+}
+Only return the JSON. No explanation. No markdown. No backticks.`;
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [{ role: "user", content: `Parse this deal: ${description}. Capital type context: ${capitalTypeHint}` }],
+      }),
+    });
+    const data = await response.json();
+    const text = data.content?.[0]?.text || "{}";
+    const clean = text.replace(/```json|```/g, "").trim();
+    return JSON.parse(clean);
+  } catch {
+    return {};
+  }
+}
+
 // ─── StatCard ─────────────────────────────────────────────────────────────────
 
 function StatCard({ title, value, detail, icon: Icon }: { title: string; value: string; detail: string; icon: any }) {
@@ -159,9 +186,7 @@ function StatCard({ title, value, detail, icon: Icon }: { title: string; value: 
 // ─── CheckboxGroup ────────────────────────────────────────────────────────────
 
 function CheckboxGroup({ label, options, selected, onChange }: { label: string; options: string[]; selected: string[]; onChange: (v: string[]) => void; }) {
-  function toggle(opt: string) {
-    onChange(selected.includes(opt) ? selected.filter((x) => x !== opt) : [...selected, opt]);
-  }
+  function toggle(opt: string) { onChange(selected.includes(opt) ? selected.filter((x) => x !== opt) : [...selected, opt]); }
   return (
     <div>
       <label className="text-xs text-gray-500 mb-2 block font-bold uppercase tracking-wide">{label}</label>
@@ -169,7 +194,7 @@ function CheckboxGroup({ label, options, selected, onChange }: { label: string; 
         {options.map((opt) => (
           <label key={opt} className="flex items-center gap-2 text-xs cursor-pointer group">
             <input type="checkbox" checked={selected.includes(opt)} onChange={() => toggle(opt)} className="accent-[#0a1f44] w-3.5 h-3.5" />
-            <span className={`${selected.includes(opt) ? "text-[#0a1f44] font-semibold" : "text-gray-600"} group-hover:text-[#0a1f44] transition-colors`}>{opt}</span>
+            <span className={`${selected.includes(opt) ? "text-[#0a1f44] font-semibold" : "text-gray-600"}`}>{opt}</span>
           </label>
         ))}
       </div>
@@ -212,9 +237,7 @@ function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTr
   });
 
   function upd(field: keyof NewLenderForm, value: any) { setForm((prev) => ({ ...prev, [field]: value })); }
-  function toggleMatchMode(field: string) {
-    setMatchMode((prev) => ({ ...prev, [field]: prev[field] === "manual" ? "spreadsheet" : "manual" }));
-  }
+  function toggleMatchMode(field: string) { setMatchMode((prev) => ({ ...prev, [field]: prev[field] === "manual" ? "spreadsheet" : "manual" })); }
 
   const spreadsheetSuggestions: Record<string, string[]> = {
     programName: [...new Set(existingLenders.map((l) => l.program))],
@@ -224,17 +247,9 @@ function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTr
     website: [...new Set(existingLenders.map((l) => l.website || "").filter(Boolean))],
   };
 
-  function handleSave() {
-    if (!form.programName.trim()) return;
-    onSave(form);
-  }
-
   const matchableFields: [keyof NewLenderForm, string][] = [
-    ["programName", "Program Name (Lender)"],
-    ["contactPerson", "Contact Person"],
-    ["email", "Email Address"],
-    ["phone", "Phone Number"],
-    ["website", "Website"],
+    ["programName", "Program Name (Lender)"], ["contactPerson", "Contact Person"],
+    ["email", "Email Address"], ["phone", "Phone Number"], ["website", "Website"],
   ];
 
   return (
@@ -243,15 +258,12 @@ function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTr
         <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">New Entry</div>
         <h2 className="font-display text-3xl font-bold text-[#0a1f44] mb-2">Add Lender</h2>
         <p className="text-sm text-gray-500 mb-8">Fill in lender details manually or match from your spreadsheet data.</p>
-
         <div className="space-y-6">
-
-          {/* Matchable fields */}
           <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-5">
             <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-4">Lender Information</div>
             <div className="grid gap-4 md:grid-cols-2">
               {matchableFields.map(([field, label]) => (
-                <div key={field}>
+                <div key={String(field)}>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-xs text-gray-500 font-bold uppercase tracking-wide">{label}</label>
                     <button type="button" onClick={() => toggleMatchMode(String(field))} className={`text-xs px-2 py-0.5 rounded-full border transition-all ${matchMode[String(field)] === "spreadsheet" ? "bg-[#0a1f44] text-white border-[#0a1f44]" : "bg-white text-gray-500 border-gray-200 hover:border-[#0a1f44]/30"}`}>
@@ -260,10 +272,8 @@ function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTr
                   </div>
                   {matchMode[String(field)] === "spreadsheet" ? (
                     <Select value={String(form[field])} onValueChange={(v) => upd(field, v)}>
-                      <SelectTrigger className={selectTriggerClass}><SelectValue placeholder={`Select from spreadsheet...`} /></SelectTrigger>
-                      <SelectContent>
-                        {(spreadsheetSuggestions[String(field)] || []).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                      </SelectContent>
+                      <SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Select from spreadsheet..." /></SelectTrigger>
+                      <SelectContent>{(spreadsheetSuggestions[String(field)] || []).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                     </Select>
                   ) : (
                     <Input value={String(form[field])} onChange={(e) => upd(field, e.target.value)} placeholder={`Enter ${label.toLowerCase()}`} className={inputClass} />
@@ -272,62 +282,28 @@ function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTr
               ))}
             </div>
           </div>
-
-          {/* Capital & Status */}
           <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Capital Type</label>
-              <Select value={form.capitalType} onValueChange={(v) => upd("capitalType", v)}>
-                <SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger>
-                <SelectContent>{capitalTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Recourse</label>
-              <Select value={form.recourse} onValueChange={(v) => upd("recourse", v)}>
-                <SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger>
-                <SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Status</label>
-              <Select value={form.status} onValueChange={(v) => upd("status", v)}>
-                <SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent>
-              </Select>
-            </div>
+            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Capital Type</label><Select value={form.capitalType} onValueChange={(v) => upd("capitalType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{capitalTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Recourse</label><Select value={form.recourse} onValueChange={(v) => upd("recourse", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+            <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Status</label><Select value={form.status} onValueChange={(v) => upd("status", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent></Select></div>
           </div>
-
-          {/* Loan sizing */}
           <div className="grid gap-4 md:grid-cols-3">
             <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Minimum Loan Size</label><Input value={form.minLoan} onChange={(e) => upd("minLoan", formatCurrencyInput(e.target.value))} placeholder="$1,000,000" className={inputClass} /></div>
             <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Maximum Loan Size</label><Input value={form.maxLoan} onChange={(e) => upd("maxLoan", formatCurrencyInput(e.target.value))} placeholder="$25,000,000" className={inputClass} /></div>
             <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Max LTV</label><Input value={form.maxLtv} onChange={(e) => upd("maxLtv", e.target.value)} placeholder="75%" className={inputClass} /></div>
           </div>
-
-          {/* Property types & loan terms */}
           <div className="grid gap-4 md:grid-cols-2">
             <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Property Types</label><Input value={form.propertyTypes} onChange={(e) => upd("propertyTypes", e.target.value)} placeholder="e.g. Apartments, Office, Retail" className={inputClass} /></div>
             <div><label className="text-xs text-gray-500 mb-1.5 block font-bold uppercase">Loan Terms</label><Input value={form.loanTerms} onChange={(e) => upd("loanTerms", e.target.value)} placeholder="e.g. 12-36 months, 5-year fixed" className={inputClass} /></div>
           </div>
-
-          {/* Type of Loans checkboxes */}
           <CheckboxGroup label="Type of Loans" options={typeOfLoanOptions} selected={form.typeOfLoans} onChange={(v) => upd("typeOfLoans", v)} />
-
-          {/* Program checkboxes */}
           <CheckboxGroup label="Program" options={programTypeOptions} selected={form.programTypes} onChange={(v) => upd("programTypes", v)} />
-
-          {/* Target States */}
           <StateSelector label="Target States" selected={form.targetStates} onChange={(v) => upd("targetStates", v)} />
-
-          {/* Sponsor States */}
           <StateSelector label="Sponsor States" selected={form.sponsorStates} onChange={(v) => upd("sponsorStates", v)} />
-
-          {/* Actions */}
           <div className="flex gap-3 pt-4 border-t border-gray-100">
-            <button onClick={handleSave} className="px-6 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all">Save Lender</button>
-            <button onClick={() => setForm(blankLenderForm())} className="px-4 py-2.5 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50 transition-all">Reset Form</button>
-            <button onClick={onCancel} className="px-4 py-2.5 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50 transition-all">Cancel</button>
+            <button onClick={() => { if (!form.programName.trim()) return; onSave(form); }} className="px-6 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Save Lender</button>
+            <button onClick={() => setForm(blankLenderForm())} className="px-4 py-2.5 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">Reset Form</button>
+            <button onClick={onCancel} className="px-4 py-2.5 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">Cancel</button>
           </div>
         </div>
       </div>
@@ -429,19 +405,44 @@ export default function Home() {
   const [editingLenderId, setEditingLenderId] = useState<number | null>(null);
   const [tenantDatabase, setTenantDatabase] = useState<string[]>([]);
 
+  // AI prompt state
+  const [aiDescription, setAiDescription] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiParsed, setAiParsed] = useState(false);
+  const [aiError, setAiError] = useState("");
+
   // Matcher state
-  const [matcherStep, setMatcherStep] = useState<"start" | "asset-count" | "asset-form" | "review" | "results">("start");
+  const [matcherStep, setMatcherStep] = useState<"ai-prompt" | "start" | "asset-count" | "asset-form" | "review" | "results">("ai-prompt");
   const [marketScope, setMarketScope] = useState("US");
   const [capitalType, setCapitalType] = useState("Senior");
-  const [assetMode, setAssetMode] = useState<"single" | "multiple" | "">(""); 
+  const [assetMode, setAssetMode] = useState<"single" | "multiple" | "">("single");
   const [assetCount, setAssetCount] = useState("2");
   const [collateralMode, setCollateralMode] = useState<"crossed" | "separate" | "">(""); 
   const [assets, setAssets] = useState<AssetData[]>([blankAsset(1)]);
   const [currentAssetIndex, setCurrentAssetIndex] = useState(0);
-  const [reviewEditIndex, setReviewEditIndex] = useState<number | null>(null);
 
   function addTenant(name: string) { setTenantDatabase((prev) => prev.includes(name) ? prev : [...prev, name]); }
   function updateAsset(updated: AssetData) { setAssets((prev) => prev.map((a) => a.id === updated.id ? updated : a)); }
+
+  async function handleAiSubmit() {
+    if (!aiDescription.trim()) return;
+    setAiLoading(true);
+    setAiError("");
+    try {
+      const parsed = await parseDeadWithAI(aiDescription, capitalType);
+      if (Object.keys(parsed).length === 0) {
+        setAiError("Couldn't parse the deal. Try being more specific or use manual entry.");
+      } else {
+        setAssets([{ ...blankAsset(1), ...parsed }]);
+        setAiParsed(true);
+        setAssetMode("single");
+        setMatcherStep("asset-form");
+      }
+    } catch {
+      setAiError("Something went wrong. Please try again or use manual entry.");
+    }
+    setAiLoading(false);
+  }
 
   function handleAssetModeSelect(mode: "single" | "multiple") {
     setAssetMode(mode);
@@ -467,8 +468,9 @@ export default function Home() {
   }
 
   function resetMatcher() {
-    setMatcherStep("start"); setAssetMode(""); setCollateralMode("");
-    setAssets([blankAsset(1)]); setCurrentAssetIndex(0); setReviewEditIndex(null);
+    setMatcherStep("ai-prompt"); setAssetMode("single"); setCollateralMode("");
+    setAssets([blankAsset(1)]); setCurrentAssetIndex(0);
+    setAiDescription(""); setAiParsed(false); setAiError("");
   }
 
   function handleSaveLender(form: NewLenderForm) {
@@ -508,7 +510,7 @@ export default function Home() {
         if (l.type === capitalType) score += 20;
         if (allSelectedStates.some((s) => l.states.includes(s)) || l.states.includes("Nationwide")) score += 15;
         if (nr === primaryAsset.recourseType || nr === "CASE BY CASE") score += 10;
-        return { ...l, score, nr, label: "Combined Portfolio" };
+        return { ...l, score, nr };
       }).filter((l) => l.score > 30).sort((a, b) => b.score - a.score).slice(0, 4);
     } else {
       return assets.flatMap((asset) => {
@@ -520,7 +522,7 @@ export default function Home() {
           if (l.type === capitalType) score += 20;
           if (asset.selectedStates.some((s) => l.states.includes(s)) || l.states.includes("Nationwide")) score += 15;
           if (nr === asset.recourseType || nr === "CASE BY CASE") score += 10;
-          return { ...l, score, nr, label: `Asset ${asset.id} — ${asset.assetType}`, assetId: asset.id };
+          return { ...l, score, nr, assetId: asset.id };
         }).filter((l) => l.score > 30).sort((a, b) => b.score - a.score).slice(0, 3);
       });
     }
@@ -657,9 +659,7 @@ export default function Home() {
                       <h2 className="font-display text-2xl font-bold text-[#0a1f44]">Lender Programs</h2>
                       <p className="text-xs text-gray-500 mt-0.5">Edit, deactivate, filter, and review lender records.</p>
                     </div>
-                    <button onClick={() => setActiveTab("add-lender")} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all">
-                      <Plus className="h-4 w-4" /> Add Lender
-                    </button>
+                    <button onClick={() => setActiveTab("add-lender")} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all"><Plus className="h-4 w-4" /> Add Lender</button>
                   </div>
                   <div className="grid gap-3 md:grid-cols-4 mb-4">
                     <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." className="w-full pl-9 px-3 py-2 text-sm bg-white border border-gray-300 rounded-xl text-gray-800 focus:outline-none focus:border-[#0a1f44]" /></div>
@@ -668,9 +668,7 @@ export default function Home() {
                     <Select value={selectedStatusFilter} onValueChange={setSelectedStatusFilter}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="All">All Statuses</SelectItem><SelectItem value="Active">Active</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent></Select>
                   </div>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {[`Spreadsheet: ${spreadsheetCount}`, `Dashboard: ${dashboardCount}`, `Showing: ${filteredLenders.length}`].map((t) => (
-                      <span key={t} className="px-3 py-1 rounded-full text-xs border border-[#c9a84c]/30 text-[#c9a84c] font-bold">{t}</span>
-                    ))}
+                    {[`Spreadsheet: ${spreadsheetCount}`, `Dashboard: ${dashboardCount}`, `Showing: ${filteredLenders.length}`].map((t) => (<span key={t} className="px-3 py-1 rounded-full text-xs border border-[#c9a84c]/30 text-[#c9a84c] font-bold">{t}</span>))}
                   </div>
                   <div className="overflow-hidden rounded-xl border border-gray-200">
                     <Table>
@@ -695,8 +693,6 @@ export default function Home() {
                       </TableBody>
                     </Table>
                   </div>
-
-                  {/* Inline edit panel */}
                   {editingLenderId && (() => {
                     const lender = lenderRecords.find((l) => l.id === editingLenderId);
                     if (!lender) return null;
@@ -718,27 +714,21 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Add Lender Page */}
+              {/* Add Lender */}
               {activeTab === "add-lender" && (
-                <AddLenderPage
-                  onSave={handleSaveLender}
-                  onCancel={() => setActiveTab("lenders")}
-                  existingLenders={lenderRecords}
-                  inputClass={inputClass}
-                  selectTriggerClass={selectTriggerClass}
-                />
+                <AddLenderPage onSave={handleSaveLender} onCancel={() => setActiveTab("lenders")} existingLenders={lenderRecords} inputClass={inputClass} selectTriggerClass={selectTriggerClass} />
               )}
 
               {/* Deal Matcher */}
               {activeTab === "matcher" && (
                 <div>
-                  {matcherStep !== "start" && (
+                  {matcherStep !== "ai-prompt" && (
                     <div className="flex items-center gap-2 mb-6">
-                      {["Setup", assetMode === "multiple" ? "Asset Count" : null, "Asset Details", "Review", "Results"].filter(Boolean).map((step, idx, arr) => (
+                      {["AI Search", "Setup", assetMode === "multiple" ? "Asset Count" : null, "Asset Details", "Review", "Results"].filter(Boolean).map((step, idx, arr) => (
                         <React.Fragment key={String(step)}>
                           <div className="flex items-center gap-1.5">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx < arr.indexOf(matcherStep === "asset-count" ? "Asset Count" : matcherStep === "asset-form" ? "Asset Details" : matcherStep === "review" ? "Review" : "Results") ? "bg-[#0a1f44] text-white" : "bg-gray-200 text-gray-500"}`}>{idx + 1}</div>
-                            <span className="text-xs text-gray-500 font-medium">{step}</span>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx <= ["AI Search", "Setup", assetMode === "multiple" ? "Asset Count" : null, "Asset Details", "Review", "Results"].filter(Boolean).indexOf(matcherStep === "ai-prompt" ? "AI Search" : matcherStep === "start" ? "Setup" : matcherStep === "asset-count" ? "Asset Count" : matcherStep === "asset-form" ? "Asset Details" : matcherStep === "review" ? "Review" : "Results") ? "bg-[#0a1f44] text-white" : "bg-gray-200 text-gray-500"}`}>{idx + 1}</div>
+                            <span className="text-xs text-gray-500 font-medium hidden sm:block">{step}</span>
                           </div>
                           {idx < arr.length - 1 && <ChevronRight className="h-3 w-3 text-gray-300" />}
                         </React.Fragment>
@@ -747,7 +737,83 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Step 1: Start */}
+                  {/* ── AI Prompt Step ── */}
+                  {matcherStep === "ai-prompt" && (
+                    <div className="max-w-2xl">
+                      <div className={cardClass + " p-8"}>
+                        {/* AI Search */}
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-10 h-10 rounded-xl bg-[#0a1f44] flex items-center justify-center"><Sparkles className="h-5 w-5 text-[#c9a84c]" /></div>
+                          <div>
+                            <div className="text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">AI-Powered</div>
+                            <h2 className="font-display text-3xl font-bold text-[#0a1f44]">Describe Your Deal</h2>
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-500 mb-6">Tell us about your deal in plain English and our AI will find the best matching lenders instantly.</p>
+
+                        {/* Capital type first */}
+                        <div className="mb-5">
+                          <label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Capital Type</label>
+                          <Select value={capitalType} onValueChange={setCapitalType}>
+                            <SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger>
+                            <SelectContent>{capitalTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* AI text box */}
+                        <div className="mb-4">
+                          <label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Describe Your Deal</label>
+                          <textarea
+                            value={aiDescription}
+                            onChange={(e) => setAiDescription(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) handleAiSubmit(); }}
+                            placeholder={`e.g. "I need a bridge loan for a 150-unit apartment complex in Miami, FL. Purchase price is $28M, looking for $18M in senior financing at 65% LTV. Value-add deal, non-recourse preferred."`}
+                            rows={4}
+                            className="w-full px-4 py-3 text-sm bg-white border border-gray-300 rounded-xl text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#0a1f44] resize-none"
+                          />
+                          <div className="text-xs text-gray-400 mt-1">Press Cmd+Enter to submit</div>
+                        </div>
+
+                        {aiError && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{aiError}</div>}
+
+                        <div className="flex gap-3">
+                          <button onClick={handleAiSubmit} disabled={aiLoading || !aiDescription.trim()} className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+                            {aiLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing deal...</> : <><Sparkles className="h-4 w-4" /> Find Matching Lenders</>}
+                          </button>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="flex items-center gap-4 my-6">
+                          <div className="flex-1 h-px bg-gray-200" />
+                          <span className="text-xs text-gray-400 font-medium">or</span>
+                          <div className="flex-1 h-px bg-gray-200" />
+                        </div>
+
+                        {/* Manual entry option */}
+                        <button onClick={() => setMatcherStep("start")} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium border-2 border-dashed border-gray-300 text-gray-500 rounded-xl hover:border-[#0a1f44]/30 hover:text-[#0a1f44] transition-all">
+                          <Edit2 className="h-4 w-4" /> Enter deal parameters manually
+                        </button>
+
+                        {/* Example prompts */}
+                        <div className="mt-6">
+                          <div className="text-xs text-gray-400 font-medium mb-3">Example searches:</div>
+                          <div className="space-y-2">
+                            {[
+                              "Bridge loan for 200-unit apartments in Florida, $15M, 70% LTV",
+                              "Construction financing for mixed-use development in New York, $40M",
+                              "Refinance retail center in Texas, $8M, cash-out, non-recourse",
+                            ].map((ex) => (
+                              <button key={ex} onClick={() => setAiDescription(ex)} className="w-full text-left px-3 py-2 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg hover:bg-[#0a1f44]/5 hover:border-[#0a1f44]/20 hover:text-[#0a1f44] transition-all">
+                                "{ex}"
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Setup Step ── */}
                   {matcherStep === "start" && (
                     <div className="max-w-2xl">
                       <div className={cardClass + " p-8"}>
@@ -763,7 +829,7 @@ export default function Home() {
                         ) : (
                           <div>
                             <label className="text-xs text-gray-500 mb-3 block font-bold uppercase">Is this one asset or multiple assets?</label>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-3 mb-5">
                               <button onClick={() => handleAssetModeSelect("single")} className={`p-4 rounded-xl border-2 text-left transition-all ${assetMode === "single" ? "border-[#0a1f44] bg-[#0a1f44]/5" : "border-gray-200 hover:border-[#0a1f44]/30"}`}>
                                 <div className="text-sm font-bold text-[#0a1f44]">Single Asset</div>
                                 <div className="text-xs text-gray-500 mt-1">One property or collateral</div>
@@ -773,13 +839,16 @@ export default function Home() {
                                 <div className="text-xs text-gray-500 mt-1">Portfolio or pool of assets</div>
                               </button>
                             </div>
+                            <button onClick={() => setMatcherStep("ai-prompt")} className="flex items-center gap-2 text-xs text-[#c9a84c] font-medium hover:underline">
+                              <Sparkles className="h-3.5 w-3.5" /> Switch to AI search instead
+                            </button>
                           </div>
                         )}
                       </div>
                     </div>
                   )}
 
-                  {/* Step 2: Asset count */}
+                  {/* ── Asset Count ── */}
                   {matcherStep === "asset-count" && (
                     <div className="max-w-2xl">
                       <div className={cardClass + " p-8"}>
@@ -796,24 +865,38 @@ export default function Home() {
                           </div>
                           <div className="flex gap-3">
                             <button onClick={() => setMatcherStep("start")} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Previous</button>
-                            <button onClick={handleAssetCountConfirm} disabled={!collateralMode} className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 disabled:opacity-40 disabled:cursor-not-allowed">Continue to Asset Details <ChevronRight className="h-4 w-4" /></button>
+                            <button onClick={handleAssetCountConfirm} disabled={!collateralMode} className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 disabled:opacity-40 disabled:cursor-not-allowed">Continue <ChevronRight className="h-4 w-4" /></button>
                           </div>
                         </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Step 3: Asset form */}
+                  {/* ── Asset Form ── */}
                   {matcherStep === "asset-form" && (
                     <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
                       <div className={cardClass + " p-6"}>
-                        <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center justify-between mb-4">
                           <div>
                             <div className="text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold mb-1">{assets.length > 1 ? `Asset ${currentAssetIndex + 1} of ${assets.length}` : "Asset Details"}</div>
-                            <h2 className="font-display text-2xl font-bold text-[#0a1f44]">{assets.length > 1 ? `Enter details for Asset ${currentAssetIndex + 1}` : "Enter deal details"}</h2>
+                            <h2 className="font-display text-2xl font-bold text-[#0a1f44]">{assets.length > 1 ? `Asset ${currentAssetIndex + 1}` : "Deal Details"}</h2>
                           </div>
-                          {assets.length > 1 && (<div className="flex gap-1">{assets.map((_, idx) => (<div key={idx} className={`w-2 h-2 rounded-full ${idx === currentAssetIndex ? "bg-[#0a1f44]" : idx < currentAssetIndex ? "bg-[#c9a84c]" : "bg-gray-300"}`} />))}</div>)}
+                          <div className="flex items-center gap-3">
+                            {aiParsed && (
+                              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#c9a84c]/10 border border-[#c9a84c]/20">
+                                <Sparkles className="h-3 w-3 text-[#c9a84c]" />
+                                <span className="text-xs font-semibold text-[#0a1f44]">AI-filled</span>
+                              </div>
+                            )}
+                            {assets.length > 1 && (<div className="flex gap-1">{assets.map((_, idx) => (<div key={idx} className={`w-2 h-2 rounded-full ${idx === currentAssetIndex ? "bg-[#0a1f44]" : idx < currentAssetIndex ? "bg-[#c9a84c]" : "bg-gray-300"}`} />))}</div>)}
+                          </div>
                         </div>
+                        {aiParsed && (
+                          <div className="mb-4 rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 px-4 py-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-[#c9a84c]" /><span className="text-xs text-gray-600">Parameters filled by AI from your description. Review and edit any field below.</span></div>
+                            <button onClick={() => setAiParsed(false)} className="text-xs text-gray-400 hover:text-gray-600 underline">Dismiss</button>
+                          </div>
+                        )}
                         <AssetForm asset={assets[currentAssetIndex]} capitalType={capitalType} onUpdate={updateAsset} tenantDatabase={tenantDatabase} onTenantAdd={addTenant} inputClass={inputClass} selectTriggerClass={selectTriggerClass} />
                         <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
                           <button onClick={handlePrevAsset} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Previous</button>
@@ -837,19 +920,18 @@ export default function Home() {
                               </div>
                             ))}
                           </div>
-                          {collateralMode && (<div className="mt-4 rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-3"><div className="text-xs font-bold text-[#0a1f44] mb-1">Treatment</div><div className="text-xs text-gray-500">{collateralMode === "crossed" ? "Crossed Collateral — assets combined" : "Treated Separately — individual matching"}</div></div>)}
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* Step 4: Review */}
+                  {/* ── Review ── */}
                   {matcherStep === "review" && (
                     <div className="max-w-4xl">
                       <div className={cardClass + " p-8"}>
                         <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Final Review</div>
                         <h2 className="font-display text-3xl font-bold text-[#0a1f44] mb-2">Review & Confirm</h2>
-                        <p className="text-sm text-gray-500 mb-8">Review all assets below. Click Edit on any asset to make changes, then run the match.</p>
+                        <p className="text-sm text-gray-500 mb-8">Review all assets. Click Edit to make changes, then run the match.</p>
                         <div className="grid gap-4 md:grid-cols-2 mb-8">
                           {assets.map((asset, idx) => {
                             const m = calcMetrics(asset, capitalType);
@@ -869,7 +951,7 @@ export default function Home() {
                           })}
                         </div>
                         <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4 mb-6 flex items-center justify-between">
-                          <div><div className="text-sm font-bold text-[#0a1f44]">{assets.length} asset{assets.length > 1 ? "s" : ""} · {capitalType}</div><div className="text-xs text-gray-500 mt-0.5">{collateralMode === "crossed" ? "Crossed Collateral — matching as combined portfolio" : collateralMode === "separate" ? "Treated Separately — individual lender results per asset" : "Single asset"}</div></div>
+                          <div><div className="text-sm font-bold text-[#0a1f44]">{assets.length} asset{assets.length > 1 ? "s" : ""} · {capitalType}</div><div className="text-xs text-gray-500 mt-0.5">{collateralMode === "crossed" ? "Crossed Collateral" : collateralMode === "separate" ? "Treated Separately" : "Single asset"}</div></div>
                           <CheckCircle className="h-5 w-5 text-emerald-500" />
                         </div>
                         <div className="flex gap-3">
@@ -880,22 +962,22 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Step 5: Results */}
+                  {/* ── Results ── */}
                   {matcherStep === "results" && (
                     <div>
                       <div className="flex items-center justify-between mb-6">
                         <div>
                           <div className="text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold mb-1">Match Results</div>
                           <h2 className="font-display text-3xl font-bold text-[#0a1f44]">Ranked Output</h2>
-                          <p className="text-sm text-gray-500 mt-1">{collateralMode === "crossed" ? "Combined portfolio matching" : collateralMode === "separate" ? "Individual asset matching" : "Single asset matching"}</p>
+                          <p className="text-sm text-gray-500 mt-1">{collateralMode === "crossed" ? "Combined portfolio" : collateralMode === "separate" ? "Individual asset matching" : "Single asset"}</p>
                         </div>
                         <div className="flex gap-3">
-                          <button onClick={() => setMatcherStep("review")} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Back to Review</button>
+                          <button onClick={() => setMatcherStep("review")} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Back</button>
                           <button onClick={resetMatcher} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">New Deal</button>
                         </div>
                       </div>
                       {matchResults.length === 0 ? (
-                        <div className={cardClass + " p-8 text-center"}><div className="text-lg font-bold text-[#0a1f44] mb-2">No matches found</div><div className="text-sm text-gray-500">Try adjusting your deal criteria or add more lenders to the registry.</div></div>
+                        <div className={cardClass + " p-8 text-center"}><div className="text-lg font-bold text-[#0a1f44] mb-2">No matches found</div><div className="text-sm text-gray-500">Try adjusting your deal criteria or add more lenders.</div></div>
                       ) : collateralMode === "separate" && assetMode === "multiple" ? (
                         assets.map((asset) => {
                           const assetMatches = matchResults.filter((r: any) => r.assetId === asset.id);
@@ -906,7 +988,7 @@ export default function Home() {
                                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                                   {assetMatches.map((match: any) => (
                                     <div key={match.id + "-" + asset.id} className="rounded-xl border border-gray-200 bg-white p-4 hover:border-[#0a1f44]/30 transition-all">
-                                      <div className="flex items-start justify-between gap-2 mb-3"><div><div className="text-sm font-bold text-[#0a1f44]">{match.lender}</div><div className="text-xs text-gray-500 mt-0.5">{match.program}</div></div><div className="text-right flex-shrink-0"><div className="text-xs text-gray-400">Match</div><div className="text-lg font-bold text-[#0a1f44]">{match.score}%</div></div></div>
+                                      <div className="flex items-start justify-between gap-2 mb-3"><div><div className="text-sm font-bold text-[#0a1f44]">{match.lender}</div><div className="text-xs text-gray-500 mt-0.5">{match.program}</div></div><div className="text-right"><div className="text-xs text-gray-400">Match</div><div className="text-lg font-bold text-[#0a1f44]">{match.score}%</div></div></div>
                                       <div className="grid grid-cols-2 gap-2">{[["Capital", match.type], ["Contact", match.email || "—"]].map(([label, val]) => (<div key={String(label)} className="rounded-lg bg-gray-50 border border-gray-100 p-2"><div className="text-xs uppercase text-[#0a1f44] font-bold mb-0.5">{label}</div><div className="text-xs text-gray-600 break-all">{val}</div></div>))}</div>
                                     </div>
                                   ))}
@@ -919,7 +1001,7 @@ export default function Home() {
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                           {matchResults.map((match: any, idx: number) => (
                             <div key={match.id} className="rounded-xl border border-gray-200 bg-white p-5 hover:border-[#0a1f44]/30 transition-all">
-                              <div className="flex items-start justify-between gap-2 mb-4"><div><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">#{idx + 1} Match</div><div className="text-base font-bold text-[#0a1f44]">{match.lender}</div><div className="text-xs text-gray-500 mt-0.5">{match.program}</div></div><div className="text-right flex-shrink-0"><div className="text-xs text-gray-400">Match score</div><div className="text-2xl font-bold text-[#0a1f44]">{match.score}%</div></div></div>
+                              <div className="flex items-start justify-between gap-2 mb-4"><div><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">#{idx + 1} Match</div><div className="text-base font-bold text-[#0a1f44]">{match.lender}</div><div className="text-xs text-gray-500 mt-0.5">{match.program}</div></div><div className="text-right"><div className="text-xs text-gray-400">Score</div><div className="text-2xl font-bold text-[#0a1f44]">{match.score}%</div></div></div>
                               <div className="grid grid-cols-2 gap-2">{[["Capital", match.type], ["Range", `${match.minLoan}–${match.maxLoan}`], ["Recourse", match.nr], ["Contact", match.email || "—"]].map(([label, val]) => (<div key={String(label)} className="rounded-lg bg-gray-50 border border-gray-100 p-2"><div className="text-xs uppercase text-[#0a1f44] font-bold mb-0.5">{label}</div><div className="text-xs text-gray-600 break-all">{val}</div></div>))}</div>
                             </div>
                           ))}
@@ -939,9 +1021,8 @@ export default function Home() {
                     <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 p-10 text-center hover:border-[#0a1f44]/40 transition-all">
                       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-[#0a1f44]/10 border border-[#0a1f44]/20 text-[#0a1f44] mb-4"><Upload className="h-6 w-6" /></div>
                       <div className="text-base font-bold text-[#0a1f44] mb-1">Drop Updated Lender Workbook</div>
-                      <div className="text-sm text-gray-500 mb-2">Supports .xlsx ingestion with automatic field mapping.</div>
-                      <div className="text-xs text-gray-400 mb-5">Detected fields: Program Name, Contact Person, Email, Phone, Website, Type of Loans, Program, Property Types, Loan Terms, Min/Max Loan, Max LTV, Target States, Sponsor States, Recourse</div>
-                      <button className="px-5 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all">Select Spreadsheet</button>
+                      <div className="text-sm text-gray-500 mb-5">Supports .xlsx ingestion with automatic field mapping.</div>
+                      <button className="px-5 py-2.5 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Select Spreadsheet</button>
                     </div>
                   </div>
                   <div className={cardClass + " p-6"}>
@@ -952,7 +1033,7 @@ export default function Home() {
                         <span key={field} className="px-3 py-1 rounded-full text-xs border border-[#0a1f44]/20 text-[#0a1f44] font-medium">{field}</span>
                       ))}
                     </div>
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">All fields above are automatically mapped when a spreadsheet is uploaded. Spreadsheet and dashboard lenders coexist in one database.</div>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">All fields above are automatically mapped when a spreadsheet is uploaded.</div>
                   </div>
                 </div>
               )}
