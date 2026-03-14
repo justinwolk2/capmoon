@@ -244,15 +244,16 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
   const showUnits = unitAssets.includes(asset.assetType);
   const showRetail = retailAssets.includes(asset.assetType);
   const showAcres = asset.assetType === "Land";
+  const netIncome = parseCurrency(asset.currentNetIncome);
+  const propVal = parseCurrency(asset.propertyValue);
+  const capRate = netIncome > 0 && propVal > 0 ? (netIncome / propVal) * 100 : 0;
   const metricBoxes: [string, string][] = [["Senior LTV", formatPercent(m.seniorLtv)]];
   if (m.isAcqNonConst && parseCurrency(asset.purchasePrice) > 0) metricBoxes.push(["Senior LTC", formatPercent(m.seniorLtc)]);
   if (m.isRefinance) metricBoxes.push(["Cash Out", formatCurrencyInput(String(m.cashOut))]);
   metricBoxes.push([m.isSubCap ? "Subordinated LTV - Last Dollar" : "Subordinated Last $ LTV", m.isSubCap ? formatPercent(m.autoLtv) : "N/A"]);
   metricBoxes.push(["Total Capital", formatCurrencyInput(String(m.totalCap || 0))]);
   metricBoxes.push(["Equity %", formatPercent(m.equityPct)]);
-  if (parseCurrency(asset.currentNetIncome) > 0 && parseCurrency(asset.propertyValue) > 0) {
-  metricBoxes.push(["Cap Rate", formatPercent((parseCurrency(asset.currentNetIncome) / parseCurrency(asset.propertyValue)) * 100)]);
-}
+  metricBoxes.push(["Cap Rate", capRate > 0 ? formatPercent(capRate) : "—"]);
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Ownership Status</label><Select value={asset.ownershipStatus} onValueChange={(v) => upd("ownershipStatus", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
