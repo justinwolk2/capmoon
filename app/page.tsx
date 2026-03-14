@@ -623,7 +623,7 @@ export default function Home() {
                       {["Setup", assetMode === "multiple" ? "Asset Count" : null, "Asset Details", "Review", "Results"].filter(Boolean).map((step, idx, arr) => (
                         <React.Fragment key={String(step)}>
                           <div className="flex items-center gap-1.5">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx < arr.indexOf(matcherStep === "start" ? "Setup" : matcherStep === "asset-count" ? "Asset Count" : matcherStep === "asset-form" ? "Asset Details" : matcherStep === "review" ? "Review" : "Results") ? "bg-[#0a1f44] text-white" : "bg-gray-200 text-gray-500"}`}>{idx + 1}</div>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx < arr.indexOf(matcherStep === "asset-count" ? "Asset Count" : matcherStep === "asset-form" ? "Asset Details" : matcherStep === "review" ? "Review" : "Results")? "bg-[#0a1f44] text-white" : "bg-gray-200 text-gray-500"}`}>{idx + 1}</div>
                             <span className="text-xs text-gray-500 font-medium">{step}</span>
                           </div>
                           {idx < arr.length - 1 && <ChevronRight className="h-3 w-3 text-gray-300" />}
