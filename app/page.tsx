@@ -2001,18 +2001,24 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
 
         // Base value for LTV: project cost for project deals, property value otherwise
         const baseValue = isProjectDeal ? totalProjectCost : parseCurrency(isAcq ? prop.purchasePrice : prop.currentValue);
-        const seniorLoan = isProjectDeal ? totalProjectCost : parseCurrency(prop.seniorLoan);
+        // Senior loan is always manually entered now
+        const seniorLoan = parseCurrency(prop.seniorLoan);
 
-        // Last dollar LTV calculations
+        // Last dollar LTV: always divide by totalProjectCost for project deals
+        // Formula: (Senior + Layer1 + Layer2...) / Total Project Cost
+        const ltcBasis = isProjectDeal ? totalProjectCost : baseValue;
         let runningDebt = seniorLoan;
-        const seniorLtv = baseValue > 0 ? (seniorLoan / baseValue) * 100 : 0;
+        const seniorLtv = ltcBasis > 0 ? (seniorLoan / ltcBasis) * 100 : 0;
         const layerLtvs = subLayers.map(layer => {
           runningDebt += parseCurrency(layer.amount);
-          return baseValue > 0 ? (runningDebt / baseValue) * 100 : 0;
+          return ltcBasis > 0 ? (runningDebt / ltcBasis) * 100 : 0;
         });
         const totalDebt = seniorLoan + subLayers.reduce((s, l) => s + parseCurrency(l.amount), 0);
+        // For project deals: stack balances when Senior + Layers + Equity = Total Project Cost
+        // Total Debt = Total Project Cost - Borrower Equity
+        const expectedDebt = isProjectDeal && totalProjectCost > 0 ? totalProjectCost - borrowerEquity : 0;
         const totalStack = totalDebt + borrowerEquity;
-        const stackDiff = baseValue > 0 ? totalStack - baseValue : 0;
+        const stackDiff = ltcBasis > 0 ? totalStack - ltcBasis : 0;
         const stackBalanced = Math.abs(stackDiff) < 1000;
 
         return (
@@ -2119,8 +2125,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                       <Input value={prop.seniorLoan} onChange={(e) => updHybrid("seniorLoan", formatCurrencyInput(e.target.value))} placeholder="$0" className="bg-white border-blue-200 text-gray-800 rounded-xl" />
                       {(() => {
                         const seniorAmt = parseCurrency(prop.seniorLoan);
-                        const basis = isProjectDeal ? totalProjectCost : baseValue;
-                        const pct = basis > 0 && seniorAmt > 0 ? (seniorAmt / basis) * 100 : 0;
+                        const pct = ltcBasis > 0 && seniorAmt > 0 ? (seniorAmt / ltcBasis) * 100 : 0;
                         return pct > 0 ? (
                           <div className="text-xs text-blue-600 mt-1.5 font-semibold">
                             {pct.toFixed(1)}% of {isProjectDeal ? "Total Project Cost" : "Purchase Price"}
@@ -2156,7 +2161,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                         }} placeholder="$0" className="bg-white border-purple-200 text-gray-800 rounded-xl" />
                         {layerLtvs[lidx] > 0 && (
                           <div className="text-xs text-purple-600 mt-1.5 font-semibold">
-                            Last Dollar LTV (thru {layer.type}): {layerLtvs[lidx].toFixed(1)}%
+                            Last Dollar LTV: {layerLtvs[lidx].toFixed(1)}% of {isProjectDeal ? "Total Project Cost" : "Purchase Price"}
                           </div>
                         )}
                       </div>
@@ -2173,16 +2178,40 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                       + Add Another Subordinate Layer
                     </button>
 
-                    {/* Borrower equity */}
+                    {/* Borrower equity — auto-suggested as Total Project Cost - Total Debt */}
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
                       <label className="text-xs text-emerald-700 mb-1 block font-bold uppercase">Borrower Equity / Cash</label>
-                      <Input value={prop.borrowerEquity} onChange={(e) => updHybrid("borrowerEquity", formatCurrencyInput(e.target.value))} placeholder="$0" className="bg-white border-emerald-200 text-gray-800 rounded-xl" />
+                      {(() => {
+                        const seniorAmt = parseCurrency(prop.seniorLoan);
+                        const layersTotal = subLayers.reduce((s, l) => s + parseCurrency(l.amount), 0);
+                        const currentDebt = seniorAmt + layersTotal;
+                        const suggestedEquity = ltcBasis > 0 && currentDebt < ltcBasis ? ltcBasis - currentDebt : 0;
+                        return (
+                          <>
+                            <Input
+                              value={prop.borrowerEquity}
+                              onChange={(e) => updHybrid("borrowerEquity", formatCurrencyInput(e.target.value))}
+                              placeholder={suggestedEquity > 0 ? `Suggested: ${formatCurrencyInput(String(suggestedEquity))}` : "$0"}
+                              className="bg-white border-emerald-200 text-gray-800 rounded-xl"
+                            />
+                            {suggestedEquity > 0 && !prop.borrowerEquity && (
+                              <button
+                                type="button"
+                                onClick={() => updHybrid("borrowerEquity", formatCurrencyInput(String(suggestedEquity)))}
+                                className="mt-2 text-xs text-emerald-700 font-semibold hover:underline"
+                              >
+                                Use suggested: {formatCurrencyInput(String(suggestedEquity))}
+                              </button>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {/* Stack summary */}
                     {(baseValue > 0 || totalProjectCost > 0) && (() => {
                       const seniorAmt = parseCurrency(prop.seniorLoan);
-                      const basis = isProjectDeal ? totalProjectCost : baseValue;
+                      const basis = ltcBasis;
                       const seniorPct = basis > 0 && seniorAmt > 0 ? (seniorAmt / basis) * 100 : 0;
                       let rd = seniorAmt;
                       const layerPcts = subLayers.map(layer => {
@@ -2191,26 +2220,47 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                       });
                       const td = seniorAmt + subLayers.reduce((s, l) => s + parseCurrency(l.amount), 0);
                       const eq = parseCurrency(prop.borrowerEquity);
-                      const totalStack = td + eq;
-                      const diff = basis > 0 ? totalStack - basis : 0;
+                      const totalStackAmt = td + eq;
+                      const diff = basis > 0 ? totalStackAmt - basis : 0;
                       const balanced = Math.abs(diff) < 1000;
+                      // For project deals: expected debt = total project cost - equity
+                      const expectedTotalDebt = isProjectDeal && basis > 0 ? basis - eq : 0;
                       return (
                         <div className={`rounded-xl border p-4 ${balanced ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
-                          <div className={`text-xs font-bold uppercase tracking-wide mb-3 ${balanced ? "text-emerald-700" : "text-amber-700"}`}>
-                            {balanced ? "✓ Stack Balances" : `Gap: ${formatCurrencyInput(String(Math.abs(diff)))} ${diff > 0 ? "over" : "under"}`}
-                          </div>
+                          <div className="text-xs font-bold uppercase tracking-wide mb-3 text-gray-600">Stack Summary</div>
                           <div className="space-y-1">
-                            {isProjectDeal && <div className="flex justify-between text-xs font-semibold"><span className="text-gray-600">Total Project Cost</span><span className="text-[#0a1f44]">{formatCurrencyInput(String(totalProjectCost))}</span></div>}
+                            {isProjectDeal && <div className="flex justify-between text-xs font-semibold border-b border-gray-200 pb-1 mb-1"><span className="text-gray-600">Total Project Cost</span><span className="text-[#0a1f44]">{formatCurrencyInput(String(totalProjectCost))}</span></div>}
                             {!isProjectDeal && <div className="flex justify-between text-xs"><span className="text-gray-500">{isAcq ? "Purchase Price" : "Property Value"}</span><span className="font-bold text-[#0a1f44]">{formatCurrencyInput(String(basis))}</span></div>}
-                            <div className="flex justify-between text-xs"><span className="text-blue-600">Senior {seniorPct > 0 ? `(${seniorPct.toFixed(1)}%)` : ""}</span><span className="font-bold text-[#0a1f44]">{prop.seniorLoan || "—"}</span></div>
+                            <div className="flex justify-between text-xs"><span className="text-blue-600">Senior {seniorPct > 0 ? `(${seniorPct.toFixed(1)}% of cost)` : ""}</span><span className="font-bold text-[#0a1f44]">{prop.seniorLoan || "—"}</span></div>
                             {subLayers.map((layer, lidx) => (
                               <div key={layer.id} className="flex justify-between text-xs">
-                                <span className="text-purple-600">{layer.type} {layerPcts[lidx] > 0 ? `(${layerPcts[lidx].toFixed(1)}% last $)` : ""}</span>
+                                <span className="text-purple-600">{layer.type} {layerPcts[lidx] > 0 ? `(${layerPcts[lidx].toFixed(1)}% last $ of cost)` : ""}</span>
                                 <span className="font-bold text-[#0a1f44]">{layer.amount || "—"}</span>
                               </div>
                             ))}
-                            <div className="flex justify-between text-xs"><span className="text-emerald-600">Borrower Equity</span><span className="font-bold text-[#0a1f44]">{prop.borrowerEquity || "—"}</span></div>
-                            <div className="flex justify-between text-xs pt-1 border-t border-gray-200 mt-1"><span className="font-semibold text-gray-600">Total Debt</span><span className="font-bold text-[#0a1f44]">{formatCurrencyInput(String(td))}</span></div>
+                            {isProjectDeal && eq > 0 && (
+                              <div className="flex justify-between text-xs text-emerald-700">
+                                <span className="font-medium">Borrower Equity (deducted)</span>
+                                <span className="font-bold">− {formatCurrencyInput(String(eq))}</span>
+                              </div>
+                            )}
+                            {!isProjectDeal && eq > 0 && (
+                              <div className="flex justify-between text-xs"><span className="text-emerald-600">Borrower Equity</span><span className="font-bold text-[#0a1f44]">{prop.borrowerEquity}</span></div>
+                            )}
+                            <div className="flex justify-between text-xs pt-1 border-t border-gray-200 mt-1 font-bold">
+                              <span className="text-gray-700">Total Debt</span>
+                              <span className="text-[#0a1f44]">{formatCurrencyInput(String(td))}</span>
+                            </div>
+                            {/* Gap / Surplus shown directly under Total Debt */}
+                            {!balanced && (
+                              <div className={`flex justify-between text-xs font-bold ${diff > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                <span>{diff > 0 ? "Surplus" : "Gap"}</span>
+                                <span>{formatCurrencyInput(String(Math.abs(diff)))}</span>
+                              </div>
+                            )}
+                            {balanced && (
+                              <div className="text-xs font-bold text-emerald-600 text-center pt-1">✓ Stack Balances</div>
+                            )}
                           </div>
                         </div>
                       );
