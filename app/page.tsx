@@ -3256,7 +3256,7 @@ function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, in
             {submittedDeals.map(d => {
               const asset = d.assets?.[0];
               const isSelected = selectedDealId === d.id;
-              const photo = d.photos?.[0]?.url || null;
+              const photo = null; // photos are uploaded in the memo builder, not stored on the deal
               return (
                 <button
                   key={d.id}
