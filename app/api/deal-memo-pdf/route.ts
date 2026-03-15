@@ -27,9 +27,9 @@ export async function POST(req: NextRequest) {
   .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0a1f44; padding-bottom: 24px; margin-bottom: 32px; }
   .logo-area { display: flex; align-items: center; gap: 12px; }
   .logo-text { font-family: 'Cormorant Garamond', serif; font-size: 28pt; font-weight: 700; color: #0a1f44; }
-  .logo-sub { font-size: 7pt; color: #c9a84c; letter-spacing: 0.3em; text-transform: uppercase; margin-top: 2px; }
+  .logo-sub { font-size: 7pt; color: #0a1f44; letter-spacing: 0.3em; text-transform: uppercase; margin-top: 2px; }
   .header-right { text-align: right; }
-  .memo-label { font-size: 7pt; letter-spacing: 0.3em; text-transform: uppercase; color: #c9a84c; font-weight: 600; }
+  .memo-label { font-size: 7pt; letter-spacing: 0.3em; text-transform: uppercase; color: #0a1f44; font-weight: 600; }
   .memo-date { font-size: 9pt; color: #666; margin-top: 4px; }
   
   /* Title block */
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   
   /* Sections */
   .section { margin-bottom: 28px; }
-  .section-title { font-size: 9pt; font-weight: 600; letter-spacing: 0.25em; text-transform: uppercase; color: #c9a84c; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 12px; }
+  .section-title { font-size: 9pt; font-weight: 600; letter-spacing: 0.25em; text-transform: uppercase; color: #0a1f44; border-bottom: 2px solid #0a1f44; padding-bottom: 6px; margin-bottom: 12px; }
   .section-content { font-size: 9.5pt; color: #333; line-height: 1.7; white-space: pre-wrap; }
   
   /* Advisor */
