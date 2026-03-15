@@ -172,7 +172,7 @@ ${advisorName ? `
         const photo = lower.includes("louis") ? "/louis.jpg" : lower.includes("shuvo") ? "/Shuvo.jpeg" : null;
         return photo
           ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;" />`
-          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:rgba(255,255,255,0.45);">${advisorName.split(" ").map((n) => n[0]).join("").slice(0,2)}</div>`;
+          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:rgba(255,255,255,0.45);">${advisorName.split(" ").map((n: string) => n[0]).join("").slice(0,2)}</div>`;
       })()}
     </div>
     <div>
