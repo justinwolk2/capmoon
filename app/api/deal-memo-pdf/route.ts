@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
       "Market Overview": memoFields.marketOverview,
       "Sponsor / Borrower Profile": memoFields.sponsorProfile,
       "Financial Summary": memoFields.financialSummary,
-      "Lender Match Results": memoFields.lenderMatchResults || `Assigned Advisor: ${memoFields.advisorName || "TBD"}\nAdvisor Email: ${memoFields.advisorEmail || ""}\nAdvisor Phone: ${memoFields.advisorPhone || ""}`,
+      "Lender Match Results": memoFields.lenderMatchResults || "",
     };
     const content = fieldMap[section];
     if (!content) return "";
@@ -164,17 +164,6 @@ export async function POST(req: NextRequest) {
       </div>` : ""}
     </div>`;
   }).join("")}
-
-  <!-- Advisor -->
-  ${memoFields.advisorName ? `
-  <div class="section">
-    <div class="section-title">CapMoon Advisory Team</div>
-    <div class="advisor-box">
-      <div class="advisor-name">${memoFields.advisorName}</div>
-      ${memoFields.advisorEmail ? `<div class="advisor-detail">📧 ${memoFields.advisorEmail}</div>` : ""}
-      ${memoFields.advisorPhone ? `<div class="advisor-detail">📞 ${memoFields.advisorPhone}</div>` : ""}
-    </div>
-  </div>` : ""}
 
   <!-- Footer -->
   <div class="footer">
