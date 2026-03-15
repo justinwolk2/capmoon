@@ -169,7 +169,8 @@ ${advisorName ? `
     <div style="width:58px;height:58px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.2);flex-shrink:0;background:#1a3168;">
       ${(() => {
         const lower = advisorName.toLowerCase();
-        const photo = lower.includes("louis") ? "/louis.jpg" : lower.includes("shuvo") ? "/Shuvo.jpeg" : null;
+        const baseUrl = "https://capmoon.vercel.app";
+        const photo = lower.includes("louis") ? baseUrl + "/louis.jpg" : lower.includes("shuvo") ? baseUrl + "/Shuvo.jpeg" : null;
         return photo
           ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;" />`
           : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:rgba(255,255,255,0.45);">${advisorName.split(" ").map((n: string) => n[0]).join("").slice(0,2)}</div>`;
