@@ -2074,7 +2074,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   <div className="space-y-3">
 
                     {isProjectDeal ? (
-                      /* Project Deal: Purchase Price + Costs → Total Project Cost */
+                      /* Project Deal: Purchase Price + Costs → Total Project Cost → Senior + Sub layers */
                       <div className="space-y-3">
                         <div>
                           <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Price</label>
@@ -2095,14 +2095,15 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                             </div>
                           ))}
                         </div>
-                        {/* Total Project Cost */}
-                        <div className="rounded-xl border-2 border-[#0a1f44]/20 bg-[#0a1f44]/5 p-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">Total Project Cost</span>
-                            <span className="text-lg font-bold text-[#c9a84c]">{totalProjectCost > 0 ? formatCurrencyInput(String(totalProjectCost)) : "—"}</span>
+                        {/* Total Project Cost — standalone, no "senior basis" label */}
+                        {totalProjectCost > 0 && (
+                          <div className="rounded-xl border-2 border-[#0a1f44] bg-[#0a1f44] p-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-[#c9a84c] uppercase tracking-wide">Total Project Cost</span>
+                              <span className="text-xl font-bold text-white">{formatCurrencyInput(String(totalProjectCost))}</span>
+                            </div>
                           </div>
-                          <div className="text-xs text-gray-500 mt-1">This is your senior loan basis</div>
-                        </div>
+                        )}
                       </div>
                     ) : (
                       /* Standard deal: base value input */
@@ -2112,21 +2113,21 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                       </div>
                     )}
 
-                    {/* Senior — shown differently for project deals */}
-                    {!isProjectDeal && (
-                      <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
-                        <label className="text-xs text-blue-700 mb-1 block font-bold uppercase">Senior Loan Amount</label>
-                        <Input value={prop.seniorLoan} onChange={(e) => updHybrid("seniorLoan", formatCurrencyInput(e.target.value))} placeholder="$0" className="bg-white border-blue-200 text-gray-800 rounded-xl" />
-                        {seniorLtv > 0 && <div className="text-xs text-blue-600 mt-1.5 font-semibold">Senior LTV: {seniorLtv.toFixed(1)}%</div>}
-                      </div>
-                    )}
-                    {isProjectDeal && totalProjectCost > 0 && (
-                      <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
-                        <div className="text-xs text-blue-700 font-bold uppercase mb-1">Senior = Total Project Cost</div>
-                        <div className="text-sm font-bold text-blue-800">{formatCurrencyInput(String(totalProjectCost))}</div>
-                        <div className="text-xs text-blue-500 mt-1">Senior represents 100% of project cost basis</div>
-                      </div>
-                    )}
+                    {/* Senior Loan — always manually entered, shows % of project cost or base value */}
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+                      <label className="text-xs text-blue-700 mb-1 block font-bold uppercase">Senior Loan Amount</label>
+                      <Input value={prop.seniorLoan} onChange={(e) => updHybrid("seniorLoan", formatCurrencyInput(e.target.value))} placeholder="$0" className="bg-white border-blue-200 text-gray-800 rounded-xl" />
+                      {(() => {
+                        const seniorAmt = parseCurrency(prop.seniorLoan);
+                        const basis = isProjectDeal ? totalProjectCost : baseValue;
+                        const pct = basis > 0 && seniorAmt > 0 ? (seniorAmt / basis) * 100 : 0;
+                        return pct > 0 ? (
+                          <div className="text-xs text-blue-600 mt-1.5 font-semibold">
+                            {pct.toFixed(1)}% of {isProjectDeal ? "Total Project Cost" : "Purchase Price"}
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
 
                     {/* Sub-capital layers */}
                     {subLayers.map((layer, lidx) => (
@@ -2179,22 +2180,41 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                     </div>
 
                     {/* Stack summary */}
-                    {baseValue > 0 && (
-                      <div className={`rounded-xl border p-4 ${stackBalanced ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
-                        <div className={`text-xs font-bold uppercase tracking-wide mb-3 ${stackBalanced ? "text-emerald-700" : "text-amber-700"}`}>
-                          {stackBalanced ? "✓ Stack Balances" : `Gap: ${formatCurrencyInput(String(Math.abs(stackDiff)))} ${stackDiff > 0 ? "over" : "under"}`}
+                    {(baseValue > 0 || totalProjectCost > 0) && (() => {
+                      const seniorAmt = parseCurrency(prop.seniorLoan);
+                      const basis = isProjectDeal ? totalProjectCost : baseValue;
+                      const seniorPct = basis > 0 && seniorAmt > 0 ? (seniorAmt / basis) * 100 : 0;
+                      let rd = seniorAmt;
+                      const layerPcts = subLayers.map(layer => {
+                        rd += parseCurrency(layer.amount);
+                        return basis > 0 ? (rd / basis) * 100 : 0;
+                      });
+                      const td = seniorAmt + subLayers.reduce((s, l) => s + parseCurrency(l.amount), 0);
+                      const eq = parseCurrency(prop.borrowerEquity);
+                      const totalStack = td + eq;
+                      const diff = basis > 0 ? totalStack - basis : 0;
+                      const balanced = Math.abs(diff) < 1000;
+                      return (
+                        <div className={`rounded-xl border p-4 ${balanced ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+                          <div className={`text-xs font-bold uppercase tracking-wide mb-3 ${balanced ? "text-emerald-700" : "text-amber-700"}`}>
+                            {balanced ? "✓ Stack Balances" : `Gap: ${formatCurrencyInput(String(Math.abs(diff)))} ${diff > 0 ? "over" : "under"}`}
+                          </div>
+                          <div className="space-y-1">
+                            {isProjectDeal && <div className="flex justify-between text-xs font-semibold"><span className="text-gray-600">Total Project Cost</span><span className="text-[#0a1f44]">{formatCurrencyInput(String(totalProjectCost))}</span></div>}
+                            {!isProjectDeal && <div className="flex justify-between text-xs"><span className="text-gray-500">{isAcq ? "Purchase Price" : "Property Value"}</span><span className="font-bold text-[#0a1f44]">{formatCurrencyInput(String(basis))}</span></div>}
+                            <div className="flex justify-between text-xs"><span className="text-blue-600">Senior {seniorPct > 0 ? `(${seniorPct.toFixed(1)}%)` : ""}</span><span className="font-bold text-[#0a1f44]">{prop.seniorLoan || "—"}</span></div>
+                            {subLayers.map((layer, lidx) => (
+                              <div key={layer.id} className="flex justify-between text-xs">
+                                <span className="text-purple-600">{layer.type} {layerPcts[lidx] > 0 ? `(${layerPcts[lidx].toFixed(1)}% last $)` : ""}</span>
+                                <span className="font-bold text-[#0a1f44]">{layer.amount || "—"}</span>
+                              </div>
+                            ))}
+                            <div className="flex justify-between text-xs"><span className="text-emerald-600">Borrower Equity</span><span className="font-bold text-[#0a1f44]">{prop.borrowerEquity || "—"}</span></div>
+                            <div className="flex justify-between text-xs pt-1 border-t border-gray-200 mt-1"><span className="font-semibold text-gray-600">Total Debt</span><span className="font-bold text-[#0a1f44]">{formatCurrencyInput(String(td))}</span></div>
+                          </div>
                         </div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs"><span className="text-gray-500">{isProjectDeal ? "Total Project Cost (Senior)" : isAcq ? "Purchase Price" : "Property Value"}</span><span className="font-bold text-[#0a1f44]">{formatCurrencyInput(String(baseValue))}</span></div>
-                          {!isProjectDeal && <div className="flex justify-between text-xs"><span className="text-blue-600">Senior ({seniorLtv.toFixed(1)}% LTV)</span><span className="font-bold text-[#0a1f44]">{prop.seniorLoan || "—"}</span></div>}
-                          {subLayers.map((layer, lidx) => (
-                            <div key={layer.id} className="flex justify-between text-xs"><span className="text-purple-600">{layer.type} ({layerLtvs[lidx].toFixed(1)}% last $)</span><span className="font-bold text-[#0a1f44]">{layer.amount || "—"}</span></div>
-                          ))}
-                          <div className="flex justify-between text-xs"><span className="text-emerald-600">Borrower Equity</span><span className="font-bold text-[#0a1f44]">{prop.borrowerEquity || "—"}</span></div>
-                          <div className="flex justify-between text-xs pt-1 border-t border-gray-200 mt-1"><span className="font-semibold text-gray-600">Total Debt</span><span className="font-bold text-[#0a1f44]">{formatCurrencyInput(String(totalDebt))}</span></div>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -2930,6 +2950,16 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const [activeTab, setActiveTab] = useState("overview");
   const [prefillDeal, setPrefillDeal] = useState<SubmittedDeal | null>(null);
   const [lenderRecords, setLenderRecords] = useState<LenderRecord[]>(seedLenders);
+  const [lendersLoaded, setLendersLoaded] = useState(false);
+
+  // Auto-save dashboard lenders whenever they change (after initial load)
+  React.useEffect(() => {
+    if (!lendersLoaded) return;
+    const dashboardLenders = lenderRecords.filter(l => l.source === "Dashboard");
+    if (dashboardLenders.length === 0) return;
+    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: dashboardLenders }) })
+      .catch(e => console.error("Failed to auto-save lenders:", e));
+  }, [lenderRecords, lendersLoaded]);
 
   // Load dashboard lenders from DB on mount and merge with seed lenders
   React.useEffect(() => {
@@ -2938,10 +2968,10 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
         const res = await fetch("/api/data?type=lenders");
         const dbLenders: LenderRecord[] = await res.json();
         if (Array.isArray(dbLenders) && dbLenders.length > 0) {
-          // Merge: seed lenders + dashboard lenders, avoid duplicates by id
           setLenderRecords([...seedLenders, ...dbLenders]);
         }
       } catch (e) { console.error("Failed to load dashboard lenders:", e); }
+      setLendersLoaded(true);
     }
     loadDashboardLenders();
   }, []);
