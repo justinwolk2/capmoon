@@ -3541,7 +3541,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     if (!lender) return;
     if (isAdmin) {
       if (window.confirm(`Delete ${lender.lender}? This cannot be undone.`)) {
-        setLenderRecords((prev) => { const next = prev.filter((l) => l.id !== id); saveLendersToDb(next); return next; });
+        setLenderRecords((prev) => { const next = prev.filter((l) => l.id !== id); saveLendersToDb(next); fetch("/api/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"delete-lender",data:{id}})}).catch(console.error); return next; });
         setEditingLenderId(null);
       }
     } else {
@@ -3553,7 +3553,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   function handleDeleteRequestAction(reqId: number, action: "approved" | "denied") {
     const req = deleteRequests.find((r) => r.id === reqId);
     if (!req) return;
-    if (action === "approved") setLenderRecords((prev) => { const next = prev.filter((l) => l.id !== req.lenderId); saveLendersToDb(next); return next; });
+    if (action === "approved") setLenderRecords((prev) => { const next = prev.filter((l) => l.id !== req.lenderId); saveLendersToDb(next); fetch("/api/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"delete-lender",data:{id:req.lenderId}})}).catch(console.error); return next; });
     setDeleteRequests(deleteRequests.map((r) => r.id === reqId ? { ...r, status: action } : r));
   }
 
