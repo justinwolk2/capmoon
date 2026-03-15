@@ -3018,7 +3018,10 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
         const res = await fetch("/api/data?type=lenders");
         const dbLenders: LenderRecord[] = await res.json();
         if (Array.isArray(dbLenders) && dbLenders.length > 0) {
-          setLenderRecords([...seedLenders, ...dbLenders]);
+          // DB lenders override seed lenders with the same ID
+          const dbIds = new Set(dbLenders.map(l => l.id));
+          const seedOnly = seedLenders.filter(l => !dbIds.has(l.id));
+          setLenderRecords([...seedOnly, ...dbLenders]);
         }
       } catch (e) { console.error("Failed to load dashboard lenders:", e); }
       setLendersLoaded(true);
