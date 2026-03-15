@@ -3,7 +3,7 @@ import React, { useMemo, useState, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart3, Building2, FileSpreadsheet, Filter, Gauge, Landmark, Plus, Search, ShieldCheck, Upload, Users, Trash2, ChevronRight, ChevronLeft, CheckCircle, Edit2, Sparkles, Loader2, Lock, LogOut, Settings, Eye, EyeOff, Bell } from "lucide-react";
+import { BarChart3, Building2, FileSpreadsheet, FileText, Filter, Gauge, Landmark, Plus, Search, ShieldCheck, Upload, Users, Trash2, ChevronRight, ChevronLeft, CheckCircle, Edit2, Sparkles, Loader2, Lock, LogOut, Settings, Eye, EyeOff, Bell } from "lucide-react";
 import { motion } from "framer-motion";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -2988,6 +2988,335 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
 
 // ─── Main Portal (Admin + Advisor) ────────────────────────────────────────────
 
+// ─── Deal Memo Tab ────────────────────────────────────────────────────────────
+
+const MEMO_SECTIONS = ["Executive Summary", "Property Overview", "Capital Stack", "Market Overview", "Sponsor / Borrower Profile", "Financial Summary", "Lender Match Results"];
+
+function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, inputClass, selectTriggerClass }: {
+  submittedDeals: SubmittedDeal[]; teamMembers: TeamMember[]; lenderRecords: LenderRecord[];
+  cardClass: string; inputClass: string; selectTriggerClass: string;
+}) {
+  const [selectedDealId, setSelectedDealId] = useState<number | null>(null);
+  const [memoFields, setMemoFields] = useState<Record<string, string>>({});
+  const [activeSections, setActiveSections] = useState<Record<string, boolean>>(Object.fromEntries(MEMO_SECTIONS.map(s => [s, true])));
+  const [photos, setPhotos] = useState<{ id: number; name: string; url: string; caption: string }[]>([]);
+  const [marketData, setMarketData] = useState<any>(null);
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [marketError, setMarketError] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const selectedDeal = submittedDeals.find(d => d.id === selectedDealId);
+  const asset = selectedDeal?.assets?.[0];
+  const advisors = selectedDeal ? teamMembers.filter(m => selectedDeal.assignedAdvisorIds.includes(m.id)) : [];
+
+  // Auto-populate memo fields when deal is selected
+  React.useEffect(() => {
+    if (!selectedDeal || !asset) return;
+    setMemoFields({
+      dealTitle: `${selectedDeal.seekerName} — ${asset.assetType} ${asset.dealType}`,
+      borrowerName: selectedDeal.seekerName,
+      propertyAddress: asset.address ? `${asset.address.street}, ${asset.address.city}, ${asset.address.state} ${asset.address.zip}` : "",
+      assetType: asset.assetType || "",
+      dealType: asset.dealType || "",
+      capitalType: selectedDeal.capitalType || "",
+      loanAmount: asset.loanAmount || "",
+      propertyValue: asset.propertyValue || "",
+      purchasePrice: asset.purchasePrice || "",
+      ltv: asset.manualLtv || "",
+      dscr: asset.dscr || "",
+      currentNetIncome: asset.currentNetIncome || "",
+      numUnits: asset.numUnits || "",
+      recourse: asset.recourseType || "",
+      states: (asset.selectedStates || []).join(", "),
+      advisorName: advisors.map(a => a.name).join(", "),
+      advisorEmail: advisors.map(a => a.email).join(", "),
+      advisorPhone: advisors.map(a => a.phone).join(", "),
+      executiveSummary: `${selectedDeal.seekerName} is seeking ${asset.loanAmount || "TBD"} in ${selectedDeal.capitalType} financing for a ${asset.dealType?.toLowerCase() || ""} ${asset.assetType?.toLowerCase() || ""} located at ${asset.address?.city || ""}, ${asset.address?.state || ""}.`,
+      propertyOverview: `The subject property is a ${asset.numUnits ? asset.numUnits + "-unit " : ""}${asset.assetType?.toLowerCase() || ""} located at ${asset.address?.street || ""}, ${asset.address?.city || ""}, ${asset.address?.state || ""}. The deal is structured as a ${asset.dealType?.toLowerCase() || ""} with a ${asset.ownershipStatus?.toLowerCase() || ""}.`,
+      capitalStackSection: `Loan Amount: ${asset.loanAmount || "TBD"}\nProperty Value / ARV: ${asset.propertyValue || "TBD"}\nCapital Type: ${selectedDeal.capitalType}\nLTV: ${asset.manualLtv || "TBD"}\nDSCR: ${asset.dscr || "TBD"}\nRecourse: ${asset.recourseType || "TBD"}`,
+      sponsorProfile: `Borrower: ${selectedDeal.seekerName}\nCapital Requested: ${asset.loanAmount || "TBD"}\nProperty Type Experience: ${asset.assetType || "TBD"}`,
+      financialSummary: `Net Operating Income: ${asset.currentNetIncome || "TBD"}\nLoan Amount: ${asset.loanAmount || "TBD"}\nProperty Value: ${asset.propertyValue || "TBD"}\nDSCR: ${asset.dscr || "TBD"}`,
+    });
+    setMarketData(null);
+    // Auto-fetch market data if we have a zip
+    if (asset.address?.zip || asset.address?.city) {
+      fetchMarketData(asset);
+    }
+  }, [selectedDealId]);
+
+  async function fetchMarketData(assetData: AssetData) {
+    setMarketLoading(true);
+    setMarketError("");
+    try {
+      const zip = assetData.address?.zip || "";
+      const city = assetData.address?.city || "";
+      const state = assetData.address?.state || "";
+      const assetType = assetData.assetType || "";
+      const res = await fetch(`/api/market-data?zip=${zip}&city=${encodeURIComponent(city)}&state=${state}&assetType=${encodeURIComponent(assetType)}`);
+      const data = await res.json();
+      setMarketData(data);
+      // Populate market overview field
+      if (data.summary) {
+        setMemoFields(prev => ({ ...prev, marketOverview: data.summary }));
+      }
+    } catch (e) {
+      setMarketError("Could not load market data. You can enter it manually.");
+    }
+    setMarketLoading(false);
+  }
+
+  function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setPhotos(prev => [...prev, {
+          id: Date.now() + Math.random(),
+          name: file.name,
+          url: ev.target?.result as string,
+          caption: "",
+        }]);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleExportPDF() {
+    if (!selectedDeal) return;
+    setExporting(true);
+    try {
+      const res = await fetch("/api/deal-memo-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deal: selectedDeal, memoFields, photos, activeSections, marketData }),
+      });
+      if (res.ok) {
+        const html = await res.text();
+        const blob = new Blob([html], { type: "text/html" });
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+      }
+    } catch (e) {
+      alert("PDF export failed. Please try again.");
+    }
+    setExporting(false);
+  }
+
+  function upd(field: string, value: string) {
+    setMemoFields(prev => ({ ...prev, [field]: value }));
+  }
+
+  const sectionFieldMap: Record<string, string> = {
+    "Executive Summary": "executiveSummary",
+    "Property Overview": "propertyOverview",
+    "Capital Stack": "capitalStackSection",
+    "Market Overview": "marketOverview",
+    "Sponsor / Borrower Profile": "sponsorProfile",
+    "Financial Summary": "financialSummary",
+    "Lender Match Results": "lenderMatchResults",
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className={cardClass + " p-6"}>
+        <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Admin</div>
+        <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-1">Deal Memos</h2>
+        <p className="text-sm text-gray-500 mb-6">Build professional deal memos from submitted deals. Add photos, market data, and export to PDF.</p>
+
+        {/* Deal selector */}
+        <div className="mb-6">
+          <label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Select a Submitted Deal</label>
+          <Select value={selectedDealId?.toString() || ""} onValueChange={(v) => setSelectedDealId(parseInt(v))}>
+            <SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Choose a deal..." /></SelectTrigger>
+            <SelectContent>
+              {submittedDeals.map(d => (
+                <SelectItem key={d.id} value={d.id.toString()}>
+                  {d.seekerName} — {d.assets?.[0]?.assetType || "CRE"} | {d.capitalType} | {d.assets?.[0]?.loanAmount || "TBD"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {!selectedDeal && (
+          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">
+            Select a deal above to start building the memo
+          </div>
+        )}
+      </div>
+
+      {selectedDeal && (
+        <>
+          {/* Header info */}
+          <div className={cardClass + " p-6"}>
+            <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Memo Header</div>
+            <h3 className="font-display text-xl font-bold text-[#0a1f44] mb-4">Deal Information</h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Deal Title</label><Input value={memoFields.dealTitle || ""} onChange={e => upd("dealTitle", e.target.value)} className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Borrower Name</label><Input value={memoFields.borrowerName || ""} onChange={e => upd("borrowerName", e.target.value)} className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Property Address</label><Input value={memoFields.propertyAddress || ""} onChange={e => upd("propertyAddress", e.target.value)} className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Asset Type</label><Input value={memoFields.assetType || ""} onChange={e => upd("assetType", e.target.value)} className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Capital Type</label><Input value={memoFields.capitalType || ""} onChange={e => upd("capitalType", e.target.value)} className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Loan Amount</label><Input value={memoFields.loanAmount || ""} onChange={e => upd("loanAmount", e.target.value)} className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Property Value / ARV</label><Input value={memoFields.propertyValue || ""} onChange={e => upd("propertyValue", e.target.value)} className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">LTV</label><Input value={memoFields.ltv || ""} onChange={e => upd("ltv", e.target.value)} className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">DSCR</label><Input value={memoFields.dscr || ""} onChange={e => upd("dscr", e.target.value)} className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Net Operating Income</label><Input value={memoFields.currentNetIncome || ""} onChange={e => upd("currentNetIncome", e.target.value)} className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Number of Units</label><Input value={memoFields.numUnits || ""} onChange={e => upd("numUnits", e.target.value)} className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Recourse</label><Input value={memoFields.recourse || ""} onChange={e => upd("recourse", e.target.value)} className={inputClass} /></div>
+            </div>
+          </div>
+
+          {/* Market Data */}
+          <div className={cardClass + " p-6"}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Auto-Populated</div>
+                <h3 className="font-display text-xl font-bold text-[#0a1f44]">Market Data</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Based on {asset?.address?.city}, {asset?.address?.state} — {asset?.assetType}</p>
+              </div>
+              <button onClick={() => asset && fetchMarketData(asset)} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold border border-[#0a1f44]/20 text-[#0a1f44] rounded-xl hover:bg-[#0a1f44]/5">
+                {marketLoading ? "Loading..." : "Refresh Data"}
+              </button>
+            </div>
+
+            {marketLoading && (
+              <div className="rounded-xl bg-gray-50 border border-gray-200 p-6 text-center text-sm text-gray-400 animate-pulse">Loading market data...</div>
+            )}
+
+            {marketError && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700 mb-4">{marketError}</div>
+            )}
+
+            {marketData && !marketLoading && (
+              <div className="space-y-4">
+                {/* Demographics */}
+                {marketData.demographics && (
+                  <div>
+                    <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Demographics — {asset?.address?.zip || asset?.address?.city}</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {[
+                        ["Population", marketData.demographics.population],
+                        ["Median Income", marketData.demographics.medianIncome],
+                        ["Median Rent", marketData.demographics.medianRent],
+                        ["Median Age", marketData.demographics.medianAge],
+                      ].map(([label, val]) => val ? (
+                        <div key={String(label)} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                          <div className="text-xs text-gray-400 mb-0.5">{label}</div>
+                          <div className="text-sm font-bold text-[#0a1f44]">{val}</div>
+                        </div>
+                      ) : null)}
+                    </div>
+                  </div>
+                )}
+
+                {/* Property type specific data */}
+                {marketData.propertyData && (
+                  <div>
+                    <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">{asset?.assetType} Market Data</div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {Object.entries(marketData.propertyData).map(([key, val]) => (
+                        <div key={key} className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-3">
+                          <div className="text-xs text-gray-400 mb-0.5">{key}</div>
+                          <div className="text-sm font-bold text-[#0a1f44]">{String(val)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Memo Sections */}
+          <div className={cardClass + " p-6"}>
+            <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Content</div>
+            <h3 className="font-display text-xl font-bold text-[#0a1f44] mb-4">Memo Sections</h3>
+            <p className="text-xs text-gray-500 mb-5">Toggle sections on/off. All content is pre-filled and fully editable.</p>
+            <div className="space-y-4">
+              {MEMO_SECTIONS.map(section => (
+                <div key={section} className={`rounded-xl border ${activeSections[section] ? "border-[#0a1f44]/20" : "border-gray-100 opacity-50"} overflow-hidden`}>
+                  <div className="flex items-center justify-between px-4 py-3 bg-gray-50 cursor-pointer" onClick={() => setActiveSections(prev => ({ ...prev, [section]: !prev[section] }))}>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${activeSections[section] ? "border-[#0a1f44] bg-[#0a1f44]" : "border-gray-300"}`}>
+                        {activeSections[section] && <div className="w-2 h-2 bg-white rounded-sm" />}
+                      </div>
+                      <span className="text-sm font-bold text-[#0a1f44]">{section}</span>
+                    </div>
+                    <span className="text-xs text-gray-400">{activeSections[section] ? "Included" : "Excluded"}</span>
+                  </div>
+                  {activeSections[section] && (
+                    <div className="p-4">
+                      {section === "Market Overview" && marketLoading ? (
+                        <div className="text-xs text-gray-400 animate-pulse">Fetching market data...</div>
+                      ) : (
+                        <textarea
+                          value={memoFields[sectionFieldMap[section]] || ""}
+                          onChange={e => upd(sectionFieldMap[section], e.target.value)}
+                          rows={section === "Capital Stack" ? 8 : 5}
+                          className="w-full px-4 py-3 text-sm bg-white border border-gray-200 rounded-xl text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#0a1f44] resize-none"
+                          placeholder={`Enter ${section.toLowerCase()} content...`}
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Photo Upload */}
+          <div className={cardClass + " p-6"}>
+            <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Media</div>
+            <h3 className="font-display text-xl font-bold text-[#0a1f44] mb-4">Property Photos</h3>
+            <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handlePhotoUpload} className="hidden" />
+            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-2 border-dashed border-[#0a1f44]/20 text-[#0a1f44] rounded-xl hover:bg-[#0a1f44]/5 mb-4 w-full justify-center">
+              <Plus className="h-4 w-4" /> Upload Photos
+            </button>
+            {photos.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {photos.map(photo => (
+                  <div key={photo.id} className="rounded-xl border border-gray-200 overflow-hidden">
+                    <img src={photo.url} alt={photo.name} className="w-full h-32 object-cover" />
+                    <div className="p-2">
+                      <input
+                        value={photo.caption}
+                        onChange={e => setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, caption: e.target.value } : p))}
+                        placeholder="Add caption..."
+                        className="w-full text-xs px-2 py-1 border border-gray-200 rounded-lg focus:outline-none focus:border-[#0a1f44]"
+                      />
+                      <button onClick={() => setPhotos(prev => prev.filter(p => p.id !== photo.id))} className="mt-1 text-xs text-red-400 hover:text-red-600">Remove</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Export */}
+          <div className={cardClass + " p-6"}>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Export</div>
+                <h3 className="font-display text-xl font-bold text-[#0a1f44]">Generate Deal Memo PDF</h3>
+                <p className="text-sm text-gray-500 mt-0.5">{photos.length} photo{photos.length !== 1 ? "s" : ""} · {Object.values(activeSections).filter(Boolean).length} sections included</p>
+              </div>
+              <button
+                onClick={handleExportPDF}
+                disabled={exporting}
+                className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#c9a84c] text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/80 disabled:opacity-50"
+              >
+                {exporting ? "Generating..." : "Export PDF"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, users, setUsers, teamMembers, setTeamMembers, deleteRequests, setDeleteRequests, lenderChangeRequests, setLenderChangeRequests }: {
   session: AuthSession; onLogout: () => void;
   submittedDeals: SubmittedDeal[]; setSubmittedDeals: (d: SubmittedDeal[]) => void;
@@ -3180,6 +3509,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     ["submitted-deals", "Submitted Deals", FileSpreadsheet],
     ["uploads", "Upload Center", Upload],
     ...(isAdmin ? [["user-management", "User Management", Settings] as [string, string, any]] : []),
+    ...(isAdmin ? [["deal-memos", "Deal Memos", FileText] as [string, string, any]] : []),
     ...(isAdmin && pendingDeleteCount > 0 ? [["delete-queue", `Delete Requests (${pendingDeleteCount})`, Bell] as [string, string, any]] : []),
     ...(isAdmin && pendingLenderChangeCount > 0 ? [["lender-changes", `Lender Changes (${pendingLenderChangeCount})`, Bell] as [string, string, any]] : []),
   ];
@@ -3921,6 +4251,18 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* Deal Memos */}
+              {activeTab === "deal-memos" && isAdmin && (
+                <DealMemoTab
+                  submittedDeals={submittedDeals}
+                  teamMembers={teamMembers}
+                  lenderRecords={lenderRecords}
+                  cardClass={cardClass}
+                  inputClass={inputClass}
+                  selectTriggerClass={selectTriggerClass}
+                />
               )}
 
             </motion.div>
