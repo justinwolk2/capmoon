@@ -4317,7 +4317,9 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                     if (req.changeType === "edit" && req.lenderId) {
                                       fetch("/api/data?type=lenders").then(r => r.json()).then(dbL => {
                                         if (Array.isArray(dbL) && dbL.length > 0) {
-                                          setLenderRecords([...seedLenders, ...dbL]);
+                                          const dbIds2 = new Set(dbL.map((l) => l.id));
+                                          const seedOnly2 = seedLenders.filter((l) => !dbIds2.has(l.id));
+                                          setLenderRecords([...seedOnly2, ...dbL]);
                                         } else {
                                           setLenderRecords(seedLenders);
                                         }
