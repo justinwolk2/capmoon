@@ -3566,7 +3566,11 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   function handleDeleteRequestAction(reqId: number, action: "approved" | "denied") {
     const req = deleteRequests.find((r) => r.id === reqId);
     if (!req) return;
-    if (action === "approved") setLenderRecords((prev) => prev.filter((l) => l.id !== req.lenderId));
+    if (action === "approved") setLenderRecords((prev) => {
+      const next = prev.filter((l) => l.id !== req.lenderId);
+      saveLendersToDb(next);
+      return next;
+    });
     setDeleteRequests(deleteRequests.map((r) => r.id === reqId ? { ...r, status: action } : r));
   }
 
