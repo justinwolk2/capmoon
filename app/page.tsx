@@ -3034,15 +3034,6 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
       await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: toSave }) });
     } catch (e) { console.error("Failed to save lenders:", e); }
   }
-
-  function saveEditedLender(id: number) {
-    // Mark this lender as Dashboard source then save all Dashboard lenders
-    setLenderRecords((prev) => {
-      const next = prev.map(l => l.id === id ? { ...l, source: "Dashboard" } : l);
-      saveLendersToDb(next);
-      return next;
-    });
-  }
   const [search, setSearch] = useState("");
   const [selectedSourceFilter, setSelectedSourceFilter] = useState("All");
   const [selectedCapitalFilter, setSelectedCapitalFilter] = useState("All");
@@ -3089,11 +3080,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     setLenderRecords((prev) => prev.map((l) => l.id === id ? { ...l, source: "Dashboard", [field]: value } : l));
   }
   function toggleLenderStatus(id: number) {
-    setLenderRecords((prev) => {
-      const next = prev.map((l) => l.id !== id ? l : { ...l, source: "Dashboard", status: l.status === "Inactive" ? "Active" : "Inactive" });
-      if (isAdmin) saveLendersToDb(next); // status toggle saves immediately
-      return next;
-    });
+    setLenderRecords((prev) => prev.map((l) => l.id !== id ? l : { ...l, source: "Dashboard", status: l.status === "Inactive" ? "Active" : "Inactive" }));
   }
   function submitLenderEditRequest(lender: LenderRecord) {
     const req: LenderChangeRequest = {
@@ -3413,7 +3400,13 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                       </div>
                                       <div className="flex gap-2">
                                         {isAdmin ? (
-                                          <button onClick={() => { saveEditedLender(item.id); setEditingLenderId(null); }} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Save Changes</button>
+                                          <button onClick={() => {
+                                            const updated = lenderRecords.map(l => l.id === item.id ? { ...l, source: "Dashboard" } : l);
+                                            setLenderRecords(updated);
+                                            const toSave = updated.filter(l => l.source === "Dashboard");
+                                            if (toSave.length > 0) fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: toSave }) }).catch(console.error);
+                                            setEditingLenderId(null);
+                                          }} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Save Changes</button>
                                         ) : (
                                           <button onClick={() => submitLenderEditRequest(item)} className="px-4 py-2 text-sm font-semibold bg-[#c9a84c] text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/80">Submit for Approval</button>
                                         )}
