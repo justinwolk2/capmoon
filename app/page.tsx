@@ -3026,10 +3026,10 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     loadDashboardLenders();
   }, []);
 
-  // Save only dashboard-added lenders to DB
+  // Save all edited/added lenders to DB
   async function saveLendersToDb(records: LenderRecord[]) {
-    const dashboardLenders = records.filter(l => l.source === "Dashboard");
-    if (dashboardLenders.length === 0) return;
+    const toSave = records.filter(l => l.source === "Dashboard");
+    if (toSave.length === 0) return;
     try {
       await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: dashboardLenders }) });
     } catch (e) { console.error("Failed to save lenders:", e); }
@@ -3077,15 +3077,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
   function updateLenderField(id: number, field: keyof LenderRecord, value: string) {
     // Always update local state for live preview while editing
-    setLenderRecords((prev) => prev.map((l) => l.id === id ? { ...l, [field]: value } : l));
-    // Admins also persist to DB immediately
-    if (isAdmin) {
-      setLenderRecords((prev) => {
-        const next = prev.map((l) => l.id === id ? { ...l, [field]: value } : l);
-        saveLendersToDb(next);
-        return next;
-      });
-    }
+    setLenderRecords((prev) => prev.map((l) => l.id === id ? { ...l, source: "Dashboard", [field]: value } : l));
+    if (isAdmin) saveLendersToDb(lenderRecords);
   }
   function toggleLenderStatus(id: number) {
     if (isAdmin) {
