@@ -89,6 +89,9 @@ body { font-family:'Montserrat',sans-serif; background:white; color:#1a2f5e; -we
     <div style="width:42px;height:2px;background:rgba(255,255,255,0.28);margin-bottom:12px;"></div>
     <div style="font-size:12px;color:rgba(255,255,255,0.75);">${f("capitalType") || deal?.capitalType || ""} &nbsp;·&nbsp; ${f("loanAmount") || asset?.loanAmount || ""}</div>
     <div style="font-size:10.5px;color:rgba(255,255,255,0.42);margin-top:5px;">${f("propertyAddress") || ""}</div>
+    <div style="position:absolute;bottom:20px;right:48px;">
+      <img src="https://capmoon.vercel.app/logo1.JPEG" style="height:48px;width:48px;object-fit:contain;border-radius:50%;opacity:0.9;" />
+    </div>
   </div>
 </div>
 
