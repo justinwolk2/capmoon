@@ -3950,11 +3950,19 @@ export default function Home() {
   const [dbLoaded, setDbLoaded] = useState(false);
 
   // Save helper — defined first so useEffects can reference it
-  async function saveToDb(type: string, data: any[]) {
+ const saveToDb = React.useCallback(async (type: string, data: any[]) => {
     if (!data || data.length === 0) return;
-    try { await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, data }) }); }
-    catch (e) { console.error("DB save failed:", e); }
-  }
+    try {
+      const res = await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, data }) });
+      const json = await res.json();
+      if (!json.success) console.error("DB save returned failure:", json);
+    } catch (e) { console.error("DB save failed:", e); }
+  }, []);
+  React.useEffect(() => { if (dbLoaded && users.length > 0) saveToDb("users", users); }, [users, dbLoaded, saveToDb]);
+  React.useEffect(() => { if (dbLoaded && teamMembers.length > 0) saveToDb("team", teamMembers); }, [teamMembers, dbLoaded, saveToDb]);
+  React.useEffect(() => { if (dbLoaded && submittedDeals.length > 0) saveToDb("deals", submittedDeals); }, [submittedDeals, dbLoaded, saveToDb]);
+  React.useEffect(() => { if (dbLoaded && deleteRequests.length > 0) saveToDb("deletes", deleteRequests); }, [deleteRequests, dbLoaded, saveToDb]);
+  React.useEffect(() => { if (dbLoaded && lenderChangeRequests.length > 0) saveToDb("lender-changes", lenderChangeRequests); }, [lenderChangeRequests, dbLoaded, saveToDb]);
 
   // Auto-save to DB on every state change — fires after every setX() anywhere in the app
   // The dbLoaded guard prevents saving before we've loaded from DB
