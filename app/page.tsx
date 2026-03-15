@@ -3026,12 +3026,12 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     loadDashboardLenders();
   }, []);
 
-  // Save only dashboard-added lenders to DB
+  // Save all non-seed lenders to DB (dashboard-added AND edited seed lenders)
   async function saveLendersToDb(records: LenderRecord[]) {
-    const dashboardLenders = records.filter(l => l.source === "Dashboard");
-    if (dashboardLenders.length === 0) return;
+    const toSave = records.filter(l => l.source === "Dashboard");
+    if (toSave.length === 0) return;
     try {
-      await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: dashboardLenders }) });
+      await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: toSave }) });
     } catch (e) { console.error("Failed to save lenders:", e); }
   }
   const [search, setSearch] = useState("");
@@ -3076,27 +3076,19 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   }
 
   function updateLenderField(id: number, field: keyof LenderRecord, value: string) {
-    // Always update local state for live preview while editing
-    setLenderRecords((prev) => prev.map((l) => l.id === id ? { ...l, [field]: value } : l));
-    // Admins also persist to DB immediately
-    if (isAdmin) {
-      setLenderRecords((prev) => {
-        const next = prev.map((l) => l.id === id ? { ...l, [field]: value } : l);
-        saveLendersToDb(next);
-        return next;
-      });
-    }
+    // Mark as Dashboard source so it gets saved to DB, then update field
+    setLenderRecords((prev) => {
+      const next = prev.map((l) => l.id === id ? { ...l, source: "Dashboard", [field]: value } : l);
+      if (isAdmin) saveLendersToDb(next);
+      return next;
+    });
   }
   function toggleLenderStatus(id: number) {
-    if (isAdmin) {
-      setLenderRecords((prev) => {
-        const next = prev.map((l) => l.id !== id ? l : { ...l, status: l.status === "Inactive" ? "Active" : "Inactive" });
-        saveLendersToDb(next);
-        return next;
-      });
-    } else {
-      setLenderRecords((prev) => prev.map((l) => l.id !== id ? l : { ...l, status: l.status === "Inactive" ? "Active" : "Inactive" }));
-    }
+    setLenderRecords((prev) => {
+      const next = prev.map((l) => l.id !== id ? l : { ...l, source: "Dashboard", status: l.status === "Inactive" ? "Active" : "Inactive" });
+      if (isAdmin) saveLendersToDb(next);
+      return next;
+    });
   }
   function submitLenderEditRequest(lender: LenderRecord) {
     const req: LenderChangeRequest = {
@@ -3416,7 +3408,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                       </div>
                                       <div className="flex gap-2">
                                         {isAdmin ? (
-                                          <button onClick={() => { saveLendersToDb(lenderRecords); setEditingLenderId(null); }} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Save Changes</button>
+                                          <button onClick={() => { setLenderRecords((prev) => { const next = prev.map(l => l.id === item.id ? { ...l, source: "Dashboard" } : l); saveLendersToDb(next); return next; }); setEditingLenderId(null); }} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Save Changes</button>
                                         ) : (
                                           <button onClick={() => submitLenderEditRequest(item)} className="px-4 py-2 text-sm font-semibold bg-[#c9a84c] text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/80">Submit for Approval</button>
                                         )}
@@ -3949,20 +3941,15 @@ export default function Home() {
   const [lenderChangeRequests, setLenderChangeRequests] = useState<LenderChangeRequest[]>([]);
   const [dbLoaded, setDbLoaded] = useState(false);
 
-  // Save helper — defined first so useEffects can reference it
-  async function saveToDb(type: string, data: any[]) {
+  // Save helper as useCallback so it's stable and available to useEffects
+  const saveToDb = React.useCallback(async (type: string, data: any[]) => {
     if (!data || data.length === 0) return;
-    try { await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, data }) }); }
-    catch (e) { console.error("DB save failed:", e); }
-  }
-
-  // Auto-save to DB on every state change — fires after every setX() anywhere in the app
-  // The dbLoaded guard prevents saving before we've loaded from DB
-  React.useEffect(() => { if (dbLoaded && users.length > 0) saveToDb("users", users); }, [users, dbLoaded]);
-  React.useEffect(() => { if (dbLoaded && teamMembers.length > 0) saveToDb("team", teamMembers); }, [teamMembers, dbLoaded]);
-  React.useEffect(() => { if (dbLoaded && submittedDeals.length > 0) saveToDb("deals", submittedDeals); }, [submittedDeals, dbLoaded]);
-  React.useEffect(() => { if (dbLoaded && deleteRequests.length > 0) saveToDb("deletes", deleteRequests); }, [deleteRequests, dbLoaded]);
-  React.useEffect(() => { if (dbLoaded && lenderChangeRequests.length > 0) saveToDb("lender-changes", lenderChangeRequests); }, [lenderChangeRequests, dbLoaded]);
+    try {
+      const res = await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, data }) });
+      const json = await res.json();
+      if (!json.success) console.error("DB save returned failure:", json);
+    } catch (e) { console.error("DB save failed:", e); }
+  }, []);
 
   // Load data from DB on mount — DB is always source of truth
   React.useEffect(() => {
@@ -3994,14 +3981,33 @@ export default function Home() {
     loadData();
   }, []);
 
-  function handleSubmitDeal(deal: SubmittedDeal) { setSubmittedDeals((prev) => [...prev, deal]); }
+  // Auto-save — fires whenever state changes, but only after DB has loaded
+
+  function handleSubmitDeal(deal: SubmittedDeal) {
+    setSubmittedDeals((prev) => { const next = [...prev, deal]; saveToDb("deals", next); return next; });
+  }
   function handleLogout() { setSession(null); }
-  function handleRegisterCapitalSeeker(newUser: AppUser) { setUsers((prev) => [...prev, newUser]); }
-  function handleSetUsers(newUsers: AppUser[]) { if (newUsers.length > 0) setUsers(newUsers); }
-  function handleSetTeamMembers(newTeam: TeamMember[]) { if (newTeam.length > 0) setTeamMembers(newTeam); }
-  function handleSetSubmittedDeals(newDeals: SubmittedDeal[]) { setSubmittedDeals(newDeals); }
-  function handleSetDeleteRequests(newReqs: DeleteRequest[]) { setDeleteRequests(newReqs); }
-  function handleSetLenderChangeRequests(newReqs: LenderChangeRequest[]) { setLenderChangeRequests(newReqs); }
+  function handleRegisterCapitalSeeker(newUser: AppUser) {
+    setUsers((prev) => { const next = [...prev, newUser]; saveToDb("users", next); return next; });
+  }
+  function handleSetUsers(newUsers: AppUser[]) {
+    if (newUsers.length > 0) { setUsers(newUsers); saveToDb("users", newUsers); }
+  }
+  function handleSetTeamMembers(newTeam: TeamMember[]) {
+    if (newTeam.length > 0) { setTeamMembers(newTeam); saveToDb("team", newTeam); }
+  }
+  function handleSetSubmittedDeals(newDeals: SubmittedDeal[]) {
+    setSubmittedDeals(newDeals);
+    if (newDeals.length > 0) saveToDb("deals", newDeals);
+  }
+  function handleSetDeleteRequests(newReqs: DeleteRequest[]) {
+    setDeleteRequests(newReqs);
+    if (newReqs.length > 0) saveToDb("deletes", newReqs);
+  }
+  function handleSetLenderChangeRequests(newReqs: LenderChangeRequest[]) {
+    setLenderChangeRequests(newReqs);
+    if (newReqs.length > 0) saveToDb("lender-changes", newReqs);
+  }
 
   if (!dbLoaded) return (
     <div className="min-h-screen bg-[#f0f2f5] flex items-center justify-center">
