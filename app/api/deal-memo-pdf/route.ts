@@ -166,8 +166,14 @@ ${activeSectionList.includes("Lender Match Results") && f("lenderMatchResults") 
 ${advisorName ? `
 <div style="display:flex;border-bottom:1px solid #1a3168;">
   <div style="background:#0f2456;padding:22px 26px;display:flex;align-items:center;gap:16px;min-width:300px;">
-    <div style="width:54px;height:54px;border-radius:50%;background:#1a3168;border:2px solid rgba(255,255,255,0.18);flex-shrink:0;display:flex;align-items:center;justify-content:center;">
-      <div style="font-size:18px;font-weight:800;color:rgba(255,255,255,0.45);">${advisorName.split(" ").map((n: string) => n[0]).join("").slice(0,2)}</div>
+    <div style="width:58px;height:58px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.2);flex-shrink:0;background:#1a3168;">
+      ${(() => {
+        const lower = advisorName.toLowerCase();
+        const photo = lower.includes("louis") ? "/louis.jpg" : lower.includes("shuvo") ? "/Shuvo.jpeg" : null;
+        return photo
+          ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;" />`
+          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:rgba(255,255,255,0.45);">${advisorName.split(" ").map((n) => n[0]).join("").slice(0,2)}</div>`;
+      })()}
     </div>
     <div>
       <div style="font-size:7px;letter-spacing:0.22em;text-transform:uppercase;color:rgba(255,255,255,0.35);margin-bottom:4px;">Capital Advisor</div>
