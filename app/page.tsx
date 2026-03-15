@@ -3028,7 +3028,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
   // Save all edited/added lenders to DB
   async function saveLendersToDb(records: LenderRecord[]) {
-    const toSave = records.filter(l => l.source === "Dashboard");
+    const dashboardLenders = records.filter(l => l.source === "Dashboard");
     if (dashboardLenders.length === 0) return;
     try {
       await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: dashboardLenders }) });
