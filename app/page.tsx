@@ -3492,16 +3492,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const [lenderRecords, setLenderRecords] = useState<LenderRecord[]>(seedLenders);
   const [lendersLoaded, setLendersLoaded] = useState(false);
 
-  // Auto-save dashboard lenders — skip initial load, only save on actual changes
-  const lendersInitialLoadRef = React.useRef(false);
-  React.useEffect(() => {
-    if (!lendersLoaded) return;
-    if (!lendersInitialLoadRef.current) { lendersInitialLoadRef.current = true; return; }
-    const dashboardLenders = lenderRecords.filter(l => l.source === "Dashboard");
-    if (dashboardLenders.length === 0) return;
-    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: dashboardLenders }) })
-      .catch(e => console.error("Failed to auto-save lenders:", e));
-  }, [lenderRecords, lendersLoaded]);
+  // Lenders save explicitly via saveLendersToDb — no auto-save to avoid race conditions
 
   // Load dashboard lenders from DB on mount and merge with seed lenders
   React.useEffect(() => {
@@ -3550,7 +3541,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     if (!lender) return;
     if (isAdmin) {
       if (window.confirm(`Delete ${lender.lender}? This cannot be undone.`)) {
-        setLenderRecords((prev) => prev.filter((l) => l.id !== id));
+        setLenderRecords((prev) => { const next = prev.filter((l) => l.id !== id); saveLendersToDb(next); return next; });
         setEditingLenderId(null);
       }
     } else {
@@ -3562,7 +3553,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   function handleDeleteRequestAction(reqId: number, action: "approved" | "denied") {
     const req = deleteRequests.find((r) => r.id === reqId);
     if (!req) return;
-    if (action === "approved") setLenderRecords((prev) => prev.filter((l) => l.id !== req.lenderId));
+    if (action === "approved") setLenderRecords((prev) => { const next = prev.filter((l) => l.id !== req.lenderId); saveLendersToDb(next); return next; });
     setDeleteRequests(deleteRequests.map((r) => r.id === reqId ? { ...r, status: action } : r));
   }
 
