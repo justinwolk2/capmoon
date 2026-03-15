@@ -3007,7 +3007,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     if (!lendersLoaded) return;
     const dashboardLenders = lenderRecords.filter(l => l.source === "Dashboard");
     if (dashboardLenders.length === 0) return;
-    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: toSave }) })
+    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: dashboardLenders }) })
       .catch(e => console.error("Failed to auto-save lenders:", e));
   }, [lenderRecords, lendersLoaded]);
 
@@ -3029,9 +3029,9 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   // Save all edited/added lenders to DB
   async function saveLendersToDb(records: LenderRecord[]) {
     const toSave = records.filter(l => l.source === "Dashboard");
-    if (toSave.length === 0) return;
+    if (dashboardLenders.length === 0) return;
     try {
-      await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: toSave }) });
+      await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: dashboardLenders }) });
     } catch (e) { console.error("Failed to save lenders:", e); }
   }
   const [search, setSearch] = useState("");
