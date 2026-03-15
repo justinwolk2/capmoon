@@ -3034,6 +3034,15 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
       await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: toSave }) });
     } catch (e) { console.error("Failed to save lenders:", e); }
   }
+
+  function saveEditedLender(id: number) {
+    // Mark this lender as Dashboard source then save all Dashboard lenders
+    setLenderRecords((prev) => {
+      const next = prev.map(l => l.id === id ? { ...l, source: "Dashboard" } : l);
+      saveLendersToDb(next);
+      return next;
+    });
+  }
   const [search, setSearch] = useState("");
   const [selectedSourceFilter, setSelectedSourceFilter] = useState("All");
   const [selectedCapitalFilter, setSelectedCapitalFilter] = useState("All");
@@ -3404,7 +3413,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                       </div>
                                       <div className="flex gap-2">
                                         {isAdmin ? (
-                                          <button onClick={() => { setLenderRecords((prev) => { const next = prev.map(l => l.id === item.id ? { ...l, source: "Dashboard" } : l); saveLendersToDb(next); return next; }); setEditingLenderId(null); }} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Save Changes</button>
+                                          <button onClick={() => { saveEditedLender(item.id); setEditingLenderId(null); }} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Save Changes</button>
                                         ) : (
                                           <button onClick={() => submitLenderEditRequest(item)} className="px-4 py-2 text-sm font-semibold bg-[#c9a84c] text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/80">Submit for Approval</button>
                                         )}
