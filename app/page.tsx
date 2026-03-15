@@ -3076,17 +3076,13 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   }
 
   function updateLenderField(id: number, field: keyof LenderRecord, value: string) {
-    // Mark as Dashboard source so it gets saved to DB, then update field
-    setLenderRecords((prev) => {
-      const next = prev.map((l) => l.id === id ? { ...l, source: "Dashboard", [field]: value } : l);
-      if (isAdmin) saveLendersToDb(next);
-      return next;
-    });
+    // Just update local state — Save Changes button triggers the DB save
+    setLenderRecords((prev) => prev.map((l) => l.id === id ? { ...l, source: "Dashboard", [field]: value } : l));
   }
   function toggleLenderStatus(id: number) {
     setLenderRecords((prev) => {
       const next = prev.map((l) => l.id !== id ? l : { ...l, source: "Dashboard", status: l.status === "Inactive" ? "Active" : "Inactive" });
-      if (isAdmin) saveLendersToDb(next);
+      if (isAdmin) saveLendersToDb(next); // status toggle saves immediately
       return next;
     });
   }
