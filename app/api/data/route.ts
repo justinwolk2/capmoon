@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       case "deals": { await sql`DELETE FROM submitted_deals`; for (const item of data) { await sql`INSERT INTO submitted_deals (data) VALUES (${JSON.stringify(item)})`; } return NextResponse.json({ success: true }); }
       case "team": { await sql`DELETE FROM team_members`; for (const item of data) { await sql`INSERT INTO team_members (data) VALUES (${JSON.stringify(item)})`; } return NextResponse.json({ success: true }); }
       case "deletes": { await sql`DELETE FROM delete_requests`; for (const item of data) { await sql`INSERT INTO delete_requests (data) VALUES (${JSON.stringify(item)})`; } return NextResponse.json({ success: true }); }
-      case "delete-lender": { const delId = String(data.id); await sql`DELETE FROM lenders WHERE data->>'id' = ${delId}`; return NextResponse.json({ success: true }); }
+      case "delete-lender": { const delId = String((data as any).id); await sql`DELETE FROM lenders WHERE data->>'id' = ${delId}`; return NextResponse.json({ success: true }); }
       case "lenders": {
         const uniqueItems: any[] = Object.values(data.reduce((acc: any, item: any) => { acc[item.id] = item; return acc; }, {}));
         for (const item of uniqueItems) {
