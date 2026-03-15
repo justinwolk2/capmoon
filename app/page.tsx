@@ -3960,7 +3960,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                               {types.map((ct: string) => {
                                                 const prog = progs.find(p => p.capitalType === ct) || { capitalType: ct, minLoan: item.minLoan || "", maxLoan: item.maxLoan || "", maxLtv: item.maxLtv || "", loanTerms: item.loanTerms ? item.loanTerms.split(",").map((s:string)=>s.trim()) : [], propertyTypes: item.assets || [] };
                                                 return (
-                                                  <div key={ct} className="rounded-xl border border-[#0a1f44]/20 overflow-hidden">
+                                                  <div key={ct} className="rounded-xl border border-[#0a1f44]/20">
                                                     <div className="flex items-center gap-2 px-4 py-2.5 bg-[#0a1f44]/5">
                                                       <div className="w-2 h-2 rounded-full bg-[#c9a84c]" />
                                                       <span className="text-sm font-bold text-[#0a1f44]">{ct}</span>
