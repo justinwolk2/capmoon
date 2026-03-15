@@ -3249,23 +3249,59 @@ function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, in
         <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-1">Deal Memos</h2>
         <p className="text-sm text-gray-500 mb-6">Build professional deal memos from submitted deals. Add photos, market data, and export to PDF.</p>
 
-        {/* Deal selector */}
-        <div className="mb-6">
-          <label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Select a Submitted Deal</label>
-          <Select value={selectedDealId?.toString() || ""} onValueChange={(v) => setSelectedDealId(parseInt(v))}>
-            <SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Choose a deal..." /></SelectTrigger>
-            <SelectContent>
-              {submittedDeals.map(d => (
-                <SelectItem key={d.id} value={d.id.toString()}>
-                  {d.seekerName} — {d.assets?.[0]?.assetType || "CRE"} | {d.capitalType} | {d.assets?.[0]?.loanAmount || "TBD"}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Deal card grid */}
+        <div className="mb-2">
+          <label className="text-xs text-gray-500 mb-3 block font-bold uppercase">Select a Submitted Deal</label>
+          <div className="grid gap-3 md:grid-cols-3">
+            {submittedDeals.map(d => {
+              const asset = d.assets?.[0];
+              const isSelected = selectedDealId === d.id;
+              const photo = d.photos?.[0]?.url || null;
+              return (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => setSelectedDealId(d.id)}
+                  className={`text-left rounded-xl border-2 overflow-hidden transition-all ${isSelected ? "border-[#c9a84c] shadow-md" : "border-gray-200 hover:border-[#0a1f44]/30"}`}
+                >
+                  {/* Photo or placeholder */}
+                  <div className="h-28 relative" style={{ background: photo ? `url('${photo}') center/cover no-repeat` : "#0a1f44" }}>
+                    {!photo && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Building2 className="h-8 w-8 text-white/20" />
+                      </div>
+                    )}
+                    {/* Capital type badge */}
+                    <div className="absolute top-2 left-2">
+                      <div className="px-2 py-0.5 text-xs font-bold rounded-full bg-[#c9a84c] text-[#0a1f44]">{d.capitalType}</div>
+                    </div>
+                    {/* Selected checkmark */}
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[#c9a84c] flex items-center justify-center">
+                        <CheckCircle className="h-4 w-4 text-[#0a1f44]" />
+                      </div>
+                    )}
+                  </div>
+                  {/* Info */}
+                  <div className="p-3 bg-white">
+                    <div className="font-bold text-[#0a1f44] text-sm truncate">{d.seekerName}</div>
+                    <div className="text-xs text-gray-500 truncate mt-0.5">{asset?.assetType || "CRE"} · {asset?.address?.city || ""}{asset?.address?.state ? `, ${asset.address.state}` : ""}</div>
+                    <div className="text-sm font-bold text-[#c9a84c] mt-1.5">{asset?.loanAmount || "TBD"}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {!selectedDeal && (
+        {!selectedDeal && submittedDeals.length === 0 && (
           <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">
+            No submitted deals yet
+          </div>
+        )}
+
+        {!selectedDeal && submittedDeals.length > 0 && (
+          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-400">
             Select a deal above to start building the memo
           </div>
         )}
@@ -3868,6 +3904,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                         ) : (
                                           <button onClick={() => submitLenderEditRequest(item)} className="px-4 py-2 text-sm font-semibold bg-[#c9a84c] text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/80">Submit for Approval</button>
                                         )}
+                                        <button onClick={() => { setLenderRecords(prev => prev.map(l => l.id === item.id ? { ...l } : l)); setEditingLenderId(null); }} className="px-4 py-2 text-sm font-semibold border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">Discard Changes</button>
                                         <button onClick={() => toggleLenderStatus(item.id)} className="px-3 py-2 text-xs border border-gray-200 text-gray-500 rounded-xl hover:bg-white">{item.status === "Inactive" ? "Activate" : "Deactivate"}</button>
                                         <button onClick={() => handleDeleteLender(item.id)} className="flex items-center gap-1 px-3 py-2 text-xs text-red-500 border border-red-200 rounded-xl hover:bg-red-50"><Trash2 className="h-3 w-3" />{isAdmin ? " Delete" : " Request"}</button>
                                       </div>
@@ -3923,7 +3960,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                               {types.map((ct: string) => {
                                                 const prog = progs.find(p => p.capitalType === ct) || { capitalType: ct, minLoan: item.minLoan || "", maxLoan: item.maxLoan || "", maxLtv: item.maxLtv || "", loanTerms: item.loanTerms ? item.loanTerms.split(",").map((s:string)=>s.trim()) : [], propertyTypes: item.assets || [] };
                                                 return (
-                                                  <div key={ct} className="rounded-xl border border-[#0a1f44]/20">
+                                                  <div key={ct} className="rounded-xl border border-[#0a1f44]/20 overflow-hidden">
                                                     <div className="flex items-center gap-2 px-4 py-2.5 bg-[#0a1f44]/5">
                                                       <div className="w-2 h-2 rounded-full bg-[#c9a84c]" />
                                                       <span className="text-sm font-bold text-[#0a1f44]">{ct}</span>
@@ -4317,9 +4354,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                     if (req.changeType === "edit" && req.lenderId) {
                                       fetch("/api/data?type=lenders").then(r => r.json()).then(dbL => {
                                         if (Array.isArray(dbL) && dbL.length > 0) {
-                                          const dbIds2 = new Set(dbL.map((l) => l.id));
-                                          const seedOnly2 = seedLenders.filter((l) => !dbIds2.has(l.id));
-                                          setLenderRecords([...seedOnly2, ...dbL]);
+                                          setLenderRecords([...seedLenders, ...dbL]);
                                         } else {
                                           setLenderRecords(seedLenders);
                                         }
