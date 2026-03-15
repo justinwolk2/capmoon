@@ -3492,9 +3492,11 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const [lenderRecords, setLenderRecords] = useState<LenderRecord[]>(seedLenders);
   const [lendersLoaded, setLendersLoaded] = useState(false);
 
-  // Auto-save dashboard lenders whenever they change (after initial load)
+  // Auto-save dashboard lenders — skip initial load, only save on actual changes
+  const lendersInitialLoadRef = React.useRef(false);
   React.useEffect(() => {
     if (!lendersLoaded) return;
+    if (!lendersInitialLoadRef.current) { lendersInitialLoadRef.current = true; return; }
     const dashboardLenders = lenderRecords.filter(l => l.source === "Dashboard");
     if (dashboardLenders.length === 0) return;
     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: dashboardLenders }) })
