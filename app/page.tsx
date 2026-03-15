@@ -3503,8 +3503,9 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
         if (Array.isArray(dbLenders) && dbLenders.length > 0) {
           // DB lenders override seed lenders with the same ID
           const dbIds = new Set(dbLenders.map(l => l.id));
-          const seedOnly = seedLenders.filter(l => !dbIds.has(l.id));
-          setLenderRecords([...seedOnly, ...dbLenders]);
+          const deletedIds = new Set(dbLenders.filter(l => l.source === 'Deleted').map(l => l.originalId || l.id));
+          const seedOnly = seedLenders.filter(l => !dbIds.has(l.id) && !deletedIds.has(l.id));
+          setLenderRecords([...seedOnly, ...dbLenders.filter(l => l.source !== 'Deleted')]);
         }
       } catch (e) { console.error("Failed to load dashboard lenders:", e); }
       setLendersLoaded(true);
@@ -3541,7 +3542,14 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     if (!lender) return;
     if (isAdmin) {
       if (window.confirm(`Delete ${lender.lender}? This cannot be undone.`)) {
-        setLenderRecords((prev) => { const next = prev.filter((l) => l.id !== id); saveLendersToDb(next); fetch("/api/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"delete-lender",data:{id}})}).catch(console.error); return next; });
+        setLenderRecords((prev) => {
+        const deleted = prev.find(l => l.id === id);
+        const next = prev.filter((l) => l.id !== id);
+        const toSave = next.filter(l => l.source === 'Dashboard');
+        if (deleted) toSave.push({...deleted, source: 'Deleted', originalId: deleted.id});
+        if (toSave.length > 0) fetch("/api/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"lenders",data:toSave})}).catch(console.error);
+        return next;
+      });
         setEditingLenderId(null);
       }
     } else {
