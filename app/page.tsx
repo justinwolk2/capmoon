@@ -14,7 +14,7 @@ type LenderRecord = {
   type: string; minLoan: string; maxLoan: string; maxLtv: string; minDscr: string;
   states: string[]; assets: string[]; status: string; email: string; phone: string; recourse: string;
   contactPerson?: string; website?: string; sponsorStates?: string[]; loanTerms?: string;
-  typeOfLoans?: string[]; programTypes?: string[]; typeOfLenders?: string[]; contacts?: LenderContact[]; notes?: string; capitalTypePrograms?: CapitalTypeProgram[];
+  typeOfLoans?: string[]; programTypes?: string[]; typeOfLenders?: string[]; contacts?: LenderContact[]; notes?: string; capitalTypePrograms?: CapitalTypeProgram[]; originalId?: number;
 };
 type RetailUnit = { id: number; tenant: string; rent: string; sqft: string; };
 type AssetAddress = { street: string; unit: string; city: string; state: string; zip: string; };
