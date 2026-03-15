@@ -101,7 +101,7 @@ body { font-family:'Montserrat',sans-serif; background:white; color:#1a2f5e; -we
 ${activeSectionList.includes("Executive Summary") ? `
 <div style="display:flex;border-bottom:1px solid #e0e5f0;">
   <div style="width:42%;background:#0f2456;padding:26px 24px;">
-    <div style="font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;line-height:1.15;color:white;margin-bottom:10px;">Executive<br>Summary</div>
+    <div style="font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;line-height:1.15;color:#c9a84c;margin-bottom:10px;">Executive<br>Summary</div>
     <div style="width:34px;height:2px;background:rgba(255,255,255,0.22);margin-bottom:14px;"></div>
     <div style="font-size:10.5px;line-height:1.8;color:rgba(255,255,255,0.75);white-space:pre-wrap;">${f("executiveSummary")}</div>
   </div>
@@ -176,7 +176,7 @@ ${advisorName ? `
       })()}
     </div>
     <div>
-      <div style="font-size:7px;letter-spacing:0.22em;text-transform:uppercase;color:rgba(255,255,255,0.35);margin-bottom:4px;">Capital Advisor</div>
+      <div style="font-size:7px;letter-spacing:0.22em;text-transform:uppercase;color:#c9a84c;margin-bottom:4px;">Capital Advisor</div>
       <div style="font-size:13px;font-weight:800;color:white;">${advisorName}</div>
       ${advisorEmail ? `<div style="font-size:9.5px;color:rgba(255,255,255,0.52);margin-top:3px;">${advisorEmail}</div>` : ""}
       ${advisorPhone ? `<div style="font-size:9.5px;color:rgba(255,255,255,0.52);">${advisorPhone}</div>` : ""}
