@@ -990,7 +990,7 @@ function DropdownCheckbox({ label, options, selected, onChange }: { label: strin
         <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform ${open ? "rotate-90" : ""}`} />
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
+        <div className="absolute z-[100] mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gray-50">
             <span className="text-xs text-gray-500 font-medium">{selected.length} selected</span>
             <div className="flex gap-2">
@@ -1648,8 +1648,8 @@ function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTr
                   }
                   const open = isOpen(ct);
                   return (
-                    <div key={ct} className="rounded-xl border border-[#0a1f44]/20 overflow-hidden">
-                      <button type="button" onClick={() => toggleAccordion(ct)} className="w-full flex items-center justify-between px-4 py-3 bg-[#0a1f44]/5 hover:bg-[#0a1f44]/10 transition-all">
+                    <div key={ct} className="rounded-xl border border-[#0a1f44]/20">
+                      <button type="button" onClick={() => toggleAccordion(ct)} className="w-full flex items-center justify-between px-4 py-3 bg-[#0a1f44]/5 hover:bg-[#0a1f44]/10 transition-all rounded-t-xl">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full bg-[#c9a84c]" />
                           <span className="text-sm font-bold text-[#0a1f44]">{ct}</span>
@@ -1658,7 +1658,7 @@ function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTr
                         <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform ${open ? "rotate-90" : ""}`} />
                       </button>
                       {open && (
-                        <div className="p-4 space-y-3 bg-white">
+                        <div className="p-4 space-y-4 bg-white rounded-b-xl">
                           <div className="grid gap-3 md:grid-cols-3">
                             <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Min Loan</label><Input value={prog.minLoan} onChange={(e) => updProg("minLoan", formatCurrencyInput(e.target.value))} placeholder="$1,000,000" className={inputClass} /></div>
                             <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max Loan</label><Input value={prog.maxLoan} onChange={(e) => updProg("maxLoan", formatCurrencyInput(e.target.value))} placeholder="$25,000,000" className={inputClass} /></div>
@@ -1672,8 +1672,8 @@ function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTr
                               </>
                             ) : (
                               <>
-                                <DropdownCheckbox label="Property Types" options={lenderPropertyTypeOptions} selected={prog.propertyTypes} onChange={(v) => updProg("propertyTypes", v)} />
-                                <DropdownCheckbox label="Loan Terms" options={loanTermOptions} selected={prog.loanTerms} onChange={(v) => updProg("loanTerms", v)} />
+                                <div className="relative z-50"><DropdownCheckbox label="Property Types" options={lenderPropertyTypeOptions} selected={prog.propertyTypes} onChange={(v) => updProg("propertyTypes", v)} /></div>
+                                <div className="relative z-50"><DropdownCheckbox label="Loan Terms" options={loanTermOptions} selected={prog.loanTerms} onChange={(v) => updProg("loanTerms", v)} /></div>
                               </>
                             )}
                           </div>
@@ -3154,9 +3154,9 @@ function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, in
       numUnits: asset.numUnits || "",
       recourse: asset.recourseType || "",
       states: (asset.selectedStates || []).join(", "),
-      advisorName: advisors[0]?.name || "",
-      advisorEmail: advisors[0]?.email || "",
-      advisorPhone: advisors[0]?.phone || "",
+      advisorName: advisors.map(a => a.name).join(", "),
+      advisorEmail: advisors.map(a => a.email).join(", "),
+      advisorPhone: advisors.map(a => a.phone).join(", "),
       executiveSummary: `${selectedDeal.seekerName} is seeking ${asset.loanAmount || "TBD"} in ${selectedDeal.capitalType} financing for a ${asset.dealType?.toLowerCase() || ""} ${asset.assetType?.toLowerCase() || ""} located at ${asset.address?.city || ""}, ${asset.address?.state || ""}.`,
       propertyOverview: `The subject property is a ${asset.numUnits ? asset.numUnits + "-unit " : ""}${asset.assetType?.toLowerCase() || ""} located at ${asset.address?.street || ""}, ${asset.address?.city || ""}, ${asset.address?.state || ""}. The deal is structured as a ${asset.dealType?.toLowerCase() || ""} with a ${asset.ownershipStatus?.toLowerCase() || ""}.`,
       capitalStackSection: `Loan Amount: ${asset.loanAmount || "TBD"}\nProperty Value / ARV: ${asset.propertyValue || "TBD"}\nCapital Type: ${selectedDeal.capitalType}\nLTV: ${asset.manualLtv || "TBD"}\nDSCR: ${asset.dscr || "TBD"}\nRecourse: ${asset.recourseType || "TBD"}`,
