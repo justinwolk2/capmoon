@@ -3550,11 +3550,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     if (!lender) return;
     if (isAdmin) {
       if (window.confirm(`Delete ${lender.lender}? This cannot be undone.`)) {
-        setLenderRecords((prev) => {
-          const next = prev.filter((l) => l.id !== id);
-          saveLendersToDb(next);
-          return next;
-        });
+        setLenderRecords((prev) => prev.filter((l) => l.id !== id));
         setEditingLenderId(null);
       }
     } else {
@@ -3566,11 +3562,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   function handleDeleteRequestAction(reqId: number, action: "approved" | "denied") {
     const req = deleteRequests.find((r) => r.id === reqId);
     if (!req) return;
-    if (action === "approved") setLenderRecords((prev) => {
-      const next = prev.filter((l) => l.id !== req.lenderId);
-      saveLendersToDb(next);
-      return next;
-    });
+    if (action === "approved") setLenderRecords((prev) => prev.filter((l) => l.id !== req.lenderId));
     setDeleteRequests(deleteRequests.map((r) => r.id === reqId ? { ...r, status: action } : r));
   }
 
