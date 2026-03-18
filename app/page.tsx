@@ -45,7 +45,7 @@ type TeamMember = {
   geographicMarket: string; specialtyAreas: string[]; title: string;
 };
 type AppUser = {
-  id: number; username: string; password: string; role: "admin" | "advisor" | "capital-seeker";
+  id: number; username: string; password: string; role: "admin" | "advisor" | "capital-seeker" | "lender"; linkedLenderId?: number;
   name: string; blockedLenderIds: number[]; teamMemberId?: number; phone?: string; email?: string;
 };
 type SubmittedDeal = {
@@ -68,6 +68,13 @@ type LenderChangeRequest = {
   requestedAt: string;
   status: "pending" | "approved" | "denied";
 };
+type LenderSubmission = {
+  id: number; dealId: number; lenderId: number; lenderName: string; lenderEmail: string;
+  dealTitle: string; advisorName: string; token: string;
+  status: "sent" | "viewed" | "declined" | "info_requested";
+  responseMessage?: string; createdAt: string; viewedAt?: string; respondedAt?: string;
+};
+
 type AuthSession = { user: AppUser; } | null;
 type MatcherStep = "ai-prompt" | "start" | "asset-count" | "asset-form" | "review" | "results" | "hybrid-count" | "hybrid-form";
 type HybridSubLayer = { id: number; type: string; amount: string; };
@@ -3526,6 +3533,13 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const [selectedCapitalFilter, setSelectedCapitalFilter] = useState("All");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState("All");
   const [selectedLetter, setSelectedLetter] = useState("All");
+  const [filterMinLoan, setFilterMinLoan] = useState("");
+  const [filterMaxLoan, setFilterMaxLoan] = useState("");
+  const [filterMaxLtv, setFilterMaxLtv] = useState("");
+  const [filterPropertyTypes, setFilterPropertyTypes] = useState<string[]>([]);
+  const [filterStates, setFilterStates] = useState<string[]>([]);
+  const [filterLenderTypes, setFilterLenderTypes] = useState<string[]>([]);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [editingLenderId, setEditingLenderId] = useState<number | null>(null);
   const [viewingLenderId, setViewingLenderId] = useState<number | null>(null);
   const [newUserForm, setNewUserForm] = useState({ name: "", username: "", password: "", role: "capital-seeker" as AppUser["role"] });
@@ -3642,6 +3656,12 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
       if (selectedCapitalFilter !== "All" && !l.type?.split(",").map((s: string) => s.trim()).includes(selectedCapitalFilter)) return false;
       if (selectedStatusFilter !== "All" && l.status !== selectedStatusFilter) return false;
       if (selectedLetter !== "All" && l.lender[0]?.toUpperCase() !== selectedLetter) return false;
+      if (filterMinLoan) { const min = parseInt(filterMinLoan.replace(/[^0-9]/g,"")); const lMax = parseInt((l.maxLoan||"").replace(/[^0-9]/g,"")); if (lMax>0&&lMax<min) return false; }
+      if (filterMaxLoan) { const max = parseInt(filterMaxLoan.replace(/[^0-9]/g,"")); const lMin = parseInt((l.minLoan||"").replace(/[^0-9]/g,"")); if (lMin>0&&lMin>max) return false; }
+      if (filterMaxLtv) { const ltv=parseFloat(filterMaxLtv); const lLtv=parseFloat((l.maxLtv||"").replace(/[^0-9.]/g,"")); if (lLtv>0&&lLtv<ltv) return false; }
+      if (filterPropertyTypes.length>0) { const lProps=l.assets||[]; if (!filterPropertyTypes.some(pt=>lProps.includes(pt))) return false; }
+      if (filterStates.length>0) { const lSt=l.states||[]; if (!filterStates.some(s=>lSt.includes(s)||lSt.includes("All States"))) return false; }
+      if (filterLenderTypes.length>0) { const lTypes=l.typeOfLenders||[]; if (!filterLenderTypes.some(t=>lTypes.includes(t))) return false; }
       if (terms.length === 0) return true;
       const searchable = [
         l.lender, l.program, l.type, l.contactPerson, l.email, l.phone, l.notes,
@@ -3652,7 +3672,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
       ].filter(Boolean).join(" ").toLowerCase();
       return terms.every(term => searchable.includes(term));
     });
-  }, [lenderRecords, selectedSourceFilter, selectedCapitalFilter, selectedStatusFilter, selectedLetter, search]);
+  }, [lenderRecords, selectedSourceFilter, selectedCapitalFilter, selectedStatusFilter, selectedLetter, search, filterMinLoan, filterMaxLoan, filterMaxLtv, filterPropertyTypes, filterStates, filterLenderTypes]);
   const sortedLenders = useMemo(() => [...filteredLenders].sort((a, b) => a.lender.localeCompare(b.lender)), [filteredLenders]);
 
   const spreadsheetCount = lenderRecords.filter((l) => l.source === "Spreadsheet").length;
@@ -3799,6 +3819,68 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                         </button>
                       ))}
                     </div>
+                  </div>
+
+
+                  {/* Advanced Filters Panel */}
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <button onClick={() => setShowAdvancedFilters(p => !p)} className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/5">
+                        <Filter className="h-3 w-3" /> Advanced Filters
+                        {(filterMinLoan||filterMaxLoan||filterMaxLtv||filterPropertyTypes.length>0||filterStates.length>0||filterLenderTypes.length>0) && (
+                          <span className="ml-1 px-1.5 py-0.5 text-xs bg-[#c9a84c] text-[#0a1f44] rounded-full font-bold">
+                            {[filterMinLoan,filterMaxLoan,filterMaxLtv].filter(Boolean).length + filterPropertyTypes.length + filterStates.length + filterLenderTypes.length}
+                          </span>
+                        )}
+                      </button>
+                      {(filterMinLoan||filterMaxLoan||filterMaxLtv||filterPropertyTypes.length>0||filterStates.length>0||filterLenderTypes.length>0) && (
+                        <button onClick={() => { setFilterMinLoan(""); setFilterMaxLoan(""); setFilterMaxLtv(""); setFilterPropertyTypes([]); setFilterStates([]); setFilterLenderTypes([]); }} className="text-xs text-red-400 hover:text-red-600">Clear Advanced ✕</button>
+                      )}
+                    </div>
+                    {showAdvancedFilters && (
+                      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-4">
+                        <div className="grid gap-3 md:grid-cols-3">
+                          <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Min Loan ($)</label><input value={filterMinLoan} onChange={e=>setFilterMinLoan(e.target.value)} placeholder="e.g. 1,000,000" className="w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Max Loan ($)</label><input value={filterMaxLoan} onChange={e=>setFilterMaxLoan(e.target.value)} placeholder="e.g. 25,000,000" className="w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Min LTV (%)</label><input value={filterMaxLtv} onChange={e=>setFilterMaxLtv(e.target.value)} placeholder="e.g. 70" className="w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-3">
+                          <div>
+                            <label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Property Types</label>
+                            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                              {["Apartments","Office","Retail-Multi Tenant","Light Industrial","Hotel/Hospitality-Flag Required","Self-storage","Mixed-use","Land","Medical Office"].map(pt => (
+                                <button key={pt} type="button" onClick={() => setFilterPropertyTypes(p => p.includes(pt) ? p.filter(x=>x!==pt) : [...p,pt])}
+                                  className={"px-2 py-0.5 text-xs rounded-full border transition-all " + (filterPropertyTypes.includes(pt) ? "bg-[#0a1f44] text-white border-[#0a1f44]" : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30")}>
+                                  {pt}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Lender Type</label>
+                            <div className="flex flex-wrap gap-1">
+                              {["Bridge","Conventional","Private Lender","Hard Money","Family Office","CMBS","Balance Sheet"].map(lt => (
+                                <button key={lt} type="button" onClick={() => setFilterLenderTypes(p => p.includes(lt) ? p.filter(x=>x!==lt) : [...p,lt])}
+                                  className={"px-2 py-0.5 text-xs rounded-full border transition-all " + (filterLenderTypes.includes(lt) ? "bg-[#0a1f44] text-white border-[#0a1f44]" : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30")}>
+                                  {lt}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-500 mb-1 block font-bold uppercase">States</label>
+                            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                              {["FL","NY","TX","CA","GA","IL","CO","AZ","NC","NJ","MA","WA","NV","TN","OH"].map(s => (
+                                <button key={s} type="button" onClick={() => setFilterStates(p => p.includes(s) ? p.filter(x=>x!==s) : [...p,s])}
+                                  className={"px-2 py-0.5 text-xs rounded-full border transition-all " + (filterStates.includes(s) ? "bg-[#0a1f44] text-white border-[#0a1f44]" : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30")}>
+                                  {s}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap gap-2 mb-4">
@@ -4082,6 +4164,42 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                     );
                     setSubmittedDeals(updated);
                     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: updated }) }).catch(e => console.error(e));
+                  }
+
+                  const [showSendLenders, setShowSendLenders] = React.useState(false);
+                  const [lenderSearch, setLenderSearch] = React.useState("");
+                  const [selectedLenderIds, setSelectedLenderIds] = React.useState<number[]>([]);
+                  const [sendingToLenders, setSendingToLenders] = React.useState(false);
+                  const [sentLenders, setSentLenders] = React.useState<any[]>([]);
+
+                  React.useEffect(() => {
+                    fetch("/api/lender-submissions?dealId=" + deal.id)
+                      .then(r => r.json()).then(d => { if (Array.isArray(d)) setSentLenders(d); })
+                      .catch(() => {});
+                  }, [deal.id]);
+
+                  async function sendToLenders() {
+                    setSendingToLenders(true);
+                    const advisor = teamMembers.find((m: TeamMember) => deal.assignedAdvisorIds?.includes(m.id));
+                    for (const lid of selectedLenderIds) {
+                      const lender = lenderRecords.find((l: LenderRecord) => l.id === lid);
+                      if (!lender) continue;
+                      const email = lender.contacts?.[0]?.email || lender.email || "";
+                      await fetch("/api/lender-submissions", { method: "POST", headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "send", dealId: deal.id, lenderId: lid, lenderName: lender.lender,
+                          lenderEmail: email, dealTitle: (deal.assets?.[0]?.assetType || "CRE") + " - " + (deal.assets?.[0]?.loanAmount || "TBD"),
+                          advisorName: advisor?.name || "CapMoon" }) });
+                    }
+                    const updated = await fetch("/api/lender-submissions?dealId=" + deal.id).then(r => r.json());
+                    if (Array.isArray(updated)) setSentLenders(updated);
+                    setSelectedLenderIds([]); setShowSendLenders(false); setSendingToLenders(false);
+                  }
+
+                  async function updateLenderSubmissionStatus(token: string, newStatus: string) {
+                    await fetch("/api/lender-submissions", { method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ action: "respond", token, status: newStatus }) });
+                    const updated = await fetch("/api/lender-submissions?dealId=" + deal.id).then(r => r.json());
+                    if (Array.isArray(updated)) setSentLenders(updated);
                   }
 
                   function updateDealStatus(status: SubmittedDeal["status"]) {
