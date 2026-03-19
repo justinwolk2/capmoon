@@ -119,6 +119,7 @@ const initialUsers: AppUser[] = [
   { id: 1, username: "justin.wolk@capmoon.com", password: "Chairam1!", role: "admin", name: "Justin Wolk", blockedLenderIds: [] },
   { id: 2, username: "lpalumbo@capmoon.com", password: "Louis2024!", role: "advisor", name: "Louis Palumbo", blockedLenderIds: [], teamMemberId: 1 },
   { id: 3, username: "shussain@capmoon.com", password: "Shuvo2024!", role: "advisor", name: "Shuvo Hussain", blockedLenderIds: [], teamMemberId: 2 },
+  { id: 4, username: "testlender@example.com", password: "Lender2024!", role: "lender", name: "Test Lender", blockedLenderIds: [], linkedLenderId: 1 },
 ];
 
 const seedLenders: LenderRecord[] = [
@@ -3494,6 +3495,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   lenderChangeRequests: LenderChangeRequest[]; setLenderChangeRequests: (r: LenderChangeRequest[]) => void;
 }) {
   const isAdmin = session?.user.role === "admin";
+  const isLender = session?.user.role === "lender";
   const [activeTab, setActiveTab] = useState("overview");
   const [prefillDeal, setPrefillDeal] = useState<SubmittedDeal | null>(null);
   const [lenderRecords, setLenderRecords] = useState<LenderRecord[]>(seedLenders);
