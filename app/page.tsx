@@ -45,7 +45,7 @@ type TeamMember = {
   geographicMarket: string; specialtyAreas: string[]; title: string;
 };
 type AppUser = {
-  id: number; username: string; password: string; role: "admin" | "advisor" | "staff" | "capital-seeker" | "lender"; linkedLenderId?: number; emailPrefs?: EmailPrefs; advisorCode?: string; dealSequenceStart?: number; blocked?: boolean; phone?: string;
+  id: number; username: string; password: string; role: "admin" | "advisor" | "staff" | "capital-seeker" | "lender"; linkedLenderId?: number; emailPrefs?: EmailPrefs; advisorCode?: string; dealSequenceStart?: number; blocked?: boolean;
   name: string; blockedLenderIds: number[]; teamMemberId?: number; phone?: string; email?: string;
 };
 type SubmittedDeal = {
