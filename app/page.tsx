@@ -4393,7 +4393,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                           ) : (
                             <div className="space-y-2">
                               {sentLenders.map((sl: any) => (
-                                <div key={sl.id} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                                <div key={sl.id} className={"rounded-lg border p-3 " + (sl.status === "declined" ? "border-red-200 bg-red-50" : "border-gray-100 bg-gray-50")}>
                                   <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1 min-w-0">
                                       <div className="text-sm font-bold text-[#0a1f44] truncate">{sl.lender_name}</div>
