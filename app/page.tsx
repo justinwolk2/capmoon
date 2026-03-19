@@ -3773,7 +3773,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   function addUser() {
     if (!newUserForm.name.trim() || !newUserForm.username.trim() || !newUserForm.password.trim()) return;
     setUsers([...users, { id: users.length + 1, ...newUserForm, blockedLenderIds: [] }]);
-    setNewUserForm({ name: "", username: "", password: "", role: "capital-seeker" });
+    setNewUserForm({ name: "", username: "", password: "", role: "capital-seeker", emailPrefs: { dealSubmitted: true, lenderResponded: true, documentRequested: true, statusChanged: true, dealAssigned: true } });
   }
   function toggleBlockedLender(userId: number, lenderId: number) {
     setUsers(users.map((u) => u.id !== userId ? u : { ...u, blockedLenderIds: u.blockedLenderIds.includes(lenderId) ? u.blockedLenderIds.filter((id) => id !== lenderId) : [...u.blockedLenderIds, lenderId] }));
