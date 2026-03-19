@@ -3536,6 +3536,14 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const isAdmin = session?.user.role === "admin";
   const isLender = session?.user.role === "lender";
   const [activeTab, setActiveTab] = useState("overview");
+  const [dealSearch, setDealSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [filterCapital, setFilterCapital] = useState("All");
+  const [filterAdvisor, setFilterAdvisor] = useState("All");
+  const [filterClient, setFilterClient] = useState("All");
+  const [showMyDeals, setShowMyDeals] = useState(true);
+  const [showAdvisorDeals, setShowAdvisorDeals] = useState(true);
+  const [showClientDeals, setShowClientDeals] = useState(true);
   const [prefillDeal, setPrefillDeal] = useState<SubmittedDeal | null>(null);
   const [lenderRecords, setLenderRecords] = useState<LenderRecord[]>(seedLenders);
   const [lendersLoaded, setLendersLoaded] = useState(false);
