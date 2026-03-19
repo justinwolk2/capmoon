@@ -4434,6 +4434,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
                 return (
                   <div className={cardClass + " p-6"}>
+                    {/* Header */}
                     <div className="flex items-center justify-between mb-5">
                       <div>
                         <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">CapMoon</div>
@@ -4442,60 +4443,176 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                       <div className="text-xs text-gray-400">{visibleDeals.length} deal{visibleDeals.length !== 1 ? "s" : ""}</div>
                     </div>
 
-                    {isAdmin ? (() => {
-                      // Admin sees 3 sections
+                    {(() => {
+                      // ── Filter state (declared inside IIFE so it's scoped to this tab render) ──
+                      const [dealSearch, setDealSearch] = React.useState("");
+                      const [filterStatus, setFilterStatus] = React.useState("All");
+                      const [filterCapital, setFilterCapital] = React.useState("All");
+                      const [filterAdvisor, setFilterAdvisor] = React.useState("All");
+                      const [filterClient, setFilterClient] = React.useState("All");
+                      const [showMyDeals, setShowMyDeals] = React.useState(true);
+                      const [showAdvisorDeals, setShowAdvisorDeals] = React.useState(true);
+                      const [showClientDeals, setShowClientDeals] = React.useState(true);
+
+                      // Categorise all visible deals
                       const adminDeals = visibleDeals.filter(d => {
-                        const submitter = users.find(u => u.name === d.seekerName);
-                        return submitter?.role === "admin" || d.assignedAdvisorIds.includes(session?.user.teamMemberId || -1);
+                        const sub = users.find(u => u.name === d.seekerName);
+                        return sub?.role === "admin";
                       });
                       const advisorDeals = visibleDeals.filter(d => {
-                        const submitter = users.find(u => u.name === d.seekerName);
-                        return submitter?.role === "advisor" || (d.assignedAdvisorIds.length > 0 && !adminDeals.includes(d));
+                        const sub = users.find(u => u.name === d.seekerName);
+                        return sub?.role === "advisor" || (d.assignedAdvisorIds.length > 0 && !adminDeals.includes(d) && !(users.find(u=>u.name===d.seekerName)?.role==="capital-seeker"));
                       });
                       const clientDeals = visibleDeals.filter(d => {
-                        const submitter = users.find(u => u.name === d.seekerName);
-                        return submitter?.role === "capital-seeker" || (!adminDeals.includes(d) && !advisorDeals.includes(d));
+                        return !adminDeals.includes(d) && !advisorDeals.includes(d);
                       });
 
-                      function DealSection({ title, deals, color = "#c9a84c" }: { title: string; deals: SubmittedDeal[]; color?: string }) {
+                      // Unique advisors + clients for dropdowns
+                      const advisorOptions = teamMembers.map(m => m.name);
+                      const clientOptions = [...new Set(clientDeals.map(d => d.seekerName))];
+
+                      // Apply search + filters to a deal list
+                      function filterDeals(deals: SubmittedDeal[]) {
+                        return deals.filter(d => {
+                          const asset = d.assets?.[0];
+                          const q = dealSearch.toLowerCase();
+                          if (q && ![d.seekerName, d.capitalType, asset?.assetType, asset?.loanAmount,
+                            asset?.address?.city, asset?.address?.state, asset?.dealType]
+                            .some(v => v?.toLowerCase().includes(q))) return false;
+                          if (filterStatus !== "All" && d.status !== filterStatus.toLowerCase()) return false;
+                          if (filterCapital !== "All" && d.capitalType !== filterCapital) return false;
+                          return true;
+                        });
+                      }
+
+                      function filterAdvisorDeals(deals: SubmittedDeal[]) {
+                        let filtered = filterDeals(deals);
+                        if (filterAdvisor !== "All") {
+                          const tm = teamMembers.find(m => m.name === filterAdvisor);
+                          if (tm) filtered = filtered.filter(d => d.assignedAdvisorIds.includes(tm.id));
+                        }
+                        return filtered;
+                      }
+
+                      function filterClientDeals(deals: SubmittedDeal[]) {
+                        let filtered = filterDeals(deals);
+                        if (filterClient !== "All") filtered = filtered.filter(d => d.seekerName === filterClient);
+                        return filtered;
+                      }
+
+                      const filteredAdmin = filterDeals(adminDeals);
+                      const filteredAdvisor = filterAdvisorDeals(advisorDeals);
+                      const filteredClient = filterClientDeals(clientDeals);
+                      const totalFiltered = filteredAdmin.length + filteredAdvisor.length + filteredClient.length;
+
+                      function SectionHeader({ title, count, color, show, onToggle, children }: { title: string; count: number; color: string; show: boolean; onToggle: () => void; children?: React.ReactNode }) {
                         return (
-                          <div className="mb-8">
-                            <div className="flex items-center gap-3 mb-4">
-                              <div className="h-px flex-1 bg-gray-200" />
-                              <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-gray-200 bg-white">
-                                <div className="w-2 h-2 rounded-full" style={{ background: color }} />
+                          <div className="mb-6">
+                            <div className="flex items-center gap-3 mb-3 flex-wrap">
+                              <button type="button" onClick={onToggle} className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200 bg-white hover:border-[#0a1f44]/20 transition-all">
+                                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
                                 <span className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">{title}</span>
-                                <span className="text-xs text-gray-400">({deals.length})</span>
-                              </div>
-                              <div className="h-px flex-1 bg-gray-200" />
+                                <span className="text-xs text-gray-400">({count})</span>
+                                <span className="text-xs text-gray-300 ml-1">{show ? "▲" : "▼"}</span>
+                              </button>
+                              {children}
                             </div>
-                            {deals.length === 0 ? (
-                              <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">No deals in this category</div>
-                            ) : (
-                              <div className="space-y-4">{deals.map(d => <DealCard key={d.id} deal={d} />)}</div>
-                            )}
                           </div>
                         );
                       }
 
                       return (
                         <>
-                          <DealSection title="My Deals / Admin Deals" deals={adminDeals} color="#0a1f44" />
-                          <DealSection title="Capital Advisor Deals" deals={advisorDeals} color="#c9a84c" />
-                          <DealSection title="Client / Customer Deals" deals={clientDeals} color="#10b981" />
+                          {/* Search + Global Filters */}
+                          <div className="mb-6 space-y-3">
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                              <input value={dealSearch} onChange={e => setDealSearch(e.target.value)}
+                                placeholder="Search deals by borrower, asset type, capital type, city, loan amount..."
+                                className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+                                className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] text-gray-600">
+                                <option value="All">All Statuses</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Assigned">Assigned</option>
+                                <option value="Closed">Closed</option>
+                              </select>
+                              <select value={filterCapital} onChange={e => setFilterCapital(e.target.value)}
+                                className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] text-gray-600">
+                                <option value="All">All Capital Types</option>
+                                {capitalTypes.map(ct => <option key={ct} value={ct}>{ct}</option>)}
+                              </select>
+                              {(dealSearch || filterStatus !== "All" || filterCapital !== "All") && (
+                                <button type="button" onClick={() => { setDealSearch(""); setFilterStatus("All"); setFilterCapital("All"); }}
+                                  className="px-3 py-2 text-xs text-red-400 border border-red-200 rounded-xl hover:bg-red-50">
+                                  Clear Filters ✕
+                                </button>
+                              )}
+                              <div className="ml-auto text-xs text-gray-400 self-center">{totalFiltered} deal{totalFiltered !== 1 ? "s" : ""} shown</div>
+                            </div>
+                          </div>
+
+                          {/* My Deals / Admin Section */}
+                          {isAdmin && (
+                            <div className="mb-6">
+                              <SectionHeader title="My Deals" count={filteredAdmin.length} color="#0a1f44" show={showMyDeals} onToggle={() => setShowMyDeals(p => !p)} />
+                              {showMyDeals && (
+                                filteredAdmin.length === 0
+                                  ? <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400 mb-4">No deals found</div>
+                                  : <div className="space-y-4 mb-4">{filteredAdmin.map(d => <DealCard key={d.id} deal={d} />)}</div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Advisor Deals Section */}
+                          {isAdmin && (
+                            <div className="mb-6">
+                              <SectionHeader title="Capital Advisor Deals" count={filteredAdvisor.length} color="#c9a84c" show={showAdvisorDeals} onToggle={() => setShowAdvisorDeals(p => !p)}>
+                                <select value={filterAdvisor} onChange={e => setFilterAdvisor(e.target.value)}
+                                  className="px-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] text-gray-600">
+                                  <option value="All">All Advisors</option>
+                                  {advisorOptions.map(a => <option key={a} value={a}>{a}</option>)}
+                                </select>
+                              </SectionHeader>
+                              {showAdvisorDeals && (
+                                filteredAdvisor.length === 0
+                                  ? <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400 mb-4">No deals found</div>
+                                  : <div className="space-y-4 mb-4">{filteredAdvisor.map(d => <DealCard key={d.id} deal={d} />)}</div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Client Deals Section */}
+                          <div className="mb-6">
+                            <SectionHeader title="Client / Customer Deals" count={filteredClient.length} color="#10b981" show={showClientDeals} onToggle={() => setShowClientDeals(p => !p)}>
+                              {clientOptions.length > 0 && (
+                                <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
+                                  className="px-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] text-gray-600">
+                                  <option value="All">All Clients</option>
+                                  {clientOptions.map(cl => <option key={cl} value={cl}>{cl}</option>)}
+                                </select>
+                              )}
+                            </SectionHeader>
+                            {showClientDeals && (
+                              filteredClient.length === 0
+                                ? <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400 mb-4">
+                                    {clientDeals.length === 0 ? "No client deals yet." : "No deals match your filters."}
+                                  </div>
+                                : <div className="space-y-4 mb-4">{filteredClient.map(d => <DealCard key={d.id} deal={d} />)}</div>
+                            )}
+                          </div>
+
+                          {/* Non-admin: just show visible deals with search */}
+                          {!isAdmin && (
+                            visibleDeals.length === 0
+                              ? <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">No deals assigned to you yet.</div>
+                              : <div className="space-y-4">{filterDeals(visibleDeals).map(d => <DealCard key={d.id} deal={d} />)}</div>
+                          )}
                         </>
                       );
-                    })() : (
-                      visibleDeals.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">
-                          No deals assigned to you yet.
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {visibleDeals.map((deal) => <DealCard key={deal.id} deal={deal} />)}
-                        </div>
-                      )
-                    )}
+                    })()}
                   </div>
                 );
               })()}
