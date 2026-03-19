@@ -884,7 +884,7 @@ function blankAsset(id: number): AssetData {
   return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "Apartments", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dscr: "", currentRate: "", purchaseYear: String(new Date().getFullYear()), fullyEntitled: undefined, currentPropertyValue: "", additionalEquity: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
 }
 function blankLenderForm(): NewLenderForm {
-  return { programName: "", contactPerson: "", email: "", phone: "", website: "", typeOfLenders: [], typeOfLoans: [], programTypes: [], propertyTypes: [], loanTerms: [], notes: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalTypes: [], capitalTypePrograms: [], status: "Active" };
+  return { programName: "", contactPerson: "", email: "", phone: "", website: "", typeOfLenders: [], typeOfLoans: [], programTypes: [], propertyTypes: [], loanTerms: [], notes: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalTypes: [], capitalTypePrograms: [], contacts: [], status: "Active" };
 }
 function subordinateLabel(ct: string) {
   if (ct === "Mezzanine") return "Mezzanine Amount";
@@ -1000,7 +1000,7 @@ function DropdownCheckbox({ label, options, selected, onChange }: { label: strin
         <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform ${open ? "rotate-90" : ""}`} />
       </button>
       {open && (
-        <div className="absolute z-[100] mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
+        <div className="absolute z-[100] mt-1 w-full rounded-xl border border-gray-300 bg-gray-50 shadow-xl overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gray-50">
             <span className="text-xs text-gray-500 font-medium">{selected.length} selected</span>
             <div className="flex gap-2">
@@ -4110,6 +4110,24 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                     {item.states && item.states.length > 0 && (<div className="mb-3"><div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-1.5">States ({item.states.length})</div><div className="flex flex-wrap gap-1">{item.states.length >= 50 ? <span className="px-2 py-0.5 rounded-full text-xs bg-[#0a1f44] text-white">All 50 States</span> : item.states.map((s) => <span key={s} className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600 border border-gray-200">{s}</span>)}</div></div>)}
                                     {item.loanTerms && <div className="mb-3"><div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-1">Loan Terms</div><div className="text-xs text-gray-600">{item.loanTerms}</div></div>}
                                     {item.notes && (<div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2"><div className="text-xs font-bold text-amber-700 mb-0.5">Notes</div><div className="text-xs text-gray-700 whitespace-pre-wrap">{item.notes}</div></div>)}
+
+                                    {/* Additional Contacts */}
+                                    {item.contacts && item.contacts.length > 0 && (
+                                      <div className="mt-4">
+                                        <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Additional Contacts</div>
+                                        <div className="space-y-2">
+                                          {item.contacts.map((contact: any) => (
+                                            <div key={contact.id} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 flex flex-wrap gap-x-4 gap-y-1">
+                                              {contact.name && <div className="text-xs font-bold text-[#0a1f44]">{contact.name}</div>}
+                                              {contact.email && <div className="text-xs text-gray-500">{contact.email}</div>}
+                                              {contact.phone && <div className="text-xs text-gray-500">{contact.phone}</div>}
+                                              {contact.region && <div className="text-xs text-[#c9a84c] font-medium">{contact.region}</div>}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
                                     <div className="mt-4 flex gap-2">
                                       <button onClick={() => { setEditingLenderId(item.id); setViewingLenderId(null); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#0a1f44] text-white rounded-lg hover:bg-[#0a1f44]/80"><Edit2 className="h-3 w-3" /> Edit Lender</button>
                                       <button onClick={() => toggleLenderStatus(item.id)} className="px-3 py-1.5 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50">{item.status === "Inactive" ? "Activate" : "Deactivate"}</button>
