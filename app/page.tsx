@@ -4501,7 +4501,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                         <div className="space-y-4">
                           {visibleDeals.map((deal) => <DealCard key={deal.id} deal={deal} />)}
                         </div>
-                      ))
+                       )
+                     }
                   </div>
                 );
               })()}
