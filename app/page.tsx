@@ -1457,7 +1457,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                         <span className="font-medium">Additional Equity (deducted)</span>
                         <span className="font-bold">− {formatCurrencyInput(String(addlEquity))}</span>
                       </div>
-                    ))}
+                    )}
                     <div className="flex justify-between text-sm font-bold text-[#0a1f44] pt-2 border-t border-gray-200">
                       <span>Suggested Loan Amount</span>
                       <span className="text-[#c9a84c]">{formatCurrencyInput(String(netCost))}</span>
