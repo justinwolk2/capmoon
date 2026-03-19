@@ -3898,190 +3898,120 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   ];
 
   // ── SectionHeader component (extracted for React hooks compliance) ──
-  function SectionHeader({ title, count, color, show, onToggle, children }: { title: string; count: number; color: string; show: boolean; onToggle: () => void; children?: React.ReactNode }) {
-    return (
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-3 flex-wrap">
-          <button type="button" onClick={onToggle} className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200 bg-white hover:border-[#0a1f44]/20 transition-all">
-            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
-            <span className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">{title}</span>
-            <span className="text-xs text-gray-400">({count})</span>
-            <span className="text-xs text-gray-300 ml-1">{show ? "▲" : "▼"}</span>
-          </button>
-          {children}
-        </div>
-      </div>
-    );
-  }
+                      function SectionHeader({ title, count, color, show, onToggle, children }: { title: string; count: number; color: string; show: boolean; onToggle: () => void; children?: React.ReactNode }) {
+                        return (
+                          <div className="mb-6">
+                            <div className="flex items-center gap-3 mb-3 flex-wrap">
+                              <button type="button" onClick={onToggle} className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200 bg-white hover:border-[#0a1f44]/20 transition-all">
+                                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                                <span className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">{title}</span>
+                                <span className="text-xs text-gray-400">({count})</span>
+                                <span className="text-xs text-gray-300 ml-1">{show ? "▲" : "▼"}</span>
+                              </button>
+                              {children}
+                            </div>
+                          </div>
+                        );
+                      }
 
   // ── UserCard component (extracted for React hooks compliance) ──
-  function UserCard({ user }: { user: AppUser }) {
-    const [expanded, setExpanded] = React.useState(false);
-    const [editing, setEditing] = React.useState(false);
-    const [editForm, setEditForm] = React.useState({ name: user.name || "", username: user.username || "", phone: user.phone || "", password: "" });
-    const [confirmDelete, setConfirmDelete] = React.useState(false);
-    const isBlocked = user.blocked === true;
-  
-    function saveEdits() {
-      const updated = users.map(u => u.id === user.id ? {
-        ...u,
-        name: editForm.name || u.name,
-        username: editForm.username || u.username,
-        phone: editForm.phone,
-        ...(editForm.password ? { password: editForm.password } : {}),
-      } : u);
-      setUsers(updated);
-      fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "users", data: updated }) }).catch(console.error);
-      setEditing(false);
-    }
-  
-    function toggleBlock() {
-      const updated = users.map(u => u.id === user.id ? { ...u, blocked: !isBlocked } : u);
-      setUsers(updated);
-      fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "users", data: updated }) }).catch(console.error);
-    }
-  
-    function deleteUser() {
-      const updated = users.filter(u => u.id !== user.id);
-      setUsers(updated);
-      fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "users", data: updated }) }).catch(console.error);
-    }
-  
-    return (
-      <div data-user-card={user.name + " " + user.username + " " + user.role}
-        className={"rounded-xl border bg-white " + (isBlocked ? "border-red-200 bg-red-50/30" : "border-gray-200")}>
-        {/* Header row */}
-        <button type="button" onClick={() => setExpanded(p => !p)}
-          className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50/50 rounded-xl">
-          <div className="flex items-center gap-3">
-            <div className={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold " + (isBlocked ? "bg-red-100 text-red-500" : "bg-[#0a1f44]/10 text-[#0a1f44]")}>
-              {(user.name || user.username || "?")[0].toUpperCase()}
-            </div>
-            <div>
-              <div className="text-sm font-bold text-[#0a1f44]">{user.name || user.username}</div>
-              <div className="text-xs text-gray-400">{user.username}{isBlocked && <span className="ml-2 text-red-400 font-semibold">· Blocked</span>}</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {user.id === 1 && <span className="px-2 py-0.5 text-xs bg-[#c9a84c]/10 text-[#c9a84c] border border-[#c9a84c]/20 rounded-full font-bold">Master Admin</span>}
-            <span className="text-gray-300 text-xs">{expanded ? "▲" : "▼"}</span>
-          </div>
-        </button>
-  
-        {expanded && (
-          <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-4">
-  
-            {/* Edit Profile */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">Profile</div>
-                <button type="button" onClick={() => setEditing(p => !p)}
-                  className="text-xs text-[#0a1f44] border border-[#0a1f44]/20 px-2 py-1 rounded-lg hover:bg-[#0a1f44]/5">
-                  {editing ? "Cancel" : "Edit"}
-                </button>
-              </div>
-              {editing ? (
-                <div className="space-y-2">
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <div>
-                      <label className="text-xs text-gray-400 mb-1 block">Full Name</label>
-                      <input value={editForm.name} onChange={e => setEditForm(p => ({...p, name: e.target.value}))}
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] bg-white" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-400 mb-1 block">Email / Username</label>
-                      <input value={editForm.username} onChange={e => setEditForm(p => ({...p, username: e.target.value}))}
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] bg-white" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-400 mb-1 block">Phone</label>
-                      <input value={editForm.phone} onChange={e => setEditForm(p => ({...p, phone: e.target.value}))}
-                        placeholder="(555) 000-0000"
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] bg-white" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-400 mb-1 block">New Password <span className="text-gray-300">(leave blank to keep)</span></label>
-                      <input type="password" value={editForm.password} onChange={e => setEditForm(p => ({...p, password: e.target.value}))}
-                        placeholder="••••••••"
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] bg-white" />
-                    </div>
-                  </div>
-                  <button type="button" onClick={saveEdits}
-                    className="px-4 py-2 text-sm font-bold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">
-                    Save Changes
-                  </button>
-                </div>
-              ) : (
-                <div className="text-xs text-gray-500 space-y-0.5">
-                  {user.phone && <div>📞 {user.phone}</div>}
-                  <div>🔑 Password: ••••••••</div>
-                </div>
-              )}
-            </div>
-  
-            {/* Email Notification Prefs */}
-            <div>
-              <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Email Notifications</div>
-              <div className="flex flex-wrap gap-1.5">
-                {[["Deal Submitted","dealSubmitted"],["Lender Responded","lenderResponded"],["Doc Requested","documentRequested"],["Status Changed","statusChanged"],["Deal Assigned","dealAssigned"]].map(([label, key]) => {
-                  const prefs = user.emailPrefs || { dealSubmitted:true, lenderResponded:true, documentRequested:true, statusChanged:true, dealAssigned:true };
-                  const enabled = (prefs as any)[key] !== false;
-                  return (
-                    <button key={key} type="button" onClick={() => {
-                      const updated = users.map(u => u.id === user.id ? { ...u, emailPrefs: { ...prefs, [key]: !enabled } } : u);
-                      setUsers(updated); fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "users", data: updated }) }).catch(console.error);
-                    }} className={"px-2 py-0.5 text-xs rounded-full border font-medium transition-all " + (enabled ? "bg-[#0a1f44] text-white border-[#0a1f44]" : "bg-gray-100 text-gray-400 border-gray-200")}>
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-              {user.role === "lender" && <p className="text-xs text-gray-400 mt-1.5">Lenders always receive the initial deal request regardless of preferences.</p>}
-            </div>
-  
-            {/* Lender access control */}
-            {user.role !== "admin" && (
-              <div>
-                <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Lender Access Control</div>
-                <DropdownCheckbox
-                  label="Blocked Lenders"
-                  options={[...lenderRecords].sort((a,b) => a.lender.localeCompare(b.lender)).map(l => l.lender)}
-                  selected={user.blockedLenderIds.map(id => lenderRecords.find(l => l.id === id)?.lender || "").filter(Boolean)}
-                  onChange={(selectedNames) => {
-                    const newIds = lenderRecords.filter(l => selectedNames.includes(l.lender)).map(l => l.id);
-                    setUsers(users.map(u => u.id === user.id ? { ...u, blockedLenderIds: newIds } : u));
-                  }}
-                />
-                {user.blockedLenderIds.length > 0 && <div className="mt-1 text-xs text-red-500">{user.blockedLenderIds.length} lender{user.blockedLenderIds.length !== 1 ? "s" : ""} blocked</div>}
-              </div>
-            )}
-  
-            {/* Access + Delete (not master admin) */}
-            {user.id !== 1 && (
-              <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
-                <button type="button" onClick={toggleBlock}
-                  className={"px-3 py-1.5 text-xs font-semibold border rounded-lg " + (isBlocked ? "border-green-200 text-green-600 hover:bg-green-50" : "border-orange-200 text-orange-600 hover:bg-orange-50")}>
-                  {isBlocked ? "✓ Unblock Access" : "⊘ Block Access"}
-                </button>
-                {!confirmDelete ? (
-                  <button type="button" onClick={() => setConfirmDelete(true)}
-                    className="px-3 py-1.5 text-xs font-semibold border border-red-200 text-red-500 rounded-lg hover:bg-red-50">
-                    Delete User
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-red-500 font-medium">Are you sure?</span>
-                    <button type="button" onClick={deleteUser} className="px-3 py-1.5 text-xs font-bold bg-red-500 text-white rounded-lg hover:bg-red-600">Yes, Delete</button>
-                    <button type="button" onClick={() => setConfirmDelete(false)} className="px-3 py-1.5 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50">Cancel</button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
+                      function UserCard({ user, users, setUsers, lenderRecords }: { user: AppUser; users: AppUser[]; setUsers: (u: AppUser[]) => void; lenderRecords: LenderRecord[] }) {
+                        const [expanded, setExpanded] = React.useState(false);
+                        const [editing, setEditing] = React.useState(false);
+                        const [editForm, setEditForm] = React.useState<{name:string;username:string;phone:string;password:string}>({ name: user.name || "", username: user.username || "", phone: (user as any).phone || "", password: "" });
+                        const [confirmDelete, setConfirmDelete] = React.useState(false);
+                        const isBlocked = (user as any).blocked === true;
+                        function persist(updated: AppUser[]) {
+                          setUsers(updated);
+                          fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "users", data: updated }) }).catch(console.error);
+                        }
+                        function saveEdits() {
+                          persist(users.map(u => u.id === user.id ? { ...u, name: editForm.name || u.name, username: editForm.username || u.username, phone: editForm.phone, ...(editForm.password ? { password: editForm.password } : {}) } : u));
+                          setEditing(false);
+                        }
+                        return (
+                          <div data-user-card={(user.name || "") + " " + user.username + " " + user.role}
+                            className={"rounded-xl border bg-white " + (isBlocked ? "border-red-200 bg-red-50/30" : "border-gray-200")}>
+                            <button type="button" onClick={() => setExpanded(p => !p)}
+                              className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50/50 rounded-xl">
+                              <div className="flex items-center gap-3">
+                                <div className={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold " + (isBlocked ? "bg-red-100 text-red-500" : "bg-[#0a1f44]/10 text-[#0a1f44]")}>
+                                  {(user.name || user.username || "?")[0].toUpperCase()}
+                                </div>
+                                <div>
+                                  <div className="text-sm font-bold text-[#0a1f44]">{user.name || user.username}</div>
+                                  <div className="text-xs text-gray-400">{user.username}{isBlocked && <span className="ml-2 text-red-400 font-semibold">· Blocked</span>}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {user.id === 1 && <span className="px-2 py-0.5 text-xs bg-[#c9a84c]/10 text-[#c9a84c] border border-[#c9a84c]/20 rounded-full font-bold">Master Admin</span>}
+                                <span className="text-gray-300 text-xs">{expanded ? "▲" : "▼"}</span>
+                              </div>
+                            </button>
+                            {expanded && (
+                              <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-4">
+                                <div>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">Profile</div>
+                                    <button type="button" onClick={() => setEditing(p => !p)} className="text-xs text-[#0a1f44] border border-[#0a1f44]/20 px-2 py-1 rounded-lg hover:bg-[#0a1f44]/5">{editing ? "Cancel" : "Edit"}</button>
+                                  </div>
+                                  {editing ? (
+                                    <div className="space-y-2">
+                                      <div className="grid gap-2 md:grid-cols-2">
+                                        <div><label className="text-xs text-gray-400 mb-1 block">Full Name</label><input value={editForm.name} onChange={e => setEditForm(p => ({...p, name: e.target.value}))} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] bg-white" /></div>
+                                        <div><label className="text-xs text-gray-400 mb-1 block">Email</label><input value={editForm.username} onChange={e => setEditForm(p => ({...p, username: e.target.value}))} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] bg-white" /></div>
+                                        <div><label className="text-xs text-gray-400 mb-1 block">Phone</label><input value={editForm.phone} onChange={e => setEditForm(p => ({...p, phone: e.target.value}))} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] bg-white" /></div>
+                                        <div><label className="text-xs text-gray-400 mb-1 block">New Password</label><input type="password" value={editForm.password} onChange={e => setEditForm(p => ({...p, password: e.target.value}))} placeholder="leave blank to keep" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] bg-white" /></div>
+                                      </div>
+                                      <button type="button" onClick={saveEdits} className="px-4 py-2 text-sm font-bold bg-[#0a1f44] text-white rounded-xl">Save Changes</button>
+                                    </div>
+                                  ) : (
+                                    <div className="text-xs text-gray-500 space-y-0.5">
+                                      {(user as any).phone && <div>📞 {(user as any).phone}</div>}
+                                      <div>🔑 Password: ••••••••</div>
+                                    </div>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Email Notifications</div>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {([["Deal Submitted","dealSubmitted"],["Lender Responded","lenderResponded"],["Doc Requested","documentRequested"],["Status Changed","statusChanged"],["Deal Assigned","dealAssigned"]] as [string,string][]).map(([label, key]) => {
+                                      const prefs: any = (user as any).emailPrefs || {};
+                                      const enabled = prefs[key] !== false;
+                                      return <button key={key} type="button" onClick={() => persist(users.map(u => u.id === user.id ? { ...u, emailPrefs: { ...prefs, [key]: !enabled } } as AppUser : u))} className={"px-2 py-0.5 text-xs rounded-full border font-medium " + (enabled ? "bg-[#0a1f44] text-white border-[#0a1f44]" : "bg-gray-100 text-gray-400 border-gray-200")}>{label}</button>;
+                                    })}
+                                  </div>
+                                  {user.role === "lender" && <p className="text-xs text-gray-400 mt-1">Lenders always receive the initial deal request.</p>}
+                                </div>
+                                {user.role !== "admin" && (
+                                  <div>
+                                    <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Blocked Lenders</div>
+                                    <DropdownCheckbox label="Blocked Lenders" options={[...lenderRecords].sort((a,b)=>a.lender.localeCompare(b.lender)).map(l=>l.lender)}
+                                      selected={user.blockedLenderIds.map(id=>lenderRecords.find(l=>l.id===id)?.lender||"").filter(Boolean)}
+                                      onChange={names => persist(users.map(u => u.id===user.id ? {...u, blockedLenderIds: lenderRecords.filter(l=>names.includes(l.lender)).map(l=>l.id)} : u))} />
+                                  </div>
+                                )}
+                                {user.id !== 1 && (
+                                  <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+                                    <button type="button" onClick={() => persist(users.map(u => u.id===user.id ? {...u, blocked: !isBlocked} as AppUser : u))}
+                                      className={"px-3 py-1.5 text-xs font-semibold border rounded-lg " + (isBlocked ? "border-green-200 text-green-600 hover:bg-green-50" : "border-orange-200 text-orange-600 hover:bg-orange-50")}>
+                                      {isBlocked ? "✓ Unblock" : "⊘ Block Access"}
+                                    </button>
+                                    {!confirmDelete
+                                      ? <button type="button" onClick={() => setConfirmDelete(true)} className="px-3 py-1.5 text-xs border border-red-200 text-red-500 rounded-lg hover:bg-red-50">Delete User</button>
+                                      : <div className="flex items-center gap-2">
+                                          <span className="text-xs text-red-500">Are you sure?</span>
+                                          <button type="button" onClick={() => persist(users.filter(u => u.id !== user.id))} className="px-3 py-1.5 text-xs font-bold bg-red-500 text-white rounded-lg">Yes, Delete</button>
+                                          <button type="button" onClick={() => setConfirmDelete(false)} className="px-3 py-1.5 text-xs border border-gray-200 text-gray-500 rounded-lg">Cancel</button>
+                                        </div>
+                                    }
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
 
   return (
     <>
@@ -5130,7 +5060,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                     {groupUsers.length === 0 ? (
                                       <div className="text-xs text-gray-400 py-3 pl-2">No {group.label.toLowerCase()} yet</div>
                                     ) : (
-                                      groupUsers.map(u => <UserCard key={u.id} user={u} />)
+                                      groupUsers.map(u => <UserCard key={u.id} user={u} users={users} setUsers={setUsers} lenderRecords={lenderRecords} />)
                                     )}
                                   </div>
                                 )}
