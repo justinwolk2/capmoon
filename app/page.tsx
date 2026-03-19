@@ -38,7 +38,7 @@ type NewLenderForm = {
   programName: string; contactPerson: string; email: string; phone: string; website: string;
   typeOfLenders: string[]; typeOfLoans: string[]; programTypes: string[]; propertyTypes: string[]; loanTerms: string[]; notes: string;
   minLoan: string; maxLoan: string; maxLtv: string; targetStates: string[];
-  sponsorStates: string[]; recourse: string; capitalTypes: string[]; capitalTypePrograms: CapitalTypeProgram[]; status: string;
+  sponsorStates: string[]; recourse: string; capitalTypes: string[]; capitalTypePrograms: CapitalTypeProgram[]; contacts: LenderContact[]; status: string;
 };
 type TeamMember = {
   id: number; name: string; email: string; phone: string; photo: string;
