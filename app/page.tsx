@@ -54,6 +54,7 @@ type SubmittedDeal = {
   assets: AssetData[]; capitalType: string; assetMode: string; collateralMode: string;
   status: "pending" | "assigned" | "closed"; assignedAdvisorIds: number[];
   invitedUserIds?: number[];
+  photos?: { id: number; url: string; caption: string }[];
 };
 type DeleteRequest = {
   id: number; lenderId: number; lenderName: string; requestedBy: string; requestedAt: string; status: "pending" | "approved" | "denied";
@@ -3172,6 +3173,10 @@ function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, in
       sponsorProfile: `Borrower: ${selectedDeal.seekerName}\nCapital Requested: ${asset.loanAmount || "TBD"}\nProperty Type Experience: ${asset.assetType || "TBD"}`,
       financialSummary: `Net Operating Income: ${asset.currentNetIncome || "TBD"}\nLoan Amount: ${asset.loanAmount || "TBD"}\nProperty Value: ${asset.propertyValue || "TBD"}\nDSCR: ${asset.dscr || "TBD"}`,
     });
+    // Pre-load deal photos if available
+    if (selectedDeal.photos && selectedDeal.photos.length > 0) {
+      setPhotos(selectedDeal.photos);
+    }
     setMarketData(null);
     // Auto-fetch market data if we have a zip
     if (asset.address?.zip || asset.address?.city) {
@@ -3265,7 +3270,7 @@ function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, in
             {submittedDeals.map(d => {
               const asset = d.assets?.[0];
               const isSelected = selectedDealId === d.id;
-              const photo = null; // photos are uploaded in the memo builder, not stored on the deal
+              const photo = d.photos?.[0]?.url || null;
               return (
                 <button
                   key={d.id}
