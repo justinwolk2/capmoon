@@ -45,12 +45,12 @@ type TeamMember = {
   geographicMarket: string; specialtyAreas: string[]; title: string;
 };
 type AppUser = {
-  id: number; username: string; password: string; role: "admin" | "advisor" | "capital-seeker" | "lender"; linkedLenderId?: number;
+  id: number; username: string; password: string; role: "admin" | "advisor" | "staff" | "capital-seeker" | "lender"; linkedLenderId?: number; emailPrefs?: EmailPrefs; advisorCode?: string; dealSequenceStart?: number;
   name: string; blockedLenderIds: number[]; teamMemberId?: number; phone?: string; email?: string;
 };
 type SubmittedDeal = {
   id: number; submittedAt: string; seekerName: string;
-  seekerEmail?: string; seekerPhone?: string; notes?: string;
+  seekerEmail?: string; seekerPhone?: string; notes?: string; dealNumber?: string;
   assets: AssetData[]; capitalType: string; assetMode: string; collateralMode: string;
   status: "pending" | "assigned" | "closed"; assignedAdvisorIds: number[];
   invitedUserIds?: number[];
@@ -70,6 +70,16 @@ type LenderChangeRequest = {
   requestedAt: string;
   status: "pending" | "approved" | "denied";
 };
+type EmailPrefs = {
+  dealSubmitted: boolean; lenderResponded: boolean; documentRequested: boolean;
+  statusChanged: boolean; dealAssigned: boolean;
+};
+
+type StaffEditHistory = {
+  id: number; lenderId: number; lenderName: string; editedBy: string; editedAt: string;
+  previousData: any; currentData: any; reverted: boolean;
+};
+
 type LenderSubmission = {
   id: number; dealId: number; lenderId: number; lenderName: string; lenderEmail: string;
   dealTitle: string; advisorName: string; token: string;
@@ -3006,7 +3016,16 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
 
   function handleSubmit(assets: AssetData[], capitalType: string, assetMode: string, collateralMode: string) {
     const advisors = assignAdvisors(capitalType, teamMembers);
-    const deal: SubmittedDeal = { id: Date.now(), submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Guest", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a) => a.id) };
+    // Generate deal number
+  let dealNumber = "";
+  try {
+    const dnRes = await fetch("/api/deal-number", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ advisorEmail: session?.user.username, dealerName: session?.user.name, assetType: assets[0]?.assetType }) });
+    const dnData = await dnRes.json();
+    dealNumber = dnData.dealNumber || "";
+  } catch(e) { console.error("Deal number error:", e); }
+
+  const deal: SubmittedDeal = { id: Date.now(), submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Guest", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a) => a.id), dealNumber };
     onSubmitDeal(deal);
     // Push to Pipedrive
     const advisor = advisors[0];
@@ -3534,6 +3553,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   lenderChangeRequests: LenderChangeRequest[]; setLenderChangeRequests: (r: LenderChangeRequest[]) => void;
 }) {
   const isAdmin = session?.user.role === "admin";
+  const isStaff = session?.user.role === "staff";
   const isLender = session?.user.role === "lender";
   const [activeTab, setActiveTab] = useState("overview");
   const [dealSearch, setDealSearch] = useState("");
@@ -3651,7 +3671,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [editingLenderId, setEditingLenderId] = useState<number | null>(null);
   const [viewingLenderId, setViewingLenderId] = useState<number | null>(null);
-  const [newUserForm, setNewUserForm] = useState({ name: "", username: "", password: "", role: "capital-seeker" as AppUser["role"] });
+  const [newUserForm, setNewUserForm] = useState({ name: "", username: "", password: "", role: "capital-seeker" as AppUser["role"],
+    emailPrefs: { dealSubmitted: true, lenderResponded: true, documentRequested: true, statusChanged: true, dealAssigned: true } });
 
   const inputClass = "bg-white border-gray-300 text-gray-800 placeholder:text-gray-400 rounded-xl focus:border-[#0a1f44] focus:ring-0";
   const selectTriggerClass = "bg-white border-gray-300 text-gray-800 rounded-xl focus:border-[#0a1f44]";
@@ -3810,7 +3831,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     ["deal-team", "Deal Team", Users],
     ["submitted-deals", "Submitted Deals", FileSpreadsheet],
     ["uploads", "Upload Center", Upload],
-    ...(isAdmin ? [["user-management", "User Management", Settings] as [string, string, any]] : []),
+    ...(isAdmin ? [["user-management", "Admin Portal", Settings] as [string, string, any]] : []),
     ...(isAdmin ? [["deal-memos", "Deal Memos", FileText] as [string, string, any]] : []),
     ...(isAdmin && pendingDeleteCount > 0 ? [["delete-queue", `Delete Requests (${pendingDeleteCount})`, Bell] as [string, string, any]] : []),
     ...(isAdmin && pendingLenderChangeCount > 0 ? [["lender-changes", `Lender Changes (${pendingLenderChangeCount})`, Bell] as [string, string, any]] : []),
@@ -4806,7 +4827,9 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                 <div className="space-y-6">
                   <div className={cardClass + " p-6"}>
                     <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Admin</div>
-                    <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">User Management</h2>
+                    <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">CapMoon</div>
+                    <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-1">Admin Portal</h2>
+                    <p className="text-sm text-gray-500 mb-5">Manage users, roles, permissions, approvals and deal numbering.</p>
                     <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-5 mb-6">
                       <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-4">Add New User</div>
                       <div className="grid gap-3 md:grid-cols-4">
