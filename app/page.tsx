@@ -3175,7 +3175,7 @@ function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, in
     });
     // Pre-load deal photos if available
     if (selectedDeal.photos && selectedDeal.photos.length > 0) {
-      setPhotos(selectedDeal.photos);
+      setPhotos(selectedDeal.photos.map(p => ({ ...p, name: p.caption || "photo" })));
     }
     setMarketData(null);
     // Auto-fetch market data if we have a zip
