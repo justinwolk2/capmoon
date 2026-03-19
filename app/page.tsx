@@ -50,6 +50,7 @@ type AppUser = {
 };
 type SubmittedDeal = {
   id: number; submittedAt: string; seekerName: string;
+  seekerEmail?: string; seekerPhone?: string; notes?: string;
   assets: AssetData[]; capitalType: string; assetMode: string; collateralMode: string;
   status: "pending" | "assigned" | "closed"; assignedAdvisorIds: number[];
   invitedUserIds?: number[];
@@ -4166,6 +4167,39 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                     );
                     setSubmittedDeals(updated);
                     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: updated }) }).catch(e => console.error(e));
+                  }
+
+                  const [editingDeal, setEditingDeal] = React.useState(false);
+                  const [editDealFields, setEditDealFields] = React.useState({
+                    seekerName: deal.seekerName || "",
+                    seekerEmail: deal.seekerEmail || "",
+                    seekerPhone: deal.seekerPhone || "",
+                    notes: deal.notes || "",
+                    loanAmount: deal.assets?.[0]?.loanAmount || "",
+                    propertyValue: deal.assets?.[0]?.propertyValue || "",
+                    dscr: deal.assets?.[0]?.dscr || "",
+                    currentNetIncome: deal.assets?.[0]?.currentNetIncome || "",
+                  });
+
+                  function saveDealEdits() {
+                    const updated = {
+                      ...deal,
+                      seekerName: editDealFields.seekerName,
+                      seekerEmail: editDealFields.seekerEmail,
+                      seekerPhone: editDealFields.seekerPhone,
+                      notes: editDealFields.notes,
+                      assets: deal.assets.map((a, i) => i === 0 ? {
+                        ...a,
+                        loanAmount: editDealFields.loanAmount,
+                        propertyValue: editDealFields.propertyValue,
+                        dscr: editDealFields.dscr,
+                        currentNetIncome: editDealFields.currentNetIncome,
+                      } : a),
+                    };
+                    const newDeals = submittedDeals.map(d => d.id === deal.id ? updated : d);
+                    setSubmittedDeals(newDeals);
+                    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: newDeals }) }).catch(console.error);
+                    setEditingDeal(false);
                   }
 
                   const [showSendLenders, setShowSendLenders] = React.useState(false);
