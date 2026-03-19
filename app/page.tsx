@@ -4316,14 +4316,6 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
               {activeTab === "submitted-deals" && (() => {
                 const currentTeamMemberId = session?.user.teamMemberId;
                 const isLenderRole = session?.user.role === "lender";
-                const [dealSearch, setDealSearch] = React.useState("");
-                const [filterStatus, setFilterStatus] = React.useState("All");
-                const [filterCapital, setFilterCapital] = React.useState("All");
-                const [filterAdvisor, setFilterAdvisor] = React.useState("All");
-                const [filterClient, setFilterClient] = React.useState("All");
-                const [showMyDeals, setShowMyDeals] = React.useState(true);
-                const [showAdvisorDeals, setShowAdvisorDeals] = React.useState(true);
-                const [showClientDeals, setShowClientDeals] = React.useState(true);
                 const visibleDeals = isAdmin
                   ? submittedDeals
                   : isLenderRole
