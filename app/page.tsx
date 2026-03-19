@@ -3014,7 +3014,7 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
   const cardClass = "rounded-2xl border border-gray-200 bg-white shadow-sm";
   const myDeals = submittedDeals.filter((d) => d.seekerName === session?.user.name);
 
-  function handleSubmit(assets: AssetData[], capitalType: string, assetMode: string, collateralMode: string) {
+  async function handleSubmit(assets: AssetData[], capitalType: string, assetMode: string, collateralMode: string) {
     const advisors = assignAdvisors(capitalType, teamMembers);
     // Generate deal number
   let dealNumber = "";
