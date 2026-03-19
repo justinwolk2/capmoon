@@ -3947,13 +3947,15 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                           Clear ✕
                         </button>
                       )}
-                      <button
-                        onClick={() => exportLendersToExcel(sortedLenders)}
-                        className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border border-[#0a1f44]/20 text-[#0a1f44] rounded-xl hover:bg-[#0a1f44]/5"
-                        title="Export visible lenders to CSV/Excel"
-                      >
-                        <FileSpreadsheet className="h-4 w-4" /> Export
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => exportLendersToExcel(sortedLenders)}
+                          className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border border-[#0a1f44]/20 text-[#0a1f44] rounded-xl hover:bg-[#0a1f44]/5"
+                          title="Export visible lenders to CSV/Excel"
+                        >
+                          <FileSpreadsheet className="h-4 w-4" /> Export
+                        </button>
+                      )}
                     </div>
                     {aiSearchMessage && (
                       <div className="mt-2 flex items-center gap-2 px-3 py-1.5 bg-[#c9a84c]/10 border border-[#c9a84c]/20 rounded-lg">
