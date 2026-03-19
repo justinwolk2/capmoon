@@ -3221,6 +3221,30 @@ function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, in
     });
   }
 
+  async function handleExportWord() {
+    if (!selectedDeal) return;
+    setExporting(true);
+    try {
+      const res = await fetch("/api/deal-memo-docx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deal: selectedDeal, memoFields, activeSections, marketData }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = (memoFields.dealTitle || "DealMemo").replace(/[^a-zA-Z0-9]/g, "_") + ".doc";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else { alert("Word export failed. Please try again."); }
+    } catch (e) { alert("Word export failed. Please try again."); }
+    setExporting(false);
+  }
+
   async function handleExportPDF() {
     if (!selectedDeal) return;
     setExporting(true);
@@ -3477,13 +3501,22 @@ function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, in
                 <h3 className="font-display text-xl font-bold text-[#0a1f44]">Generate Deal Memo PDF</h3>
                 <p className="text-sm text-gray-500 mt-0.5">{photos.length} photo{photos.length !== 1 ? "s" : ""} · {Object.values(activeSections).filter(Boolean).length} sections included</p>
               </div>
-              <button
-                onClick={handleExportPDF}
-                disabled={exporting}
-                className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#c9a84c] text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/80 disabled:opacity-50"
-              >
-                {exporting ? "Generating..." : "Export PDF"}
-              </button>
+<div className="flex gap-3 flex-wrap">
+                <button
+                  onClick={handleExportPDF}
+                  disabled={exporting}
+                  className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#c9a84c] text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/80 disabled:opacity-50"
+                >
+                  {exporting ? "Generating..." : "🖨 Print / Save PDF"}
+                </button>
+                <button
+                  onClick={handleExportWord}
+                  disabled={exporting}
+                  className="flex items-center gap-2 px-6 py-3 text-sm font-semibold border-2 border-[#0a1f44] text-[#0a1f44] rounded-xl hover:bg-[#0a1f44]/5 disabled:opacity-50"
+                >
+                  📄 Download Word (.doc)
+                </button>
+              </div>
             </div>
           </div>
         </>
