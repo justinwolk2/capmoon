@@ -5123,51 +5123,6 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                   </div>
                 </div>
               )}
-                                      )}
-                                    </div>
-                                  </div>
-                                  {editingUserId === u.id && (
-                                    <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-3">
-                                      <div className="grid gap-2 md:grid-cols-2">
-                                        <div><label className="text-xs text-gray-400 mb-1 block">Full Name</label><input value={userEditForm.name} onChange={e => setUserEditForm(p=>({...p,name:e.target.value}))} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] bg-white" /></div>
-                                        <div><label className="text-xs text-gray-400 mb-1 block">Email</label><input value={userEditForm.username} onChange={e => setUserEditForm(p=>({...p,username:e.target.value}))} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] bg-white" /></div>
-                                        <div><label className="text-xs text-gray-400 mb-1 block">Phone</label><input value={userEditForm.phone} onChange={e => setUserEditForm(p=>({...p,phone:e.target.value}))} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] bg-white" /></div>
-                                        <div><label className="text-xs text-gray-400 mb-1 block">New Password <span className="text-gray-300">(blank = keep)</span></label><input type="password" value={userEditForm.password} onChange={e => setUserEditForm(p=>({...p,password:e.target.value}))} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] bg-white" /></div>
-                                      </div>
-                                      <div>
-                                        <div className="text-xs font-bold text-[#0a1f44] mb-2">Email Notifications</div>
-                                        <div className="flex flex-wrap gap-1.5">
-                                          {([["Deal Submitted","dealSubmitted"],["Lender Responded","lenderResponded"],["Doc Requested","documentRequested"],["Status Changed","statusChanged"],["Deal Assigned","dealAssigned"]] as [string,string][]).map(([label,key]) => {
-                                            const prefs: any = (u as any).emailPrefs || {};
-                                            const on = prefs[key] !== false;
-                                            return <button key={key} type="button" onClick={() => { const upd = users.map(x => x.id===u.id ? {...x, emailPrefs: {...prefs, [key]: !on}} as AppUser : x); setUsers(upd); fetch("/api/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"users",data:upd})}).catch(console.error); }} className={"px-2 py-0.5 text-xs rounded-full border font-medium " + (on ? "bg-[#0a1f44] text-white border-[#0a1f44]" : "bg-gray-100 text-gray-400 border-gray-200")}>{label}</button>;
-                                          })}
-                                        </div>
-                                        {u.role === "lender" && <p className="text-xs text-gray-400 mt-1">Lenders always receive the initial deal request.</p>}
-                                      </div>
-                                      {u.role !== "admin" && (
-                                        <div>
-                                          <div className="text-xs font-bold text-[#0a1f44] mb-2">Blocked Lenders</div>
-                                          <DropdownCheckbox label="Blocked Lenders"
-                                            options={[...lenderRecords].sort((a,b)=>a.lender.localeCompare(b.lender)).map(l=>l.lender)}
-                                            selected={u.blockedLenderIds.map(id=>lenderRecords.find(l=>l.id===id)?.lender||"").filter(Boolean)}
-                                            onChange={names => { const upd = users.map(x => x.id===u.id ? {...x, blockedLenderIds: lenderRecords.filter(l=>names.includes(l.lender)).map(l=>l.id)} : x); setUsers(upd); fetch("/api/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"users",data:upd})}).catch(console.error); }} />
-                                        </div>
-                                      )}
-                                      <button onClick={() => { const upd = users.map(x => x.id===u.id ? {...x, name: userEditForm.name||x.name, username: userEditForm.username||x.username, phone: userEditForm.phone, ...(userEditForm.password?{password:userEditForm.password}:{})} as AppUser : x); setUsers(upd); fetch("/api/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"users",data:upd})}).catch(console.error); setEditingUserId(null); }}
-                                        className="px-4 py-2 text-sm font-bold bg-[#0a1f44] text-white rounded-xl">Save Changes</button>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
               {activeTab === "delete-queue" && isAdmin && (
                 <div className={cardClass + " p-6"}>
                   <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Admin Approval</div>
