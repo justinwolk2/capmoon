@@ -4987,7 +4987,6 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
               )}
 
               {/* User Management (admin only) */}
-              {/* User Management (admin only) */}
               {activeTab === "user-management" && isAdmin && (
                 <div className="space-y-6">
                   <div className={cardClass + " p-6"}>
