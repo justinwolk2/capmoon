@@ -45,7 +45,7 @@ type TeamMember = {
   geographicMarket: string; specialtyAreas: string[]; title: string;
 };
 type AppUser = {
-  id: number; username: string; password: string; role: "admin" | "advisor" | "staff" | "capital-seeker" | "lender"; linkedLenderId?: number; emailPrefs?: EmailPrefs; advisorCode?: string; dealSequenceStart?: number;
+  id: number; username: string; password: string; role: "admin" | "advisor" | "staff" | "capital-seeker" | "lender"; linkedLenderId?: number; emailPrefs?: EmailPrefs; advisorCode?: string; dealSequenceStart?: number; blocked?: boolean; phone?: string; blocked?: boolean; phone?: string;
   name: string; blockedLenderIds: number[]; teamMemberId?: number; phone?: string; email?: string;
 };
 type SubmittedDeal = {
@@ -3151,6 +3151,11 @@ function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, in
   cardClass: string; inputClass: string; selectTriggerClass: string;
 }) {
   const [selectedDealId, setSelectedDealId] = useState<number | null>(null);
+  const [memoSearch, setMemoSearch] = useState("");
+  const [memoFilterCapital, setMemoFilterCapital] = useState("All");
+  const [memoFilterAdvisor, setMemoFilterAdvisor] = useState("All");
+  const [memoFilterStatus, setMemoFilterStatus] = useState("All");
+  const [memoFilterAsset, setMemoFilterAsset] = useState("All");
   const [memoFields, setMemoFields] = useState<Record<string, string>>({});
   const [activeSections, setActiveSections] = useState<Record<string, boolean>>(Object.fromEntries(MEMO_SECTIONS.map(s => [s, true])));
   const [photos, setPhotos] = useState<{ id: number; name: string; url: string; caption: string }[]>([]);
@@ -3306,11 +3311,64 @@ function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, in
         <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-1">Deal Memos</h2>
         <p className="text-sm text-gray-500 mb-6">Build professional deal memos from submitted deals. Add photos, market data, and export to PDF.</p>
 
+        {/* Search + Filters */}
+        <div className="mb-4 space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <input value={memoSearch} onChange={e => setMemoSearch(e.target.value)}
+              placeholder="Search by borrower, address, city, asset type, loan amount..."
+              className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <select value={memoFilterCapital} onChange={e => setMemoFilterCapital(e.target.value)}
+              className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] text-gray-600">
+              <option value="All">All Capital Types</option>
+              {["Senior","Mezzanine","Preferred Equity","JV Equity","Bridge","Construction","Stretch Senior/Hybrid"].map(ct => <option key={ct} value={ct}>{ct}</option>)}
+            </select>
+            <select value={memoFilterAsset} onChange={e => setMemoFilterAsset(e.target.value)}
+              className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] text-gray-600">
+              <option value="All">All Asset Types</option>
+              {["Apartments","Office","Hotel/Hospitality","Retail-Multi Tenant","Light Industrial","Self-storage","Mixed-use","Medical Office"].map(at => <option key={at} value={at}>{at}</option>)}
+            </select>
+            <select value={memoFilterAdvisor} onChange={e => setMemoFilterAdvisor(e.target.value)}
+              className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] text-gray-600">
+              <option value="All">All Advisors</option>
+              {teamMembers.map(m => <option key={m.id} value={String(m.id)}>{m.name}</option>)}
+            </select>
+            <select value={memoFilterStatus} onChange={e => setMemoFilterStatus(e.target.value)}
+              className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] text-gray-600">
+              <option value="All">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="assigned">Assigned</option>
+              <option value="closed">Closed</option>
+            </select>
+            {(memoSearch || memoFilterCapital !== "All" || memoFilterAsset !== "All" || memoFilterAdvisor !== "All" || memoFilterStatus !== "All") && (
+              <button type="button" onClick={() => { setMemoSearch(""); setMemoFilterCapital("All"); setMemoFilterAsset("All"); setMemoFilterAdvisor("All"); setMemoFilterStatus("All"); }}
+                className="px-3 py-2 text-xs text-red-400 border border-red-200 rounded-xl hover:bg-red-50">Clear ✕</button>
+            )}
+          </div>
+        </div>
+
         {/* Deal card grid */}
         <div className="mb-2">
           <label className="text-xs text-gray-500 mb-3 block font-bold uppercase">Select a Submitted Deal</label>
+          {(() => {
+            const filteredMemoDeals = submittedDeals.filter(d => {
+              const asset = d.assets?.[0];
+              const q = memoSearch.toLowerCase();
+              if (q && ![d.seekerName, asset?.assetType, asset?.loanAmount, asset?.address?.city, asset?.address?.street, asset?.address?.state, asset?.dealType]
+                .some(v => v?.toLowerCase().includes(q))) return false;
+              if (memoFilterCapital !== "All" && d.capitalType !== memoFilterCapital) return false;
+              if (memoFilterAsset !== "All" && asset?.assetType !== memoFilterAsset) return false;
+              if (memoFilterAdvisor !== "All" && !d.assignedAdvisorIds.includes(parseInt(memoFilterAdvisor))) return false;
+              if (memoFilterStatus !== "All" && d.status !== memoFilterStatus) return false;
+              return true;
+            });
+            return filteredMemoDeals.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-400">No deals match your filters</div>
+            ) : (
           <div className="grid gap-3 md:grid-cols-3">
-            {submittedDeals.map(d => {
+            {filteredMemoDeals.map(d => {
               const asset = d.assets?.[0];
               const isSelected = selectedDealId === d.id;
               const photo = d.photos?.[0]?.url || null;
@@ -3349,6 +3407,8 @@ function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, in
               );
             })}
           </div>
+            );
+          })()}
         </div>
 
         {!selectedDeal && submittedDeals.length === 0 && (
@@ -4839,44 +4899,243 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                         <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Role</label>
                           <Select value={newUserForm.role} onValueChange={(v) => setNewUserForm((p) => ({ ...p, role: v as AppUser["role"] }))}>
                             <SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger>
-                            <SelectContent><SelectItem value="capital-seeker">Capital Seeker</SelectItem><SelectItem value="advisor">Advisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
+                            <SelectContent>
+                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="advisor">Capital Advisor</SelectItem>
+                                <SelectItem value="staff">Staff</SelectItem>
+                                <SelectItem value="lender">Lender</SelectItem>
+                                <SelectItem value="capital-seeker">Client / Borrower</SelectItem>
+                              </SelectContent>
                           </Select>
                         </div>
                       </div>
                       <button onClick={addUser} className="mt-4 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Add User</button>
                     </div>
-                    <div className="space-y-4">
-                      {users.map((user) => (
-                        <div key={user.id} className="rounded-xl border border-gray-200 bg-gray-50 p-5">
-                          <div className="flex items-start justify-between mb-4">
-                            <div>
-                              <div className="font-bold text-[#0a1f44]">{user.name}</div>
-                              <div className="text-xs text-gray-500 mt-0.5">@{user.username} · <span className="capitalize">{user.role}</span></div>
-                            </div>
-                            <div className="flex gap-2">
-                              {user.id !== 1 && (<button onClick={() => setUsers(users.filter((u) => u.id !== user.id))} className="px-3 py-1 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50">Remove</button>)}
-                              {user.id === 1 && <span className="px-3 py-1 text-xs bg-[#c9a84c]/10 text-[#c9a84c] border border-[#c9a84c]/20 rounded-lg font-bold">Master Admin</span>}
-                            </div>
-                          </div>
-                          {user.role !== "admin" && (
-                            <div>
-                              <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Lender Access Control</div>
-                              <div className="text-xs text-gray-500 mb-3">Select lenders to block this user from seeing:</div>
-                              <DropdownCheckbox
-                                label="Blocked Lenders"
-                                options={[...lenderRecords].sort((a,b) => a.lender.localeCompare(b.lender)).map((l) => l.lender)}
-                                selected={user.blockedLenderIds.map((id) => lenderRecords.find((l) => l.id === id)?.lender || "").filter(Boolean)}
-                                onChange={(selectedNames) => {
-                                  const newBlockedIds = lenderRecords.filter((l) => selectedNames.includes(l.lender)).map((l) => l.id);
-                                  setUsers(users.map((u) => u.id === user.id ? { ...u, blockedLenderIds: newBlockedIds } : u));
-                                }}
-                              />
-                              {user.blockedLenderIds.length > 0 && <div className="mt-2 text-xs text-red-500 font-medium">{user.blockedLenderIds.length} lender{user.blockedLenderIds.length > 1 ? "s" : ""} blocked</div>}
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                    {/* Search bar */}
+                    <div className="mb-4 relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                      <input
+                        id="user-search-input"
+                        placeholder="Search users by name, email or role..."
+                        className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]"
+                        onChange={e => {
+                          const q = e.target.value.toLowerCase();
+                          document.querySelectorAll('[data-user-card]').forEach((el: any) => {
+                            const text = el.getAttribute('data-user-card').toLowerCase();
+                            el.style.display = text.includes(q) ? '' : 'none';
+                          });
+                        }}
+                      />
                     </div>
+
+                    {/* Role sections */}
+                    {(() => {
+                      const roleGroups = [
+                        { key: "admin",          label: "Administrators",     color: "#0a1f44", emoji: "🔐" },
+                        { key: "advisor",         label: "Capital Advisors",   color: "#c9a84c", emoji: "💼" },
+                        { key: "staff",           label: "Staff",              color: "#6366f1", emoji: "👤" },
+                        { key: "lender",          label: "Lenders",            color: "#10b981", emoji: "🏦" },
+                        { key: "capital-seeker",  label: "Clients / Borrowers",color: "#f59e0b", emoji: "🏢" },
+                      ];
+
+                      function UserCard({ user }: { user: AppUser }) {
+                        const [expanded, setExpanded] = React.useState(false);
+                        const [editing, setEditing] = React.useState(false);
+                        const [editForm, setEditForm] = React.useState({ name: user.name || "", username: user.username || "", phone: user.phone || "", password: "" });
+                        const [confirmDelete, setConfirmDelete] = React.useState(false);
+                        const isBlocked = user.blocked === true;
+
+                        function saveEdits() {
+                          const updated = users.map(u => u.id === user.id ? {
+                            ...u,
+                            name: editForm.name || u.name,
+                            username: editForm.username || u.username,
+                            phone: editForm.phone,
+                            ...(editForm.password ? { password: editForm.password } : {}),
+                          } : u);
+                          setUsers(updated);
+                          saveToDb("users", updated);
+                          setEditing(false);
+                        }
+
+                        function toggleBlock() {
+                          const updated = users.map(u => u.id === user.id ? { ...u, blocked: !isBlocked } : u);
+                          setUsers(updated);
+                          saveToDb("users", updated);
+                        }
+
+                        function deleteUser() {
+                          const updated = users.filter(u => u.id !== user.id);
+                          setUsers(updated);
+                          saveToDb("users", updated);
+                        }
+
+                        return (
+                          <div data-user-card={user.name + " " + user.username + " " + user.role}
+                            className={"rounded-xl border bg-white " + (isBlocked ? "border-red-200 bg-red-50/30" : "border-gray-200")}>
+                            {/* Header row */}
+                            <button type="button" onClick={() => setExpanded(p => !p)}
+                              className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50/50 rounded-xl">
+                              <div className="flex items-center gap-3">
+                                <div className={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold " + (isBlocked ? "bg-red-100 text-red-500" : "bg-[#0a1f44]/10 text-[#0a1f44]")}>
+                                  {(user.name || user.username || "?")[0].toUpperCase()}
+                                </div>
+                                <div>
+                                  <div className="text-sm font-bold text-[#0a1f44]">{user.name || user.username}</div>
+                                  <div className="text-xs text-gray-400">{user.username}{isBlocked && <span className="ml-2 text-red-400 font-semibold">· Blocked</span>}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {user.id === 1 && <span className="px-2 py-0.5 text-xs bg-[#c9a84c]/10 text-[#c9a84c] border border-[#c9a84c]/20 rounded-full font-bold">Master Admin</span>}
+                                <span className="text-gray-300 text-xs">{expanded ? "▲" : "▼"}</span>
+                              </div>
+                            </button>
+
+                            {expanded && (
+                              <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-4">
+
+                                {/* Edit Profile */}
+                                <div>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">Profile</div>
+                                    <button type="button" onClick={() => setEditing(p => !p)}
+                                      className="text-xs text-[#0a1f44] border border-[#0a1f44]/20 px-2 py-1 rounded-lg hover:bg-[#0a1f44]/5">
+                                      {editing ? "Cancel" : "Edit"}
+                                    </button>
+                                  </div>
+                                  {editing ? (
+                                    <div className="space-y-2">
+                                      <div className="grid gap-2 md:grid-cols-2">
+                                        <div>
+                                          <label className="text-xs text-gray-400 mb-1 block">Full Name</label>
+                                          <input value={editForm.name} onChange={e => setEditForm(p => ({...p, name: e.target.value}))}
+                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] bg-white" />
+                                        </div>
+                                        <div>
+                                          <label className="text-xs text-gray-400 mb-1 block">Email / Username</label>
+                                          <input value={editForm.username} onChange={e => setEditForm(p => ({...p, username: e.target.value}))}
+                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] bg-white" />
+                                        </div>
+                                        <div>
+                                          <label className="text-xs text-gray-400 mb-1 block">Phone</label>
+                                          <input value={editForm.phone} onChange={e => setEditForm(p => ({...p, phone: e.target.value}))}
+                                            placeholder="(555) 000-0000"
+                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] bg-white" />
+                                        </div>
+                                        <div>
+                                          <label className="text-xs text-gray-400 mb-1 block">New Password <span className="text-gray-300">(leave blank to keep)</span></label>
+                                          <input type="password" value={editForm.password} onChange={e => setEditForm(p => ({...p, password: e.target.value}))}
+                                            placeholder="••••••••"
+                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] bg-white" />
+                                        </div>
+                                      </div>
+                                      <button type="button" onClick={saveEdits}
+                                        className="px-4 py-2 text-sm font-bold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">
+                                        Save Changes
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="text-xs text-gray-500 space-y-0.5">
+                                      {user.phone && <div>📞 {user.phone}</div>}
+                                      <div>🔑 Password: ••••••••</div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Email Notification Prefs */}
+                                <div>
+                                  <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Email Notifications</div>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {[["Deal Submitted","dealSubmitted"],["Lender Responded","lenderResponded"],["Doc Requested","documentRequested"],["Status Changed","statusChanged"],["Deal Assigned","dealAssigned"]].map(([label, key]) => {
+                                      const prefs = user.emailPrefs || { dealSubmitted:true, lenderResponded:true, documentRequested:true, statusChanged:true, dealAssigned:true };
+                                      const enabled = (prefs as any)[key] !== false;
+                                      return (
+                                        <button key={key} type="button" onClick={() => {
+                                          const updated = users.map(u => u.id === user.id ? { ...u, emailPrefs: { ...prefs, [key]: !enabled } } : u);
+                                          setUsers(updated); saveToDb("users", updated);
+                                        }} className={"px-2 py-0.5 text-xs rounded-full border font-medium transition-all " + (enabled ? "bg-[#0a1f44] text-white border-[#0a1f44]" : "bg-gray-100 text-gray-400 border-gray-200")}>
+                                          {label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  {user.role === "lender" && <p className="text-xs text-gray-400 mt-1.5">Lenders always receive the initial deal request regardless of preferences.</p>}
+                                </div>
+
+                                {/* Lender access control */}
+                                {user.role !== "admin" && (
+                                  <div>
+                                    <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Lender Access Control</div>
+                                    <DropdownCheckbox
+                                      label="Blocked Lenders"
+                                      options={[...lenderRecords].sort((a,b) => a.lender.localeCompare(b.lender)).map(l => l.lender)}
+                                      selected={user.blockedLenderIds.map(id => lenderRecords.find(l => l.id === id)?.lender || "").filter(Boolean)}
+                                      onChange={(selectedNames) => {
+                                        const newIds = lenderRecords.filter(l => selectedNames.includes(l.lender)).map(l => l.id);
+                                        setUsers(users.map(u => u.id === user.id ? { ...u, blockedLenderIds: newIds } : u));
+                                      }}
+                                    />
+                                    {user.blockedLenderIds.length > 0 && <div className="mt-1 text-xs text-red-500">{user.blockedLenderIds.length} lender{user.blockedLenderIds.length !== 1 ? "s" : ""} blocked</div>}
+                                  </div>
+                                )}
+
+                                {/* Access + Delete (not master admin) */}
+                                {user.id !== 1 && (
+                                  <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+                                    <button type="button" onClick={toggleBlock}
+                                      className={"px-3 py-1.5 text-xs font-semibold border rounded-lg " + (isBlocked ? "border-green-200 text-green-600 hover:bg-green-50" : "border-orange-200 text-orange-600 hover:bg-orange-50")}>
+                                      {isBlocked ? "✓ Unblock Access" : "⊘ Block Access"}
+                                    </button>
+                                    {!confirmDelete ? (
+                                      <button type="button" onClick={() => setConfirmDelete(true)}
+                                        className="px-3 py-1.5 text-xs font-semibold border border-red-200 text-red-500 rounded-lg hover:bg-red-50">
+                                        Delete User
+                                      </button>
+                                    ) : (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-red-500 font-medium">Are you sure?</span>
+                                        <button type="button" onClick={deleteUser} className="px-3 py-1.5 text-xs font-bold bg-red-500 text-white rounded-lg hover:bg-red-600">Yes, Delete</button>
+                                        <button type="button" onClick={() => setConfirmDelete(false)} className="px-3 py-1.5 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50">Cancel</button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="space-y-6">
+                          {roleGroups.map(group => {
+                            const groupUsers = users.filter(u => u.role === group.key);
+                            const [open, setOpen] = React.useState(true);
+                            return (
+                              <div key={group.key}>
+                                <button type="button" onClick={() => setOpen(p => !p)}
+                                  className="w-full flex items-center gap-3 mb-3 text-left">
+                                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: group.color }} />
+                                  <span className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">{group.emoji} {group.label}</span>
+                                  <span className="text-xs text-gray-400">({groupUsers.length})</span>
+                                  <div className="h-px flex-1 bg-gray-200" />
+                                  <span className="text-xs text-gray-300">{open ? "▲" : "▼"}</span>
+                                </button>
+                                {open && (
+                                  <div className="space-y-2">
+                                    {groupUsers.length === 0 ? (
+                                      <div className="text-xs text-gray-400 py-3 pl-2">No {group.label.toLowerCase()} yet</div>
+                                    ) : (
+                                      groupUsers.map(u => <UserCard key={u.id} user={u} />)
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
