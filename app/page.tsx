@@ -1457,7 +1457,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                         <span className="font-medium">Additional Equity (deducted)</span>
                         <span className="font-bold">− {formatCurrencyInput(String(addlEquity))}</span>
                       </div>
-                    )}
+                    ))}
                     <div className="flex justify-between text-sm font-bold text-[#0a1f44] pt-2 border-t border-gray-200">
                       <span>Suggested Loan Amount</span>
                       <span className="text-[#c9a84c]">{formatCurrencyInput(String(netCost))}</span>
@@ -4174,8 +4174,11 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
               {/* Submitted Deals */}
               {activeTab === "submitted-deals" && (() => {
                 const currentTeamMemberId = session?.user.teamMemberId;
+                const isLenderRole = session?.user.role === "lender";
                 const visibleDeals = isAdmin
                   ? submittedDeals
+                  : isLenderRole
+                  ? [] // lenders see deals via lender portal, not here
                   : submittedDeals.filter((d) =>
                       (currentTeamMemberId && d.assignedAdvisorIds.includes(currentTeamMemberId)) ||
                       (session?.user.id && (d.invitedUserIds || []).includes(session.user.id))
@@ -4183,6 +4186,23 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
                 function DealCard({ deal }: { deal: SubmittedDeal }) {
                   const [showInvite, setShowInvite] = React.useState(false);
+                  const [showLenderResponses, setShowLenderResponses] = React.useState(false);
+                  const [dealSentLenders, setDealSentLenders] = React.useState<any[]>([]);
+
+                  React.useEffect(() => {
+                    fetch("/api/lender-submissions?dealId=" + deal.id)
+                      .then(r => r.json()).then(d => { if (Array.isArray(d)) setDealSentLenders(d); })
+                      .catch(() => {});
+                  }, [deal.id]);
+
+                  const sentLenders = dealSentLenders;
+
+                  async function updateLenderResponseStatus(token: string, newStatus: string) {
+                    await fetch("/api/lender-submissions", { method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ action: "respond", token, status: newStatus }) });
+                    const updated = await fetch("/api/lender-submissions?dealId=" + deal.id).then(r => r.json());
+                    if (Array.isArray(updated)) setDealSentLenders(updated);
+                  }
                   const [inviteUserId, setInviteUserId] = React.useState("");
                   const advisors = teamMembers.filter((m) => deal.assignedAdvisorIds.includes(m.id));
                   const invitedUsers = users.filter((u) => (deal.invitedUserIds || []).includes(u.id));
@@ -4341,10 +4361,14 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                       )}
                       <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-2">
                         <button onClick={() => { setPrefillDeal(deal); setActiveTab("matcher"); }} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">
-                          <Filter className="h-4 w-4" /> Submit to Deal Matcher
+                          <Filter className="h-4 w-4" /> Resubmit to Deal Matcher
                         </button>
                         <button onClick={() => setShowInvite(!showInvite)} className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-[#c9a84c]/30 text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/10">
                           <Users className="h-4 w-4" /> Invite Collaborator
+                        </button>
+                        <button onClick={() => setShowLenderResponses(!showLenderResponses)} className={"flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-xl transition-all " + (showLenderResponses ? "border-[#0a1f44] bg-[#0a1f44] text-white" : "border-[#0a1f44]/30 text-[#0a1f44] hover:bg-[#0a1f44]/5")}>
+                          <Landmark className="h-4 w-4" /> Lender Responses
+                          {sentLenders.length > 0 && <span className={"ml-1 px-1.5 py-0.5 text-xs rounded-full font-bold " + (showLenderResponses ? "bg-white text-[#0a1f44]" : "bg-[#c9a84c] text-[#0a1f44]")}>{sentLenders.length}</span>}
                         </button>
                       </div>
                       {showInvite && (
@@ -4362,6 +4386,55 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                           </div>
                         </div>
                       )}
+                    {showLenderResponses && (
+                        <div className="mt-3 rounded-xl border border-[#0a1f44]/20 bg-white p-4">
+                          <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-3">Lender Responses</div>
+                          {sentLenders.length === 0 ? (
+                            <div className="text-xs text-gray-400 py-4 text-center">No lenders have been sent this deal yet. Use the Send to Lenders button on a deal to get started.</div>
+                          ) : (
+                            <div className="space-y-2">
+                              {sentLenders.map((sl: any) => (
+                                <div key={sl.id} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-sm font-bold text-[#0a1f44] truncate">{sl.lender_name}</div>
+                                      <div className="text-xs text-gray-400 mt-0.5">Sent {new Date(sl.created_at).toLocaleDateString()}{sl.viewed_at ? " · Viewed " + new Date(sl.viewed_at).toLocaleDateString() : ""}</div>
+                                      {sl.response_message && (
+                                        <div className="mt-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs text-gray-600 italic">
+                                          "{sl.response_message}"
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                      <span className={"px-2.5 py-1 text-xs font-bold rounded-full " +
+                                        (sl.status === "declined" ? "bg-red-100 text-red-600" :
+                                         sl.status === "info_requested" ? "bg-blue-100 text-blue-700" :
+                                         sl.status === "viewed" ? "bg-yellow-100 text-yellow-700" :
+                                         "bg-gray-100 text-gray-500")}>
+                                        {sl.status === "info_requested" ? "Info Requested" :
+                                         sl.status === "viewed" ? "Viewed" :
+                                         sl.status === "declined" ? "Declined" : "Sent"}
+                                      </span>
+                                      {isAdmin && (
+                                        <select value={sl.status} onChange={e => updateLenderResponseStatus(sl.token, e.target.value)}
+                                          className="text-xs border border-gray-200 rounded-lg px-2 py-1 text-gray-500 bg-white focus:outline-none focus:border-[#0a1f44]">
+                                          <option value="sent">Sent</option>
+                                          <option value="viewed">Viewed</option>
+                                          <option value="info_requested">Info Requested</option>
+                                          <option value="declined">Declined</option>
+                                        </select>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {sl.responded_at && (
+                                    <div className="text-xs text-gray-400 mt-1">Responded {new Date(sl.responded_at).toLocaleDateString()}</div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 }
@@ -4370,20 +4443,64 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                   <div className={cardClass + " p-6"}>
                     <div className="flex items-center justify-between mb-5">
                       <div>
-                        <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">{isAdmin ? "All Deals" : "Your Deals"}</div>
+                        <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">CapMoon</div>
                         <h2 className="font-display text-2xl font-bold text-[#0a1f44]">Submitted Deals</h2>
-                        {!isAdmin && <p className="text-xs text-gray-500 mt-1">Showing deals assigned to you or that you've been invited to.</p>}
                       </div>
                       <div className="text-xs text-gray-400">{visibleDeals.length} deal{visibleDeals.length !== 1 ? "s" : ""}</div>
                     </div>
-                    {visibleDeals.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">
-                        {isAdmin ? "No deals submitted yet." : "No deals assigned to you yet. Ask an admin to invite you to a deal."}
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {visibleDeals.map((deal) => <DealCard key={deal.id} deal={deal} />)}
-                      </div>
+
+                    {isAdmin ? (() => {
+                      // Admin sees 3 sections
+                      const adminDeals = visibleDeals.filter(d => {
+                        const submitter = users.find(u => u.name === d.seekerName);
+                        return submitter?.role === "admin" || d.assignedAdvisorIds.includes(session?.user.teamMemberId || -1);
+                      });
+                      const advisorDeals = visibleDeals.filter(d => {
+                        const submitter = users.find(u => u.name === d.seekerName);
+                        return submitter?.role === "advisor" || (d.assignedAdvisorIds.length > 0 && !adminDeals.includes(d));
+                      });
+                      const clientDeals = visibleDeals.filter(d => {
+                        const submitter = users.find(u => u.name === d.seekerName);
+                        return submitter?.role === "capital-seeker" || (!adminDeals.includes(d) && !advisorDeals.includes(d));
+                      });
+
+                      function DealSection({ title, deals, color = "#c9a84c" }: { title: string; deals: SubmittedDeal[]; color?: string }) {
+                        return (
+                          <div className="mb-8">
+                            <div className="flex items-center gap-3 mb-4">
+                              <div className="h-px flex-1 bg-gray-200" />
+                              <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-gray-200 bg-white">
+                                <div className="w-2 h-2 rounded-full" style={{ background: color }} />
+                                <span className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">{title}</span>
+                                <span className="text-xs text-gray-400">({deals.length})</span>
+                              </div>
+                              <div className="h-px flex-1 bg-gray-200" />
+                            </div>
+                            {deals.length === 0 ? (
+                              <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">No deals in this category</div>
+                            ) : (
+                              <div className="space-y-4">{deals.map(d => <DealCard key={d.id} deal={d} />)}</div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <>
+                          <DealSection title="My Deals / Admin Deals" deals={adminDeals} color="#0a1f44" />
+                          <DealSection title="Capital Advisor Deals" deals={advisorDeals} color="#c9a84c" />
+                          <DealSection title="Client / Customer Deals" deals={clientDeals} color="#10b981" />
+                        </>
+                      );
+                    })() : (
+                      visibleDeals.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">
+                          No deals assigned to you yet.
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {visibleDeals.map((deal) => <DealCard key={deal.id} deal={deal} />)}
+                        </div>
                     )}
                   </div>
                 );
