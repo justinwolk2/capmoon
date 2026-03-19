@@ -3570,6 +3570,66 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     } catch (e) { console.error("Failed to save lenders:", e); }
   }
   const [search, setSearch] = useState("");
+  const [aiSearchQuery, setAiSearchQuery] = useState("");
+  const [aiSearchLoading, setAiSearchLoading] = useState(false);
+  const [aiSearchMessage, setAiSearchMessage] = useState("");
+  const [aiLenderFilters, setAiLenderFilters] = useState<any>(null);
+
+  async function runAiLenderSearch(query: string) {
+    if (!query.trim()) { setAiLenderFilters(null); setAiSearchMessage(""); return; }
+    setAiSearchLoading(true);
+    try {
+      const res = await fetch("/api/ai-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, mode: "lenders" }),
+      });
+      const data = await res.json();
+      setAiLenderFilters(data.filters);
+      setAiSearchMessage(data.message || "");
+    } catch(e) {
+      setAiSearchMessage("AI search unavailable — using keyword search");
+      setAiLenderFilters({ keywords: [query] });
+    }
+    setAiSearchLoading(false);
+  }
+
+  function exportLendersToExcel(records: LenderRecord[]) {
+    // Build CSV content (universal, no library needed)
+    const headers = ["Lender Name", "Program", "Capital Type", "Min Loan", "Max Loan", "Max LTV", "Min DSCR", "States", "Property Types", "Loan Terms", "Contact Person", "Email", "Phone", "Recourse", "Status", "Notes"];
+    const rows = records.map(l => [
+      l.lender || "",
+      l.program || "",
+      l.type || "",
+      l.minLoan || "",
+      l.maxLoan || "",
+      l.maxLtv || "",
+      l.minDscr || "",
+      (l.states || []).join("; "),
+      (l.assets || []).join("; "),
+      l.loanTerms || "",
+      l.contactPerson || "",
+      l.email || "",
+      l.phone || "",
+      l.recourse || "",
+      l.status || "",
+      (l.notes || "").replace(/,/g, ";"),
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `CapMoon_Lenders_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
   const [selectedSourceFilter, setSelectedSourceFilter] = useState("All");
   const [selectedCapitalFilter, setSelectedCapitalFilter] = useState("All");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState("All");
@@ -3703,6 +3763,21 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
       if (filterPropertyTypes.length>0) { const lProps=l.assets||[]; if (!filterPropertyTypes.some(pt=>lProps.includes(pt))) return false; }
       if (filterStates.length>0) { const lSt=l.states||[]; if (!filterStates.some(s=>lSt.includes(s)||lSt.includes("All States"))) return false; }
       if (filterLenderTypes.length>0) { const lTypes=l.typeOfLenders||[]; if (!filterLenderTypes.some(t=>lTypes.includes(t))) return false; }
+      // AI search filters
+      if (aiLenderFilters) {
+        const f = aiLenderFilters;
+        if (f.capitalTypes?.length > 0 && !f.capitalTypes.some((ct: string) => l.type?.includes(ct))) return false;
+        if (f.states?.length > 0 && !(l.states || []).some((s: string) => f.states.includes(s) || l.states?.includes("All States"))) return false;
+        if (f.propertyTypes?.length > 0 && !(l.assets || []).some((a: string) => f.propertyTypes.includes(a))) return false;
+        if (f.lenderTypes?.length > 0 && !(l.typeOfLenders || []).some((t: string) => f.lenderTypes.includes(t))) return false;
+        if (f.minLoanMin) { const lMax = parseInt((l.maxLoan||"").replace(/[^0-9]/g,"")); if (lMax > 0 && lMax < f.minLoanMin) return false; }
+        if (f.maxLoanMax) { const lMin = parseInt((l.minLoan||"").replace(/[^0-9]/g,"")); if (lMin > 0 && lMin > f.maxLoanMax) return false; }
+        if (f.minLtv) { const lLtv = parseFloat((l.maxLtv||"").replace(/[^0-9.]/g,"")); if (lLtv > 0 && lLtv < f.minLtv) return false; }
+        if (f.keywords?.length > 0) {
+          const hay = [l.lender, l.type, l.notes, (l.assets||[]).join(" "), (l.states||[]).join(" ")].join(" ").toLowerCase();
+          if (!f.keywords.every((kw: string) => hay.includes(kw.toLowerCase()))) return false;
+        }
+      }
       if (terms.length === 0) return true;
       const searchable = [
         l.lender, l.program, l.type, l.contactPerson, l.email, l.phone, l.notes,
@@ -3713,7 +3788,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
       ].filter(Boolean).join(" ").toLowerCase();
       return terms.every(term => searchable.includes(term));
     });
-  }, [lenderRecords, selectedSourceFilter, selectedCapitalFilter, selectedStatusFilter, selectedLetter, search, filterMinLoan, filterMaxLoan, filterMaxLtv, filterPropertyTypes, filterStates, filterLenderTypes]);
+  }, [lenderRecords, selectedSourceFilter, selectedCapitalFilter, selectedStatusFilter, selectedLetter, search, filterMinLoan, filterMaxLoan, filterMaxLtv, filterPropertyTypes, filterStates, filterLenderTypes, aiLenderFilters]);
   const sortedLenders = useMemo(() => [...filteredLenders].sort((a, b) => a.lender.localeCompare(b.lender)), [filteredLenders]);
 
   const spreadsheetCount = lenderRecords.filter((l) => l.source === "Spreadsheet").length;
@@ -3835,6 +3910,50 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                       <p className="text-xs text-gray-500 mt-0.5">Click a lender name to view profile. Click Edit to modify.</p>
                     </div>
                     <button onClick={() => setActiveTab("add-lender")} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80"><Plus className="h-4 w-4" /> Add Lender</button>
+                  </div>
+
+                  {/* AI Search bar */}
+                  <div className="mb-3">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#c9a84c]" />
+                        <input
+                          value={aiSearchQuery}
+                          onChange={e => setAiSearchQuery(e.target.value)}
+                          onKeyDown={e => e.key === "Enter" && runAiLenderSearch(aiSearchQuery)}
+                          placeholder='AI Search: "bridge lenders in Florida for apartments over $5M"'
+                          className="w-full pl-9 pr-4 py-2.5 text-sm bg-[#0a1f44]/3 border border-[#c9a84c]/30 rounded-xl focus:outline-none focus:border-[#c9a84c] text-gray-800 placeholder:text-gray-400"
+                        />
+                      </div>
+                      <button
+                        onClick={() => runAiLenderSearch(aiSearchQuery)}
+                        disabled={aiSearchLoading || !aiSearchQuery.trim()}
+                        className="px-4 py-2.5 text-sm font-semibold bg-[#c9a84c] text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/80 disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {aiSearchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                        {aiSearchLoading ? "Searching..." : "AI Search"}
+                      </button>
+                      {aiLenderFilters && (
+                        <button onClick={() => { setAiLenderFilters(null); setAiSearchQuery(""); setAiSearchMessage(""); }}
+                          className="px-3 py-2 text-xs text-red-400 border border-red-200 rounded-xl hover:bg-red-50">
+                          Clear ✕
+                        </button>
+                      )}
+                      <button
+                        onClick={() => exportLendersToExcel(sortedLenders)}
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border border-[#0a1f44]/20 text-[#0a1f44] rounded-xl hover:bg-[#0a1f44]/5"
+                        title="Export visible lenders to CSV/Excel"
+                      >
+                        <FileSpreadsheet className="h-4 w-4" /> Export
+                      </button>
+                    </div>
+                    {aiSearchMessage && (
+                      <div className="mt-2 flex items-center gap-2 px-3 py-1.5 bg-[#c9a84c]/10 border border-[#c9a84c]/20 rounded-lg">
+                        <Sparkles className="h-3.5 w-3.5 text-[#c9a84c] flex-shrink-0" />
+                        <span className="text-xs text-[#0a1f44]">{aiSearchMessage}</span>
+                        <span className="text-xs text-gray-400 ml-auto">{sortedLenders.length} results</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Search + filters */}
@@ -4525,11 +4644,32 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                         <>
                           {/* Search + Global Filters */}
                           <div className="mb-6 space-y-3">
-                            <div className="relative">
-                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                              <input value={dealSearch} onChange={e => setDealSearch(e.target.value)}
-                                placeholder="Search deals by borrower, asset type, capital type, city, loan amount..."
-                                className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
+                            <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                                <input value={dealSearch} onChange={e => setDealSearch(e.target.value)}
+                                  placeholder='Search deals or try AI: "Louis deals pending in Florida"'
+                                  className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
+                              </div>
+                              <button
+                                onClick={async () => {
+                                  if (!dealSearch.trim()) return;
+                                  const res = await fetch("/api/ai-search", { method: "POST", headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ query: dealSearch, mode: "deals", teamMembers }) });
+                                  const data = await res.json();
+                                  if (data.filters) {
+                                    const f = data.filters;
+                                    if (f.status) setFilterStatus(f.status.charAt(0).toUpperCase() + f.status.slice(1));
+                                    if (f.capitalType) setFilterCapital(f.capitalType);
+                                    if (f.advisorName) setFilterAdvisor(f.advisorName);
+                                    if (f.seekerName) setFilterClient(f.seekerName);
+                                    if (f.keywords?.length > 0) setDealSearch(f.keywords.join(" "));
+                                  }
+                                }}
+                                className="px-3 py-2 text-xs font-semibold bg-[#c9a84c] text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/80 flex items-center gap-1.5 whitespace-nowrap"
+                              >
+                                <Sparkles className="h-3.5 w-3.5" /> AI
+                              </button>
                             </div>
                             <div className="flex flex-wrap gap-2">
                               <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
