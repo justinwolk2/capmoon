@@ -1745,7 +1745,7 @@ function DealTeamTab({ teamMembers, setTeamMembers, currentUserId, isAdmin, inpu
                   <div>
                     <div className="font-display text-xl font-bold text-white">{member.name}</div>
                     <div className="text-xs text-[#c9a84c] font-medium mt-0.5">{member.title}</div>
-                    <div className="text-xs text-gray-400 mt-1">{member.email}</div>
+                    <a href={`mailto:${member.email}`} className="text-xs text-gray-400 mt-1 hover:underline">{member.email}</a>
                   </div>
                 </div>
                 <div className="p-5">
@@ -4101,7 +4101,11 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                       {[["Min Loan", item.minLoan || "—"], ["Max Loan", item.maxLoan || "—"], ["Max LTV", item.maxLtv || "—"], ["Recourse", item.recourse || "—"], ["Contact", item.contactPerson || "—"], ["Email", item.email || "—"], ["Phone", item.phone || "—"]].map(([label, val]) => (
                                         <div key={String(label)} className="rounded-lg bg-gray-50 border border-gray-100 p-2.5">
                                           <div className="text-xs text-[#c9a84c] font-bold uppercase tracking-wide mb-0.5">{label}</div>
-                                          <div className="text-xs font-semibold text-[#0a1f44] break-all">{val}</div>
+                                          {label === "Email" && item.email
+                                            ? <a href={`mailto:${item.email}`} className="text-xs font-semibold text-[#0a1f44] break-all hover:underline">{val}</a>
+                                            : label === "Phone" && item.phone
+                                            ? <a href={`tel:${item.phone.replace(/[^0-9+]/g,"")}`} className="text-xs font-semibold text-[#0a1f44] break-all hover:underline">{val}</a>
+                                            : <div className="text-xs font-semibold text-[#0a1f44] break-all">{val}</div>}
                                         </div>
                                       ))}
                                     </div>
@@ -4119,7 +4123,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                           {item.contacts.map((contact: any) => (
                                             <div key={contact.id} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 flex flex-wrap gap-x-4 gap-y-1">
                                               {contact.name && <div className="text-xs font-bold text-[#0a1f44]">{contact.name}</div>}
-                                              {contact.email && <div className="text-xs text-gray-500">{contact.email}</div>}
+                                              {contact.email && <a href={`mailto:${contact.email}`} className="text-xs text-gray-500 hover:underline">{contact.email}</a>}
                                               {contact.phone && <div className="text-xs text-gray-500">{contact.phone}</div>}
                                               {contact.region && <div className="text-xs text-[#c9a84c] font-medium">{contact.region}</div>}
                                             </div>
