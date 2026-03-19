@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       const t = Math.random().toString(36).slice(2) + Date.now().toString(36);
       await sql`INSERT INTO lender_submissions (deal_id, lender_id, lender_name, lender_email, deal_title, advisor_name, token, status, created_at)
         VALUES (${dealId}, ${lenderId}, ${lenderName}, ${lenderEmail || ""}, ${dealTitle || ""}, ${advisorName || ""}, ${t}, 'sent', NOW())
-        ON CONFLICT (token) DO NOTHING`;
+        ON CONFLICT (token) DO UPDATE SET status = EXCLUDED.status`;
       // Send real email via Resend (or placeholder if not configured)
       if (lenderEmail) {
         await sendEmail(

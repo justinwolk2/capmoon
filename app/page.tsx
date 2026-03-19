@@ -4187,20 +4187,14 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                 function DealCard({ deal }: { deal: SubmittedDeal }) {
                   const [showInvite, setShowInvite] = React.useState(false);
                   const [showLenderResponses, setShowLenderResponses] = React.useState(false);
-                  const [dealSentLenders, setDealSentLenders] = React.useState<any[]>([]);
-
-                  React.useEffect(() => {
-                    fetch("/api/lender-submissions?dealId=" + deal.id)
-                      .then(r => r.json()).then(d => { if (Array.isArray(d)) setDealSentLenders(d); })
-                      .catch(() => {});
-                  }, [deal.id]);
+                  
 
 
                   async function updateLenderResponseStatus(token: string, newStatus: string) {
                     await fetch("/api/lender-submissions", { method: "POST", headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ action: "respond", token, status: newStatus }) });
                     const updated = await fetch("/api/lender-submissions?dealId=" + deal.id).then(r => r.json());
-                    if (Array.isArray(updated)) setDealSentLenders(updated);
+                    if (Array.isArray(updated)) setSentLenders(updated);
                   }
                   const [inviteUserId, setInviteUserId] = React.useState("");
                   const advisors = teamMembers.filter((m) => deal.assignedAdvisorIds.includes(m.id));
@@ -4755,8 +4749,14 @@ export default function Home() {
   // Save helper as useCallback so it's stable and available to useEffects
   const saveToDb = React.useCallback(async (type: string, data: any[]) => {
     if (!data || data.length === 0) return;
+    // Deduplicate by id before saving
+    const unique = Object.values(data.reduce((acc: any, item: any) => {
+      const key = item.id || item.token || JSON.stringify(item);
+      acc[key] = item;
+      return acc;
+    }, {})) as any[];
     try {
-      const res = await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, data }) });
+      const res = await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, data: unique }) });
       const json = await res.json();
       if (!json.success) console.error("DB save returned failure:", json);
     } catch (e) { console.error("DB save failed:", e); }
