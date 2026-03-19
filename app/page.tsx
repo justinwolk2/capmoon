@@ -4195,7 +4195,6 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                       .catch(() => {});
                   }, [deal.id]);
 
-                  const sentLenders = dealSentLenders;
 
                   async function updateLenderResponseStatus(token: string, newStatus: string) {
                     await fetch("/api/lender-submissions", { method: "POST", headers: { "Content-Type": "application/json" },
