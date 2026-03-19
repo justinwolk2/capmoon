@@ -4954,20 +4954,20 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                             ...(editForm.password ? { password: editForm.password } : {}),
                           } : u);
                           setUsers(updated);
-                          saveToDb("users", updated);
+                          fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "users", data: updated }) }).catch(console.error);
                           setEditing(false);
                         }
 
                         function toggleBlock() {
                           const updated = users.map(u => u.id === user.id ? { ...u, blocked: !isBlocked } : u);
                           setUsers(updated);
-                          saveToDb("users", updated);
+                          fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "users", data: updated }) }).catch(console.error);
                         }
 
                         function deleteUser() {
                           const updated = users.filter(u => u.id !== user.id);
                           setUsers(updated);
-                          saveToDb("users", updated);
+                          fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "users", data: updated }) }).catch(console.error);
                         }
 
                         return (
@@ -5052,7 +5052,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                       return (
                                         <button key={key} type="button" onClick={() => {
                                           const updated = users.map(u => u.id === user.id ? { ...u, emailPrefs: { ...prefs, [key]: !enabled } } : u);
-                                          setUsers(updated); saveToDb("users", updated);
+                                          setUsers(updated); fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "users", data: updated }) }).catch(console.error);
                                         }} className={"px-2 py-0.5 text-xs rounded-full border font-medium transition-all " + (enabled ? "bg-[#0a1f44] text-white border-[#0a1f44]" : "bg-gray-100 text-gray-400 border-gray-200")}>
                                           {label}
                                         </button>
