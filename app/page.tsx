@@ -2776,7 +2776,6 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   <button onClick={resetMatcher} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">New Deal</button>
                 </div>
               </div>
-              </div>
               {matchResults.length === 0 ? (
                 <div className={cardClass + " p-8 text-center"}><div className="text-lg font-bold text-[#0a1f44] mb-2">No matches found</div><div className="text-sm text-gray-500">Try adjusting your deal criteria or add more lenders.</div></div>
               ) : collateralMode === "separate" && assetMode === "multiple" ? (
