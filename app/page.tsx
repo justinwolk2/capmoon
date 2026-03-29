@@ -3156,7 +3156,7 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
     dealNumber = dnData.dealNumber || "";
   } catch(e) { console.error("Deal number error:", e); }
 
-  const deal: SubmittedDeal = { id: Date.now(), submittedAt: new Date().toLocaleString(), seekerName: editableSeekerName || session?.user.name || "Guest", seekerEmail: session?.user.email || session?.user.username || "", seekerPhone: (session?.user as any).phone || "", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a) => a.id), dealNumber };
+  const deal: SubmittedDeal = { id: Date.now(), submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Guest", seekerEmail: session?.user.email || session?.user.username || "", seekerPhone: (session?.user as any).phone || "", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a) => a.id), dealNumber };
     onSubmitDeal(deal);
     // Save to DB immediately
     try {
