@@ -44,9 +44,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true });
       }
       case "deals": {
-        await sql`DELETE FROM submitted_deals`;
-        const unique = Object.values(data.reduce((a,i) => ({...a,[i.id]:i}), {}));
-        for (const item of unique) await sql`INSERT INTO submitted_deals (data) VALUES (${JSON.stringify(item)})`;
+        const unique = Object.values(data.reduce((a: any, i: any) => ({...a,[String(i.id)]:i}), {})) as any[];
+        for (const item of unique) {
+          await sql`INSERT INTO submitted_deals (data) VALUES (${JSON.stringify(item)})
+            ON CONFLICT ((data->>'id')) DO UPDATE SET data = EXCLUDED.data`;
+        }
         return NextResponse.json({ success: true });
       }
       case "team": {
