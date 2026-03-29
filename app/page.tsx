@@ -4777,6 +4777,97 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                           {sentLenders.length > 0 && <span className={"ml-1 px-1.5 py-0.5 text-xs rounded-full font-bold " + (showLenderResponses ? "bg-white text-[#0a1f44]" : "bg-[#c9a84c] text-[#0a1f44]")}>{sentLenders.length}</span>}
                         </button>
                       </div>
+
+                      {/* Document Upload + Request */}
+                      <div className="mt-3 space-y-2">
+                        <div className="flex gap-2 flex-wrap">
+                          <button type="button" onClick={() => setShowDocUpload(p => !p)}
+                            className={"flex items-center gap-2 px-4 py-2 text-xs font-semibold border rounded-xl transition-all " + (showDocUpload ? "border-[#0a1f44] bg-[#0a1f44] text-white" : "border-gray-200 text-gray-600 hover:border-[#0a1f44]/30")}>
+                            <FileSpreadsheet className="h-3.5 w-3.5" /> Upload Docs
+                            {dealDocs.length > 0 && <span className={"ml-1 px-1.5 py-0.5 text-xs rounded-full font-bold " + (showDocUpload ? "bg-white text-[#0a1f44]" : "bg-[#0a1f44] text-white")}>{dealDocs.length}</span>}
+                          </button>
+                          <button type="button" onClick={() => setShowDocRequest(p => !p)}
+                            className={"flex items-center gap-2 px-4 py-2 text-xs font-semibold border rounded-xl transition-all " + (showDocRequest ? "border-[#c9a84c] bg-[#c9a84c] text-[#0a1f44]" : "border-gray-200 text-gray-600 hover:border-[#c9a84c]/30")}>
+                            <Mail className="h-3.5 w-3.5" /> Request Docs from Borrower
+                          </button>
+                        </div>
+
+                        {showDocUpload && (
+                          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+                            <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">Upload Document</div>
+                            <div className="grid gap-2 md:grid-cols-2">
+                              <div>
+                                <label className="text-xs text-gray-500 mb-1 block font-bold">Document Type</label>
+                                <select value={docType} onChange={e => setDocType(e.target.value)}
+                                  className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]">
+                                  {["Rent Roll","T12 Financials","Operating Statement","Tax Returns (2yr)","Bank Statements (3mo)","Purchase Contract","Appraisal","Environmental Report","Survey","Title Report","Loan Application","Personal Financial Statement","Entity Documents","Construction Budget","Proforma","Other"].map((t: string) => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-xs text-gray-500 mb-1 block font-bold">File</label>
+                                <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                                  onChange={e => setDocFile(e.target.files?.[0] || null)}
+                                  className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl" />
+                              </div>
+                            </div>
+                            {docType === "Other" && (
+                              <input value={docLabel} onChange={e => setDocLabel(e.target.value)}
+                                placeholder="Describe this document..." className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
+                            )}
+                            {docFile && (
+                              <button type="button" onClick={uploadDoc} disabled={docUploading}
+                                className="w-full py-2.5 text-sm font-bold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 disabled:opacity-50">
+                                {docUploading ? "Uploading..." : "Upload " + (docType === "Other" ? docLabel || "Document" : docType)}
+                              </button>
+                            )}
+                            {dealDocs.length > 0 && (
+                              <div className="space-y-1.5 border-t border-gray-200 pt-3">
+                                <div className="text-xs font-bold text-[#0a1f44] mb-2">Uploaded Documents</div>
+                                {dealDocs.map((doc: any) => (
+                                  <div key={doc.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-gray-100">
+                                    <div>
+                                      <div className="text-xs font-semibold text-[#0a1f44]">{doc.document_name}</div>
+                                      <div className="text-xs text-gray-400">{doc.lender_name} · {new Date(doc.uploaded_at).toLocaleDateString()}</div>
+                                    </div>
+                                    <a href={doc.document_url} target="_blank" rel="noopener noreferrer"
+                                      className="px-2.5 py-1 text-xs font-semibold border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/5">
+                                      View →
+                                    </a>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {showDocRequest && (
+                          <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4 space-y-3">
+                            <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">Request Documents from Borrower</div>
+                            <div>
+                              <label className="text-xs text-gray-500 mb-1 block font-bold">Borrower Email</label>
+                              <input value={requestEmail} onChange={e => setRequestEmail(e.target.value)}
+                                placeholder="borrower@email.com" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-500 mb-2 block font-bold">Documents Needed</label>
+                              <div className="flex flex-wrap gap-1.5">
+                                {["Rent Roll","T12 Financials","Operating Statement","Tax Returns (2yr)","Bank Statements (3mo)","Purchase Contract","Appraisal","Environmental Report","Survey","Title Report","Loan Application","Personal Financial Statement","Entity Documents","Construction Budget","Proforma","Other"].map((t: string) => (
+                                  <button key={t} type="button" onClick={() => setRequestDocs(p => p.includes(t) ? p.filter(x => x !== t) : [...p, t])}
+                                    className={"px-2.5 py-1 text-xs rounded-full border font-medium transition-all " + (requestDocs.includes(t) ? "bg-[#0a1f44] text-white border-[#0a1f44]" : "bg-white text-gray-500 border-gray-200 hover:border-[#0a1f44]/30")}>
+                                    {t}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            {requestDocs.length > 0 && (
+                              <button type="button" onClick={sendDocRequest} disabled={requestSending || requestSent}
+                                className={"w-full py-2.5 text-sm font-bold rounded-xl " + (requestSent ? "bg-green-500 text-white" : "bg-[#c9a84c] text-[#0a1f44] hover:bg-[#c9a84c]/80")}>
+                                {requestSent ? "✓ Sent!" : requestSending ? "Sending..." : "Send Request (" + requestDocs.length + " docs)"}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                       {showInvite && (
                         <div className="mt-3 rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4">
                           <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-3">Invite a Collaborator</div>
