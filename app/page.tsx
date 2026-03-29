@@ -3074,11 +3074,6 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
             </div>
           </aside>
           <main className="p-6 md:p-8 overflow-auto">
-              </button>
-              <img src="/logo1.JPEG" alt="CapMoon" className="h-7 w-7 object-contain rounded-full" />
-              <span className="font-display text-lg font-bold text-white">CapMoon</span>
-              <div className="ml-auto text-xs text-gray-400">{session?.user.name}</div>
-            </div>
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
               <div className="mb-8">
                 <div className="text-xs uppercase tracking-[0.28em] text-[#0a1f44] font-bold">Capital Search</div>
