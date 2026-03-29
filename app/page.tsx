@@ -2761,6 +2761,18 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   <button onClick={() => setMatcherStep("review")} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Back</button>
                   <button onClick={resetMatcher} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">New Deal</button>
                 </div>
+              </div>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold mb-1">Match Results</div>
+                  <h2 className="font-display text-3xl font-bold text-[#0a1f44]">Ranked Output</h2>
+                  <p className="text-sm text-gray-500 mt-1">{collateralMode === "crossed" ? "Combined portfolio" : collateralMode === "separate" ? "Individual asset matching" : "Single asset"}</p>
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setMatcherStep("review")} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Back</button>
+                  <button onClick={resetMatcher} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">New Deal</button>
+                </div>
+              </div>
               {matchResults.length === 0 ? (
                 <div className={cardClass + " p-8 text-center"}><div className="text-lg font-bold text-[#0a1f44] mb-2">No matches found</div><div className="text-sm text-gray-500">Try adjusting your deal criteria or add more lenders.</div></div>
               ) : collateralMode === "separate" && assetMode === "multiple" ? (
@@ -2796,7 +2808,15 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   {matchResults.map((match: any, idx: number) => {
                     const ml = matchLabel(match.score);
                     return (
-                      <div key={match.id} className={`rounded-xl border bg-white p-5 hover:shadow-sm transition-all ${ml.border}`}>
+                      <div key={match.id} className={`rounded-xl border bg-white p-5 hover:shadow-sm transition-all ${ml.border} ${!capitalSeekerMode ? "cursor-pointer" : ""}`} onClick={() => !capitalSeekerMode && setSelectedMatchIds && setSelectedMatchIds((p: number[]) => p.includes(match.id) ? p.filter((x: number) => x !== match.id) : [...p, match.id])}>
+                      {!capitalSeekerMode && (
+                        <div className="flex items-center justify-between mb-2">
+                          <input type="checkbox" checked={selectedMatchIds?.includes(match.id) ?? true}
+                            onChange={() => setSelectedMatchIds && setSelectedMatchIds((p: number[]) => p.includes(match.id) ? p.filter((x: number) => x !== match.id) : [...p, match.id])}
+                            className="accent-[#0a1f44] w-4 h-4" onClick={e => e.stopPropagation()} />
+                          <span className="text-xs text-gray-400">{selectedMatchIds?.includes(match.id) ?? true ? "Selected" : "Deselected"}</span>
+                        </div>
+                      )}
                         <div className="flex items-start justify-between gap-2 mb-3">
                           <div>
                             <div className={`text-xs font-bold px-2 py-0.5 rounded-full border inline-block mb-2 ${ml.bg} ${ml.color} ${ml.border}`}>{ml.label}</div>
