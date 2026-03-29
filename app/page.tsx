@@ -3157,6 +3157,13 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
 
   const deal: SubmittedDeal = { id: Date.now(), submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Guest", seekerEmail: session?.user.email || session?.user.username || "", seekerPhone: (session?.user as any).phone || "", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a) => a.id), dealNumber };
     onSubmitDeal(deal);
+    // Save to DB immediately
+    try {
+      const existing = await fetch("/api/data?type=deals").then(r => r.json());
+      const allDeals = Array.isArray(existing) ? existing : [];
+      const updated = [deal, ...allDeals.filter((d: SubmittedDeal) => d.id !== deal.id)];
+      await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: updated }) });
+    } catch(e) { console.error("Failed to save deal to DB:", e); }
     // Push to Pipedrive
     const advisor = advisors[0];
     if (advisor) {
