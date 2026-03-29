@@ -3049,10 +3049,7 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600&display=swap'); * { font-family: 'Montserrat', sans-serif; } .font-display { font-family: 'Cormorant Garamond', serif; } [data-radix-select-content] { background: white !important; border: 1px solid #e5e7eb !important; color: #1f2937 !important; } [data-radix-select-item] { color: #1f2937 !important; } [data-radix-select-item]:hover, [data-radix-select-item][data-highlighted] { background: #f3f4f6 !important; color: #0a1f44 !important; }`}</style>
       <div className="min-h-screen bg-[#f0f2f5] text-gray-800">
         <div className="grid min-h-screen lg:grid-cols-[260px_1fr]">
-          <aside className={
-            "fixed inset-y-0 left-0 z-50 w-[260px] border-r border-[#c9a84c]/10 bg-[#0a1f44] flex flex-col transition-transform duration-300 lg:relative lg:translate-x-0 " +
-          <aside className="border-r border-[#c9a84c]/10 bg-[#0a1f44] flex flex-col hidden lg:flex">
-          }>
+          <aside className="hidden lg:flex flex-col border-r border-[#c9a84c]/10 bg-[#0a1f44]">
             <div className="px-6 py-8 border-b border-[#c9a84c]/20">
               <div className="flex items-center gap-3 mb-2">
                 <img src="/logo1.JPEG" alt="CapMoon" className="h-12 w-12 object-contain rounded-full" />
