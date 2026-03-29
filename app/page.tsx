@@ -2771,6 +2771,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                     const [showExtra, setShowExtra] = React.useState(false);
                     const [selectedExtra, setSelectedExtra] = React.useState<number[]>([]);
 
+                    async function submitToMatched() {
                       setSendingMatch(true);
                       const dealsRes = await fetch("/api/data?type=deals");
                       const allDeals = await dealsRes.json();
@@ -2779,7 +2780,6 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                         setSendingMatch(false); return;
                       }
                       const lastDeal = allDeals[0];
-                      const lastDeal = submittedDeals[0];
                       const advisor = teamMembers.find((m: TeamMember) => lastDeal.assignedAdvisorIds?.includes(m.id));
                       const allIds = [...new Set([...matchResults.map((m: any) => m.id), ...selectedExtra])];
                       let sent = 0;
