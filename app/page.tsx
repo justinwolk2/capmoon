@@ -4676,6 +4676,24 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                   }
 
 
+                  const [docMenuOpenId, setDocMenuOpenId] = React.useState<number|null>(null);
+
+                  async function deleteDoc(docId: number, docName: string) {
+                    if (!window.confirm('Delete "' + docName + '"?')) return;
+                    setDocMenuOpenId(null);
+                    if (isAdmin) {
+                      await fetch("/api/upload?id=" + docId, { method: "DELETE" });
+                    } else {
+                      // Non-admin: flag for admin review (future approval queue)
+                      await fetch("/api/upload?id=" + docId + "&requestDelete=1", { method: "DELETE" });
+                      alert("Delete request submitted to admin.");
+                      return;
+                    }
+                    const updated = await fetch("/api/upload?dealId=" + deal.id).then(r => r.json());
+                    if (Array.isArray(updated)) setDealDocs(updated);
+                  }
+
+
                   async function sendDocRequest() {
                     if (requestDocs.length === 0) return;
                     setRequestSending(true);
@@ -4917,7 +4935,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                             </div>
                             <div className="divide-y divide-gray-50">
                               {dealDocs.map((doc: any) => (
-                                <div key={doc.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                                <div key={doc.id} className="relative">
+                                  <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setDocMenuOpenId(docMenuOpenId === doc.id ? null : doc.id)}>
                                   <span className="text-lg flex-shrink-0">
                                     {(() => {
                                       const t = doc.document_type || "";
@@ -4939,11 +4958,22 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                       {doc.lender_name} · {new Date(doc.uploaded_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                                     </div>
                                   </div>
-                                  <a href={doc.document_url} target="_blank" rel="noopener noreferrer"
-                                    className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 text-xs font-semibold border border-[#0a1f44]/15 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/5 transition-colors">
-                                    View →
-                                  </a>
-                                </div>
+                                    <span className="text-gray-300 text-xs ml-1">⋮</span>
+                                  </div>{/* end inner flex */}
+                                  </div>{/* end row */}
+                                  {docMenuOpenId === doc.id && (
+                                    <div className="absolute right-3 top-10 z-50 bg-white rounded-xl border border-gray-200 shadow-xl overflow-hidden w-40">
+                                      <a href={doc.document_url} target="_blank" rel="noopener noreferrer"
+                                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-[#0a1f44] hover:bg-gray-50 border-b border-gray-100">
+                                        📄 View File
+                                      </a>
+                                      <button type="button" onClick={() => deleteDoc(doc.id, doc.document_name)}
+                                        className={"flex items-center gap-2 px-4 py-2.5 text-sm w-full text-left " + (isAdmin ? "text-red-500 hover:bg-red-50" : "text-gray-500 hover:bg-gray-50")}>
+                                        🗑 {isAdmin ? "Delete" : "Request Delete"}
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>{/* end relative */}
                               ))}
                             </div>
                           </div>
