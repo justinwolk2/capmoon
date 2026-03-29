@@ -2698,10 +2698,10 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                 if (capitalType === "Stretch Senior/Hybrid") { setHybridIndex(hybridProperties.length - 1); setMatcherStep("hybrid-form"); }
                 else { setCurrentAssetIndex(0); setMatcherStep("asset-form"); }
               }} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Back</button>
-              <button onClick={() => {
+              <button onClick={async () => {
+                const advisors = assignAdvisors(capitalType, teamMembers);
+                setAssignedAdvisors(advisors);
                 if (onSubmitDeal) {
-                  const advisors = assignAdvisors(capitalType, teamMembers);
-                  setAssignedAdvisors(advisors);
                   onSubmitDeal(assets, capitalType, assetMode, collateralMode);
                 }
                 setMatcherStep("results");
@@ -4667,7 +4667,20 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
               {activeTab === "add-lender" && <AddLenderPage onSave={handleSaveLender} onCancel={() => setActiveTab("lenders")} existingLenders={lenderRecords} inputClass={inputClass} selectTriggerClass={selectTriggerClass} />}
 
-              {activeTab === "matcher" && <DealMatcher lenderRecords={lenderRecords} teamMembers={teamMembers} onSubmitDeal={(assets, capitalType, assetMode, collateralMode) => { const advisors = assignAdvisors(capitalType, teamMembers); const deal = { id: Date.now(), submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Admin", seekerEmail: session?.user.username || "", assets, capitalType, assetMode, collateralMode, status: "pending" as const, assignedAdvisorIds: advisors.map(a => a.id), dealNumber: "" }; const next = [deal, ...submittedDeals]; setSubmittedDeals(next); fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [deal] }) }); setActiveTab("submitted-deals"); }} prefillDeal={prefillDeal} onPrefillConsumed={() => setPrefillDeal(null)} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />}
+              {activeTab === "matcher" && <DealMatcher lenderRecords={lenderRecords} teamMembers={teamMembers} onSubmitDeal={(assets, capitalType, assetMode, collateralMode) => {
+                const advisors = assignAdvisors(capitalType, teamMembers);
+                const dealId = Date.now();
+                fetch("/api/deal-number", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ advisorId: session?.user.id }) })
+                  .then(r => r.json()).then(dn => {
+                    const deal = { id: dealId, submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Admin", seekerEmail: session?.user.username || "", assets, capitalType, assetMode, collateralMode, status: "pending" as const, assignedAdvisorIds: advisors.map((a: any) => a.id), dealNumber: dn.dealNumber || "" };
+                    setSubmittedDeals(prev => [deal, ...prev.filter(d => d.id !== deal.id)]);
+                    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [deal] }) });
+                  }).catch(() => {
+                    const deal = { id: dealId, submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Admin", seekerEmail: session?.user.username || "", assets, capitalType, assetMode, collateralMode, status: "pending" as const, assignedAdvisorIds: advisors.map((a: any) => a.id), dealNumber: "" };
+                    setSubmittedDeals(prev => [deal, ...prev.filter(d => d.id !== deal.id)]);
+                    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [deal] }) });
+                  });
+              }} prefillDeal={prefillDeal} onPrefillConsumed={() => setPrefillDeal(null)} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />}
 
               {/* Deal Team Tab */}
               {activeTab === "deal-team" && (
