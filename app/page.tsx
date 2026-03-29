@@ -2660,7 +2660,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
               <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Quick Edit — Final Details</div>
               <div className="grid gap-3 md:grid-cols-3">
                 <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Borrower Name</label>
-                  <input value={assets[0]?.ownerName || seekerName || ""} onChange={e => setAssets(prev => prev.map((a,i) => i===0 ? {...a, ownerName: e.target.value} : a))}
+                  <input value={seekerName || ""} readOnly
                     className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
                 <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Loan Amount</label>
                   <input value={assets[0]?.loanAmount || ""} onChange={e => setAssets(prev => prev.map((a,i) => i===0 ? {...a, loanAmount: e.target.value} : a))}
