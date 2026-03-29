@@ -2762,11 +2762,6 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   <button onClick={resetMatcher} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">New Deal</button>
                 </div>
 
-                    const [sendingMatch, setSendingMatch] = React.useState(false);
-                    const [sentMatch, setSentMatch] = React.useState<number[]>([]);
-                    const [extraSearch, setExtraSearch] = React.useState("");
-                    const [showExtra, setShowExtra] = React.useState(false);
-                    const [selectedExtra, setSelectedExtra] = React.useState<number[]>([]);
               {/* Submit to Matched Lenders */}
               {!capitalSeekerMode && (
                 <div className="mt-4 space-y-3">
