@@ -5616,3 +5616,55 @@ export default function Home() {
   }
   return <MainPortal session={session} onLogout={handleLogout} submittedDeals={submittedDeals} setSubmittedDeals={handleSetSubmittedDeals} users={users} setUsers={handleSetUsers} teamMembers={teamMembers} setTeamMembers={handleSetTeamMembers} deleteRequests={deleteRequests} setDeleteRequests={handleSetDeleteRequests} lenderChangeRequests={lenderChangeRequests} setLenderChangeRequests={handleSetLenderChangeRequests} />;
 }
+                        {dealDocs.length > 0 && (
+                          <div className="mt-3 rounded-xl overflow-hidden border border-[#0a1f44]/15">
+                            {/* Folder Header */}
+                            <div className="flex items-center justify-between px-4 py-3 bg-[#0a1f44]">
+                              <div className="flex items-center gap-2">
+                                <span className="text-base">📁</span>
+                                <span className="text-xs font-bold text-white uppercase tracking-wider">Deal Documents</span>
+                                <span className="px-2 py-0.5 text-xs bg-[#c9a84c] text-[#0a1f44] rounded-full font-bold">{dealDocs.length}</span>
+                              </div>
+                              {deal.dealNumber && <span className="text-xs text-white/50">{deal.dealNumber}</span>}
+                            </div>
+                            {/* Doc rows */}
+                            <div className="bg-white divide-y divide-gray-100">
+                              {dealDocs.map((doc: any) => (
+                                <div key={doc.id} className="relative group">
+                                  <div className="flex items-center gap-3 px-4 py-3">
+                                    <span className="text-xl flex-shrink-0">
+                                      {(() => {
+                                        const t = doc.document_type || "";
+                                        if (t.includes("Rent Roll") || t.includes("Financial") || t.includes("Statement") || t.includes("Budget") || t.includes("Proforma")) return "📊";
+                                        if (t.includes("Tax")) return "🧾";
+                                        if (t.includes("Bank")) return "🏦";
+                                        if (t.includes("Contract")) return "📝";
+                                        if (t.includes("Appraisal")) return "🏠";
+                                        if (t.includes("Environmental") || t.includes("Survey")) return "🗺️";
+                                        if (t.includes("Title")) return "📋";
+                                        if (t.includes("Entity") || t.includes("Personal")) return "👤";
+                                        if (t.includes("Construction")) return "🏗️";
+                                        return "📄";
+                                      })()}
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-sm font-semibold text-[#0a1f44] truncate">{doc.document_name}</div>
+                                      <div className="text-xs text-gray-400 mt-0.5">{doc.lender_name} · {new Date(doc.uploaded_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                      <a href={doc.document_url} target="_blank" rel="noopener noreferrer"
+                                        className="px-3 py-1.5 text-xs font-bold bg-[#0a1f44] text-white rounded-lg hover:bg-[#0a1f44]/80 transition-colors">
+                                        View
+                                      </a>
+                                      <button type="button" onClick={() => deleteDoc(doc.id, doc.document_name)}
+                                        className={"px-3 py-1.5 text-xs font-bold border rounded-lg transition-colors " + (isAdmin ? "border-red-200 text-red-500 hover:bg-red-50" : "border-gray-200 text-gray-400 hover:bg-gray-50")}
+                                        title={isAdmin ? "Delete" : "Request deletion"}>
+                                        {isAdmin ? "Delete" : "Remove"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
