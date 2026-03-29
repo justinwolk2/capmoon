@@ -4678,20 +4678,6 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
                   const [docMenuOpenId, setDocMenuOpenId] = React.useState<number|null>(null);
 
-                  async function deleteDoc(docId: number, docName: string) {
-                    if (!window.confirm('Delete "' + docName + '"?')) return;
-                    setDocMenuOpenId(null);
-                    if (isAdmin) {
-                      await fetch("/api/upload?id=" + docId, { method: "DELETE" });
-                    } else {
-                      // Non-admin: flag for admin review (future approval queue)
-                      await fetch("/api/upload?id=" + docId + "&requestDelete=1", { method: "DELETE" });
-                      alert("Delete request submitted to admin.");
-                      return;
-                    }
-                    const updated = await fetch("/api/upload?dealId=" + deal.id).then(r => r.json());
-                    if (Array.isArray(updated)) setDealDocs(updated);
-                  }
 
 
                   async function sendDocRequest() {
