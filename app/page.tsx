@@ -2699,7 +2699,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                 else { setCurrentAssetIndex(0); setMatcherStep("asset-form"); }
               }} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Back</button>
               <button onClick={() => {
-                if (capitalSeekerMode && onSubmitDeal) {
+                if (onSubmitDeal) {
                   const advisors = assignAdvisors(capitalType, teamMembers);
                   setAssignedAdvisors(advisors);
                   onSubmitDeal(assets, capitalType, assetMode, collateralMode);
