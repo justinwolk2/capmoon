@@ -1846,6 +1846,9 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
   const [aiError, setAiError] = useState("");
   const [assignedAdvisors, setAssignedAdvisors] = useState<TeamMember[]>([]);
   const [prefillBanner, setPrefillBanner] = useState("");
+  const [selectedMatchIds, setSelectedMatchIds] = useState<number[]>([]);
+  const [additionalSearch, setAdditionalSearch] = useState("");
+  const [additionalSelected, setAdditionalSelected] = useState<number[]>([]);
   // Hybrid/Stretch Senior state
   const [hybridCount, setHybridCount] = useState("1");
   const [hybridProperties, setHybridProperties] = useState<HybridProperty[]>([]);
