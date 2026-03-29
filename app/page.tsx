@@ -1924,6 +1924,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
   }
   function handleNextAsset() { if (currentAssetIndex < assets.length - 1) { setCurrentAssetIndex((i) => i + 1); } else { setMatcherStep("review"); } }
   function handlePrevAsset() { if (currentAssetIndex > 0) { setCurrentAssetIndex((i) => i - 1); } else { setMatcherStep(assetMode === "multiple" ? "asset-count" : "start"); } }
+  function handleBackFromStart() { if (prefillBanner && !capitalSeekerMode && typeof (window as any).__setActiveTab === 'function') { (window as any).__setActiveTab('submitted-deals'); } else { setMatcherStep('ai-prompt'); } }
   function resetMatcher() { setMatcherStep("ai-prompt"); setAssetMode("single"); setCollateralMode(""); setAssets([blankAsset(1)]); setCurrentAssetIndex(0); setAiDescription(""); setAiParsed(false); setAiError(""); setAssignedAdvisors([]); setPrefillBanner(""); setHybridProperties([]); setHybridIndex(0); setHybridCount("1"); }
 
   const matchResults = useMemo(() => {
@@ -2088,7 +2089,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                 <Select value={collateralMode} onValueChange={(v) => setCollateralMode(v as "crossed" | "separate")}><SelectTrigger className={selectTriggerClass + " max-w-xs"}><SelectValue placeholder="Select treatment..." /></SelectTrigger><SelectContent><SelectItem value="crossed">Crossed Collateral</SelectItem><SelectItem value="separate">Treated Separately</SelectItem></SelectContent></Select>
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setMatcherStep("start")} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Previous</button>
+                <button onClick={prefillBanner ? handleBackFromStart : () => setMatcherStep("ai-prompt")} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> {prefillBanner ? "Back to Deals" : "Previous"}</button>
                 <button onClick={handleAssetCountConfirm} disabled={!collateralMode} className="flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 disabled:opacity-40 disabled:cursor-not-allowed">Continue <ChevronRight className="h-4 w-4" /></button>
               </div>
             </div>
@@ -3616,6 +3617,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const isStaff = session?.user.role === "staff";
   const isLender = session?.user.role === "lender";
   const [activeTab, setActiveTab] = useState("overview");
+  React.useEffect(() => { (window as any).__setActiveTab = setActiveTab; }, [setActiveTab]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [editingUserId, setEditingUserId] = useState<number|null>(null);
@@ -4551,6 +4553,26 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                 function DealCard({ deal }: { deal: SubmittedDeal }) {
                   const [showInvite, setShowInvite] = React.useState(false);
                   const [showLenderResponses, setShowLenderResponses] = React.useState(false);
+                  const [threadMessages, setThreadMessages] = React.useState<Record<string, any[]>>({});
+                  const [threadInput, setThreadInput] = React.useState<Record<string, string>>({});
+                  const [threadLoading, setThreadLoading] = React.useState<Record<string, boolean>>({});
+
+                  async function loadThread(token: string) {
+                    const msgs = await fetch("/api/submission-messages?token=" + token).then(r => r.json());
+                    if (Array.isArray(msgs)) setThreadMessages(p => ({ ...p, [token]: msgs }));
+                  }
+
+                  async function sendMessage(token: string, submissionId: number) {
+                    const msg = (threadInput[token] || "").trim();
+                    if (!msg) return;
+                    setThreadLoading(p => ({ ...p, [token]: true }));
+                    setThreadInput(p => ({ ...p, [token]: "" }));
+                    await fetch("/api/submission-messages", { method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ token, dealId: deal.id, senderName: session?.user.name || "Admin",
+                        senderRole: session?.user.role || "admin", message: msg }) });
+                    await loadThread(token);
+                    setThreadLoading(p => ({ ...p, [token]: false }));
+                  }
                   
 
 
