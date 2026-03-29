@@ -2762,6 +2762,58 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   <button onClick={resetMatcher} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">New Deal</button>
                 </div>
 
+              {/* Submit to Matched Lenders */}
+              {!capitalSeekerMode && matchResults.length > 0 && (
+                <div className="mt-4 p-4 rounded-xl bg-[#c9a84c]/10 border border-[#c9a84c]/30 space-y-3">
+                  <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">
+                    Send Deal to {matchResults.length} Matched Lender{matchResults.length !== 1 ? "s" : ""}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    First submit your deal using the button above, then click below to send it to all matched lenders.
+                    In dev mode, all emails go to accounting@capmoon.com.
+                  </p>
+                  <button type="button"
+                    onClick={async (e) => {
+                      const btn = e.currentTarget as HTMLButtonElement;
+                      btn.disabled = true;
+                      btn.innerHTML = "Sending...";
+                      try {
+                        const res = await fetch("/api/data?type=deals");
+                        const allDeals = await res.json();
+                        if (!Array.isArray(allDeals) || allDeals.length === 0) {
+                          alert("Please submit the deal first.");
+                          btn.disabled = false; btn.innerHTML = "Send Deal to Matched Lenders";
+                          return;
+                        }
+                        const lastDeal = allDeals[0];
+                        let sent = 0;
+                        for (const match of matchResults) {
+                          const lender = lenderRecords.find((l: LenderRecord) => l.id === match.id);
+                          if (!lender) continue;
+                          await fetch("/api/lender-submissions", {
+                            method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "send", dealId: lastDeal.id,
+                              lenderId: lender.id, lenderName: lender.lender,
+                              lenderEmail: lender.contacts?.[0]?.email || lender.email || "",
+                              dealTitle: (lastDeal.assets?.[0]?.assetType || "CRE") + " — " + (lastDeal.assets?.[0]?.loanAmount || "TBD"),
+                              advisorName: "CapMoon", dealNumber: lastDeal.dealNumber || "" })
+                          });
+                          sent++;
+                        }
+                        btn.innerHTML = "✓ Sent to " + sent + " lenders!";
+                        setTimeout(() => { btn.disabled = false; btn.innerHTML = "Resend to All Matched Lenders"; }, 3000);
+                      } catch(err: any) {
+                        btn.disabled = false; btn.innerHTML = "Send Deal to Matched Lenders";
+                        alert("Error: " + err.message);
+                      }
+                    }}
+                    className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 disabled:opacity-50">
+                    <Landmark className="h-4 w-4" />
+                    Send Deal to Matched Lenders ({matchResults.length})
+                  </button>
+                </div>
+              )}
+
 
               {/* Submit to Matched Lenders - uses refs to avoid hook scope issues */}
               {!capitalSeekerMode && matchResults.length > 0 && (
