@@ -4618,6 +4618,55 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                   }
 
                   const [showSendLenders, setShowSendLenders] = React.useState(false);
+                  const [showDocUpload, setShowDocUpload] = React.useState(false);
+                  const [showDocRequest, setShowDocRequest] = React.useState(false);
+                  const [docType, setDocType] = React.useState("Rent Roll");
+                  const [docLabel, setDocLabel] = React.useState("");
+                  const [docFile, setDocFile] = React.useState<File|null>(null);
+                  const [docUploading, setDocUploading] = React.useState(false);
+                  const [dealDocs, setDealDocs] = React.useState<any[]>([]);
+                  const [requestDocs, setRequestDocs] = React.useState<string[]>([]);
+                  const [requestEmail, setRequestEmail] = React.useState(deal.seekerEmail || "");
+                  const [requestSending, setRequestSending] = React.useState(false);
+                  const [requestSent, setRequestSent] = React.useState(false);
+
+                  React.useEffect(() => {
+                    fetch("/api/upload?dealId=" + deal.id)
+                      .then(r => r.json()).then(d => { if (Array.isArray(d)) setDealDocs(d); }).catch(() => {});
+                  }, [deal.id]);
+
+                  async function uploadDoc() {
+                    if (!docFile) return;
+                    setDocUploading(true);
+                    const formData = new FormData();
+                    formData.append("file", docFile);
+                    formData.append("dealId", String(deal.id));
+                    formData.append("dealNumber", deal.dealNumber || "");
+                    formData.append("uploadedBy", session?.user.name || "Admin");
+                    formData.append("uploadedByRole", session?.user.role || "admin");
+                    formData.append("docType", docType);
+                    formData.append("docLabel", docType === "Other" ? docLabel : docType);
+                    const res = await fetch("/api/upload", { method: "POST", body: formData });
+                    const data = await res.json();
+                    if (data.success) {
+                      const updated = await fetch("/api/upload?dealId=" + deal.id).then(r => r.json());
+                      if (Array.isArray(updated)) setDealDocs(updated);
+                      setDocFile(null); setDocType("Rent Roll"); setDocLabel("");
+                    }
+                    setDocUploading(false);
+                  }
+
+                  async function sendDocRequest() {
+                    if (requestDocs.length === 0) return;
+                    setRequestSending(true);
+                    const advisor = teamMembers.find((m: TeamMember) => deal.assignedAdvisorIds?.includes(m.id));
+                    await fetch("/api/document-request", { method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ dealId: deal.id, dealNumber: deal.dealNumber, borrowerName: deal.seekerName,
+                        borrowerEmail: requestEmail, requestedBy: advisor?.name || session?.user.name || "CapMoon",
+                        requestedByRole: session?.user.role, documentsNeeded: requestDocs }) });
+                    setRequestSending(false); setRequestSent(true);
+                    setTimeout(() => { setRequestSent(false); setShowDocRequest(false); setRequestDocs([]); }, 3000);
+                  }
                   const [lenderSearch, setLenderSearch] = React.useState("");
                   const [selectedLenderIds, setSelectedLenderIds] = React.useState<number[]>([]);
                   const [sendingToLenders, setSendingToLenders] = React.useState(false);
