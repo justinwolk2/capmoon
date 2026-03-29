@@ -2655,6 +2655,34 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
               </div>
             )}
 
+            {/* Editable summary fields */}
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 mb-6 space-y-4">
+              <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Quick Edit — Final Details</div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Borrower Name</label>
+                  <input value={assets[0]?.ownerName || seekerName || ""} onChange={e => setAssets(prev => prev.map((a,i) => i===0 ? {...a, ownerName: e.target.value} : a))}
+                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
+                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Loan Amount</label>
+                  <input value={assets[0]?.loanAmount || ""} onChange={e => setAssets(prev => prev.map((a,i) => i===0 ? {...a, loanAmount: e.target.value} : a))}
+                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
+                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Property Value</label>
+                  <input value={assets[0]?.propertyValue || ""} onChange={e => setAssets(prev => prev.map((a,i) => i===0 ? {...a, propertyValue: e.target.value} : a))}
+                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
+                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">DSCR</label>
+                  <input value={assets[0]?.dscr || ""} onChange={e => setAssets(prev => prev.map((a,i) => i===0 ? {...a, dscr: e.target.value} : a))}
+                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
+                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Net Income (NOI)</label>
+                  <input value={assets[0]?.currentNetIncome || ""} onChange={e => setAssets(prev => prev.map((a,i) => i===0 ? {...a, currentNetIncome: e.target.value} : a))}
+                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
+                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Capital Type</label>
+                  <div className="w-full px-3 py-2 text-sm bg-gray-100 border border-gray-200 rounded-xl text-gray-600">{capitalType}</div></div>
+              </div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Advisor Notes</label>
+                <textarea value={assets[0]?.notes || ""} onChange={e => setAssets(prev => prev.map((a,i) => i===0 ? {...a, notes: e.target.value} : a))}
+                  rows={2} placeholder="Add any notes for advisors or lenders..."
+                  className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] resize-none" /></div>
+            </div>
+
             <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4 mb-6 flex items-center justify-between">
               <div>
                 <div className="text-sm font-bold text-[#0a1f44]">
@@ -3026,7 +3054,7 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
     dealNumber = dnData.dealNumber || "";
   } catch(e) { console.error("Deal number error:", e); }
 
-  const deal: SubmittedDeal = { id: Date.now(), submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Guest", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a) => a.id), dealNumber };
+  const deal: SubmittedDeal = { id: Date.now(), submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Guest", seekerEmail: session?.user.email || session?.user.username || "", seekerPhone: (session?.user as any).phone || "", notes: assets[0]?.notes || "", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a) => a.id), dealNumber };
     onSubmitDeal(deal);
     // Push to Pipedrive
     const advisor = advisors[0];
