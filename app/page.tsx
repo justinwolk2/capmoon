@@ -4673,7 +4673,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                 fetch("/api/deal-number", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ advisorId: session?.user.id }) })
                   .then(r => r.json()).then(dn => {
                     const deal = { id: dealId, submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Admin", seekerEmail: session?.user.username || "", assets, capitalType, assetMode, collateralMode, status: "pending" as const, assignedAdvisorIds: advisors.map((a: any) => a.id), dealNumber: dn.dealNumber || "" };
-                    setSubmittedDeals(prev => [deal, ...prev.filter(d => d.id !== deal.id)]);
+                    setSubmittedDeals((prev: SubmittedDeal[]) => [deal, ...prev.filter((d: SubmittedDeal) => d.id !== deal.id)]);
                     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [deal] }) });
                   }).catch(() => {
                     const deal = { id: dealId, submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Admin", seekerEmail: session?.user.username || "", assets, capitalType, assetMode, collateralMode, status: "pending" as const, assignedAdvisorIds: advisors.map((a: any) => a.id), dealNumber: "" };
