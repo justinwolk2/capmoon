@@ -4909,21 +4909,20 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                       )}
 
                         {/* Document Folder — always visible when docs exist */}
-                        {dealDocs.length > 0 && !showDocUpload && (
-                          <div className="mt-3 rounded-xl border border-gray-200 bg-white overflow-hidden">
-                            <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+                        {dealDocs.length > 0 && (
+                          <div className="mt-3 rounded-xl overflow-hidden border border-[#0a1f44]/15">
+                            <div className="flex items-center justify-between px-4 py-3 bg-[#0a1f44]">
                               <div className="flex items-center gap-2">
                                 <span className="text-base">📁</span>
-                                <span className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">Deal Documents</span>
-                                <span className="px-1.5 py-0.5 text-xs bg-[#0a1f44] text-white rounded-full font-bold">{dealDocs.length}</span>
+                                <span className="text-xs font-bold text-white uppercase tracking-wider">Deal Documents</span>
+                                <span className="px-2 py-0.5 text-xs bg-[#c9a84c] text-[#0a1f44] rounded-full font-bold">{dealDocs.length}</span>
                               </div>
-                              {deal.dealNumber && <span className="text-xs text-gray-400">{deal.dealNumber}</span>}
+                              {deal.dealNumber && <span className="text-xs text-white/50">{deal.dealNumber}</span>}
                             </div>
-                            <div className="divide-y divide-gray-50">
+                            <div className="bg-white divide-y divide-gray-100">
                               {dealDocs.map((doc: any) => (
-                                <div key={doc.id} className="relative">
-                                  <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setDocMenuOpenId(docMenuOpenId === doc.id ? null : doc.id)}>
-                                  <span className="text-lg flex-shrink-0">
+                                <div key={doc.id} className="flex items-center gap-3 px-4 py-3">
+                                  <span className="text-xl flex-shrink-0">
                                     {(() => {
                                       const t = doc.document_type || "";
                                       if (t.includes("Rent Roll") || t.includes("Financial") || t.includes("Statement") || t.includes("Budget") || t.includes("Proforma")) return "📊";
@@ -4939,28 +4938,24 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                     })()}
                                   </span>
                                   <div className="flex-1 min-w-0">
-                                    <div className="text-xs font-semibold text-[#0a1f44] truncate">{doc.document_name}</div>
-                                    <div className="text-xs text-gray-400 mt-0.5">
-                                      {doc.lender_name} · {new Date(doc.uploaded_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                                    </div>
+                                    <div className="text-sm font-semibold text-[#0a1f44] truncate">{doc.document_name}</div>
+                                    <div className="text-xs text-gray-400 mt-0.5">{doc.lender_name} · {new Date(doc.uploaded_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
                                   </div>
-                                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                                    <span className="text-gray-300 text-sm">⋮</span>
-                                  </div>
-                                </div>
-                                {docMenuOpenId === doc.id && (
-                                  <div className="absolute right-3 top-10 z-50 bg-white rounded-xl border border-gray-200 shadow-xl overflow-hidden w-44">
+                                  <div className="flex items-center gap-2 flex-shrink-0">
                                     <a href={doc.document_url} target="_blank" rel="noopener noreferrer"
-                                      onClick={() => setDocMenuOpenId(null)}
-                                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-[#0a1f44] hover:bg-gray-50 border-b border-gray-100">
-                                      📄 View File
+                                      className="px-3 py-1.5 text-xs font-bold bg-[#0a1f44] text-white rounded-lg hover:bg-[#0a1f44]/80">
+                                      View
                                     </a>
                                     <button type="button" onClick={() => deleteDoc(doc.id, doc.document_name)}
-                                      className={"flex items-center gap-2 px-4 py-2.5 text-sm w-full text-left " + (isAdmin ? "text-red-500 hover:bg-red-50" : "text-gray-500 hover:bg-gray-50")}>
-                                      🗑 {isAdmin ? "Delete" : "Request Delete"}
+                                      className={"px-3 py-1.5 text-xs font-bold border rounded-lg " + (isAdmin ? "border-red-200 text-red-500 hover:bg-red-50" : "border-gray-200 text-gray-400 hover:bg-gray-50")}>
+                                      {isAdmin ? "Delete" : "Remove"}
                                     </button>
                                   </div>
-                                )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                                 </div>
                               ))}
                             </div>
@@ -5616,55 +5611,3 @@ export default function Home() {
   }
   return <MainPortal session={session} onLogout={handleLogout} submittedDeals={submittedDeals} setSubmittedDeals={handleSetSubmittedDeals} users={users} setUsers={handleSetUsers} teamMembers={teamMembers} setTeamMembers={handleSetTeamMembers} deleteRequests={deleteRequests} setDeleteRequests={handleSetDeleteRequests} lenderChangeRequests={lenderChangeRequests} setLenderChangeRequests={handleSetLenderChangeRequests} />;
 }
-                        {dealDocs.length > 0 && (
-                          <div className="mt-3 rounded-xl overflow-hidden border border-[#0a1f44]/15">
-                            {/* Folder Header */}
-                            <div className="flex items-center justify-between px-4 py-3 bg-[#0a1f44]">
-                              <div className="flex items-center gap-2">
-                                <span className="text-base">📁</span>
-                                <span className="text-xs font-bold text-white uppercase tracking-wider">Deal Documents</span>
-                                <span className="px-2 py-0.5 text-xs bg-[#c9a84c] text-[#0a1f44] rounded-full font-bold">{dealDocs.length}</span>
-                              </div>
-                              {deal.dealNumber && <span className="text-xs text-white/50">{deal.dealNumber}</span>}
-                            </div>
-                            {/* Doc rows */}
-                            <div className="bg-white divide-y divide-gray-100">
-                              {dealDocs.map((doc: any) => (
-                                <div key={doc.id} className="relative group">
-                                  <div className="flex items-center gap-3 px-4 py-3">
-                                    <span className="text-xl flex-shrink-0">
-                                      {(() => {
-                                        const t = doc.document_type || "";
-                                        if (t.includes("Rent Roll") || t.includes("Financial") || t.includes("Statement") || t.includes("Budget") || t.includes("Proforma")) return "📊";
-                                        if (t.includes("Tax")) return "🧾";
-                                        if (t.includes("Bank")) return "🏦";
-                                        if (t.includes("Contract")) return "📝";
-                                        if (t.includes("Appraisal")) return "🏠";
-                                        if (t.includes("Environmental") || t.includes("Survey")) return "🗺️";
-                                        if (t.includes("Title")) return "📋";
-                                        if (t.includes("Entity") || t.includes("Personal")) return "👤";
-                                        if (t.includes("Construction")) return "🏗️";
-                                        return "📄";
-                                      })()}
-                                    </span>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="text-sm font-semibold text-[#0a1f44] truncate">{doc.document_name}</div>
-                                      <div className="text-xs text-gray-400 mt-0.5">{doc.lender_name} · {new Date(doc.uploaded_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
-                                    </div>
-                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                      <a href={doc.document_url} target="_blank" rel="noopener noreferrer"
-                                        className="px-3 py-1.5 text-xs font-bold bg-[#0a1f44] text-white rounded-lg hover:bg-[#0a1f44]/80 transition-colors">
-                                        View
-                                      </a>
-                                      <button type="button" onClick={() => deleteDoc(doc.id, doc.document_name)}
-                                        className={"px-3 py-1.5 text-xs font-bold border rounded-lg transition-colors " + (isAdmin ? "border-red-200 text-red-500 hover:bg-red-50" : "border-gray-200 text-gray-400 hover:bg-gray-50")}
-                                        title={isAdmin ? "Delete" : "Request deletion"}>
-                                        {isAdmin ? "Delete" : "Remove"}
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
