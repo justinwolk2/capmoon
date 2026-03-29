@@ -4956,11 +4956,6 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                             </div>
                           </div>
                         )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
 
                         {/* Document Folder — always visible when docs exist */}
                     {showLenderResponses && (
