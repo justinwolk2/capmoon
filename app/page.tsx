@@ -3048,10 +3048,6 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
     <>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600&display=swap'); * { font-family: 'Montserrat', sans-serif; } .font-display { font-family: 'Cormorant Garamond', serif; } [data-radix-select-content] { background: white !important; border: 1px solid #e5e7eb !important; color: #1f2937 !important; } [data-radix-select-item] { color: #1f2937 !important; } [data-radix-select-item]:hover, [data-radix-select-item][data-highlighted] { background: #f3f4f6 !important; color: #0a1f44 !important; }`}</style>
       <div className="min-h-screen bg-[#f0f2f5] text-gray-800">
-        {/* Mobile overlay */}
-        {sidebarOpen && (
-          <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
-        )}
         <div className="grid min-h-screen lg:grid-cols-[260px_1fr]">
           <aside className={
             "fixed inset-y-0 left-0 z-50 w-[260px] border-r border-[#c9a84c]/10 bg-[#0a1f44] flex flex-col transition-transform duration-300 lg:relative lg:translate-x-0 " +
