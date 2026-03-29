@@ -5725,7 +5725,13 @@ export default function Home() {
   // Auto-save — fires whenever state changes, but only after DB has loaded
 
   function handleSubmitDeal(deal: SubmittedDeal) {
-    setSubmittedDeals((prev) => { const next = [...prev, deal]; saveToDb("deals", next); return next; });
+    setSubmittedDeals((prev) => [...prev, deal]);
+    // Direct DB insert - don't rely on full array save
+    fetch("/api/data", { 
+      method: "POST", 
+      headers: { "Content-Type": "application/json" }, 
+      body: JSON.stringify({ type: "deals", data: [deal] }) 
+    }).then(r => r.json()).then(d => console.log("Deal saved:", d)).catch(e => console.error("Deal save failed:", e));
   }
   function handleLogout() { setSession(null); }
   function handleRegisterCapitalSeeker(newUser: AppUser) {
