@@ -2771,12 +2771,14 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                     const [showExtra, setShowExtra] = React.useState(false);
                     const [selectedExtra, setSelectedExtra] = React.useState<number[]>([]);
 
-                    async function submitToMatched() {
-                      if (!submittedDeals || submittedDeals.length === 0) {
-                        alert("Please submit the deal first before sending to lenders.");
-                        return;
-                      }
                       setSendingMatch(true);
+                      const dealsRes = await fetch("/api/data?type=deals");
+                      const allDeals = await dealsRes.json();
+                      if (!Array.isArray(allDeals) || allDeals.length === 0) {
+                        alert("Please submit the deal first.");
+                        setSendingMatch(false); return;
+                      }
+                      const lastDeal = allDeals[0];
                       const lastDeal = submittedDeals[0];
                       const advisor = teamMembers.find((m: TeamMember) => lastDeal.assignedAdvisorIds?.includes(m.id));
                       const allIds = [...new Set([...matchResults.map((m: any) => m.id), ...selectedExtra])];
