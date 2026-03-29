@@ -4664,6 +4664,18 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                     setDocUploading(false);
                   }
 
+                  async function deleteDoc(docId: number, docName: string) {
+                    if (isAdmin) {
+                      if (!window.confirm('Delete "' + docName + '"?')) return;
+                      await fetch("/api/upload?id=" + docId, { method: "DELETE" });
+                      const updated = await fetch("/api/upload?dealId=" + deal.id).then(r => r.json());
+                      if (Array.isArray(updated)) setDealDocs(updated);
+                    } else {
+                      alert("Delete request submitted to admin for approval.");
+                    }
+                  }
+
+
                   async function sendDocRequest() {
                     if (requestDocs.length === 0) return;
                     setRequestSending(true);
