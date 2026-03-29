@@ -4788,7 +4788,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                           </button>
                           <button type="button" onClick={() => setShowDocRequest(p => !p)}
                             className={"flex items-center gap-2 px-4 py-2 text-xs font-semibold border rounded-xl transition-all " + (showDocRequest ? "border-[#c9a84c] bg-[#c9a84c] text-[#0a1f44]" : "border-gray-200 text-gray-600 hover:border-[#c9a84c]/30")}>
-                            <Mail className="h-3.5 w-3.5" /> Request Docs from Borrower
+                            <FileText className="h-3.5 w-3.5" /> Request Docs from Borrower
                           </button>
                         </div>
 
