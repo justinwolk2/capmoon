@@ -2826,6 +2826,99 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   })}
                 </div>
               )}
+
+              {/* Submit section - admin/advisor only */}
+              {!capitalSeekerMode && matchResults.length > 0 && (
+                <div className="mt-8 grid gap-6 md:grid-cols-2">
+                  <div className="rounded-xl border border-[#0a1f44]/20 bg-white p-5">
+                    <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Send to Matched Lenders</div>
+                    <p className="text-xs text-gray-400 mb-4">
+                      {selectedMatchIds.length === 0 ? matchResults.length : selectedMatchIds.length} lender{((selectedMatchIds.length === 0 ? matchResults.length : selectedMatchIds.length) !== 1 ? "s" : "")} selected — uncheck cards above to exclude
+                    </p>
+                    <button type="button" onClick={async (e) => {
+                      const btn = e.currentTarget as HTMLButtonElement;
+                      btn.disabled = true; btn.textContent = "Sending...";
+                      try {
+                        const res = await fetch("/api/data?type=deals");
+                        const allDeals = await res.json();
+                        if (!Array.isArray(allDeals) || allDeals.length === 0) {
+                          alert("Please submit the deal first."); btn.disabled = false; btn.textContent = "Send to Selected Lenders"; return;
+                        }
+                        const lastDeal = allDeals[0];
+                        const toSend = selectedMatchIds.length > 0 ? matchResults.filter((m: any) => selectedMatchIds.includes(m.id)) : matchResults;
+                        let sent = 0;
+                        for (const match of toSend) {
+                          const lender = lenderRecords.find((l: LenderRecord) => l.id === match.id);
+                          if (!lender) continue;
+                          await fetch("/api/lender-submissions", { method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "send", dealId: lastDeal.id, lenderId: lender.id,
+                              lenderName: lender.lender, lenderEmail: lender.contacts?.[0]?.email || lender.email || "",
+                              dealTitle: (lastDeal.assets?.[0]?.assetType || "CRE") + " — " + (lastDeal.assets?.[0]?.loanAmount || "TBD"),
+                              advisorName: "CapMoon", dealNumber: lastDeal.dealNumber || "" }) });
+                          sent++;
+                        }
+                        btn.textContent = "✓ Sent to " + sent + " lender" + (sent !== 1 ? "s" : "") + "!";
+                        setTimeout(() => { btn.disabled = false; btn.textContent = "Send to Selected Lenders"; }, 3000);
+                      } catch(err: any) { btn.disabled = false; btn.textContent = "Send to Selected Lenders"; alert("Error: " + err); }
+                    }} className="w-full py-3 text-sm font-bold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 disabled:opacity-50">
+                      Send to Selected Lenders ({selectedMatchIds.length === 0 ? matchResults.length : selectedMatchIds.length})
+                    </button>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 bg-white p-5">
+                    <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Submit to Additional Lenders</div>
+                    <p className="text-xs text-gray-400 mb-3">Add lenders not in the ranked results</p>
+                    <input value={additionalSearch} onChange={e => setAdditionalSearch(e.target.value)}
+                      placeholder="Search all active lenders..."
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] mb-3" />
+                    <div className="max-h-36 overflow-y-auto space-y-1 mb-3">
+                      {lenderRecords.filter((l: LenderRecord) => l.status === "Active" &&
+                        !matchResults.some((m: any) => m.id === l.id) &&
+                        (!additionalSearch || l.lender.toLowerCase().includes(additionalSearch.toLowerCase())))
+                        .slice(0, 80).map((l: LenderRecord) => (
+                        <label key={l.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-100 cursor-pointer hover:border-[#0a1f44]/20">
+                          <input type="checkbox" checked={additionalSelected.includes(l.id)}
+                            onChange={() => setAdditionalSelected(p => p.includes(l.id) ? p.filter(x => x !== l.id) : [...p, l.id])}
+                            className="accent-[#0a1f44]" />
+                          <div>
+                            <div className="text-xs font-semibold text-[#0a1f44]">{l.lender}</div>
+                            <div className="text-xs text-gray-400">{l.type}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                    {additionalSelected.length > 0 && (
+                      <button type="button" onClick={async (e) => {
+                        const btn = e.currentTarget as HTMLButtonElement;
+                        btn.disabled = true; btn.textContent = "Sending...";
+                        try {
+                          const res = await fetch("/api/data?type=deals");
+                          const allDeals = await res.json();
+                          if (!Array.isArray(allDeals) || allDeals.length === 0) {
+                            alert("Please submit the deal first."); btn.disabled = false; return;
+                          }
+                          const lastDeal = allDeals[0];
+                          let sent = 0;
+                          for (const lid of additionalSelected) {
+                            const lender = lenderRecords.find((l: LenderRecord) => l.id === lid);
+                            if (!lender) continue;
+                            await fetch("/api/lender-submissions", { method: "POST", headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ action: "send", dealId: lastDeal.id, lenderId: lender.id,
+                                lenderName: lender.lender, lenderEmail: lender.contacts?.[0]?.email || lender.email || "",
+                                dealTitle: (lastDeal.assets?.[0]?.assetType || "CRE") + " — " + (lastDeal.assets?.[0]?.loanAmount || "TBD"),
+                                advisorName: "CapMoon", dealNumber: lastDeal.dealNumber || "" }) });
+                            sent++;
+                          }
+                          setAdditionalSelected([]);
+                          btn.textContent = "✓ Sent to " + sent + "!";
+                          setTimeout(() => { btn.disabled = false; btn.textContent = "Send to " + additionalSelected.length + " Additional"; }, 3000);
+                        } catch(err: any) { btn.disabled = false; alert("Error: " + err); }
+                      }} className="w-full py-2.5 text-sm font-bold bg-[#c9a84c] text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/80 disabled:opacity-50">
+                        Send to {additionalSelected.length} Additional Lender{additionalSelected.length !== 1 ? "s" : ""}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
