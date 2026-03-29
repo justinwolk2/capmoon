@@ -4676,8 +4676,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                     setSubmittedDeals([deal, ...submittedDeals.filter(d => d.id !== deal.id)]);
                     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [deal] }) });
                   }).catch(() => {
-                    const deal = { id: dealId, submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Admin", seekerEmail: session?.user.username || "", assets, capitalType, assetMode, collateralMode, status: "pending" as const, assignedAdvisorIds: advisors.map((a: any) => a.id), dealNumber: "" };
-                    setSubmittedDeals(prev => [deal, ...prev.filter(d => d.id !== deal.id)]);
+                    const deal: SubmittedDeal = { id: dealId, submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Admin", seekerEmail: session?.user.username || "", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a: any) => a.id), dealNumber: "" };
+                    setSubmittedDeals([deal, ...submittedDeals.filter(d => d.id !== deal.id)]);
                     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [deal] }) });
                   });
               }} prefillDeal={prefillDeal} onPrefillConsumed={() => setPrefillDeal(null)} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />}
