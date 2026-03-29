@@ -4581,6 +4581,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                   const [threadMessages, setThreadMessages] = React.useState<Record<string, any[]>>({});
                   const [threadInput, setThreadInput] = React.useState<Record<string, string>>({});
                   const [threadLoading, setThreadLoading] = React.useState<Record<string, boolean>>({});
+                  const [replyOpen, setReplyOpen] = React.useState<Record<string, boolean>>({});
 
                   async function loadThread(token: string) {
                     const msgs = await fetch("/api/submission-messages?token=" + token).then(r => r.json());
