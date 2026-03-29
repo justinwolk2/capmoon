@@ -3048,8 +3048,15 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
     <>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600&display=swap'); * { font-family: 'Montserrat', sans-serif; } .font-display { font-family: 'Cormorant Garamond', serif; } [data-radix-select-content] { background: white !important; border: 1px solid #e5e7eb !important; color: #1f2937 !important; } [data-radix-select-item] { color: #1f2937 !important; } [data-radix-select-item]:hover, [data-radix-select-item][data-highlighted] { background: #f3f4f6 !important; color: #0a1f44 !important; }`}</style>
       <div className="min-h-screen bg-[#f0f2f5] text-gray-800">
+        {/* Mobile overlay */}
+        {sidebarOpen && (
+          <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
+        )}
         <div className="grid min-h-screen lg:grid-cols-[260px_1fr]">
-          <aside className="border-r border-[#c9a84c]/10 bg-[#0a1f44] flex flex-col">
+          <aside className={
+            "fixed inset-y-0 left-0 z-50 w-[260px] border-r border-[#c9a84c]/10 bg-[#0a1f44] flex flex-col transition-transform duration-300 lg:relative lg:translate-x-0 " +
+            (sidebarOpen ? "translate-x-0" : "-translate-x-full")
+          }>
             <div className="px-6 py-8 border-b border-[#c9a84c]/20">
               <div className="flex items-center gap-3 mb-2">
                 <img src="/logo1.JPEG" alt="CapMoon" className="h-12 w-12 object-contain rounded-full" />
@@ -3059,7 +3066,7 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
             </div>
             <nav className="space-y-1 p-4 flex-1">
               {([["matcher", "Deal Matcher", Filter], ["my-deals", "My Deals", FileSpreadsheet], ["uploads", "Upload Center", Upload]] as [string, string, any][]).map(([key, label, Icon]) => (
-                <button key={key} onClick={() => setActiveTab(key)} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-all ${activeTab === key ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/30" : "text-gray-300 hover:bg-white/5 hover:text-white border border-transparent"}`}>
+                <button key={key} onClick={() => { setActiveTab(key); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-all ${activeTab === key ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/30" : "text-gray-300 hover:bg-white/5 hover:text-white border border-transparent"}`}>
                   <Icon className="h-4 w-4" /><span className="text-sm font-medium">{label}</span>
                   {activeTab === key && <div className="ml-auto w-1 h-4 bg-[#c9a84c] rounded-full" />}
                 </button>
@@ -3073,7 +3080,19 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
               <button onClick={onLogout} className="w-full flex items-center gap-2 px-4 py-2 text-xs text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all"><LogOut className="h-3.5 w-3.5" /> Exit Portal</button>
             </div>
           </aside>
-          <main className="p-6 md:p-8 overflow-auto">
+          <main className="min-w-0 overflow-auto">
+            {/* Mobile top bar */}
+            <div className="sticky top-0 z-30 flex items-center gap-3 bg-[#0a1f44] px-4 py-3 lg:hidden">
+              <button onClick={() => setSidebarOpen(true)} className="text-white p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <img src="/logo1.JPEG" alt="CapMoon" className="h-7 w-7 object-contain rounded-full" />
+              <span className="font-display text-lg font-bold text-white">CapMoon</span>
+              <div className="ml-auto text-xs text-gray-400">{session?.user.name}</div>
+            </div>
+            <div className="p-4 md:p-6 lg:p-8">
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
               <div className="mb-8">
                 <div className="text-xs uppercase tracking-[0.28em] text-[#0a1f44] font-bold">Capital Search</div>
@@ -3133,6 +3152,7 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
                 </div>
               )}
             </motion.div>
+            </div>{/* end p-4 wrapper */}
           </main>
         </div>
       </div>
@@ -4018,11 +4038,23 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
   return (
     <>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600&display=swap'); * { font-family: 'Montserrat', sans-serif; } .font-display { font-family: 'Cormorant Garamond', serif; } ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: #f0f2f5; } ::-webkit-scrollbar-thumb { background: #c9a84c66; border-radius: 2px; } [data-radix-select-content] { background: white !important; border: 1px solid #e5e7eb !important; color: #1f2937 !important; } [data-radix-select-item] { color: #1f2937 !important; } [data-radix-select-item]:hover, [data-radix-select-item][data-highlighted] { background: #f3f4f6 !important; color: #0a1f44 !important; }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600&display=swap'); * { font-family: 'Montserrat', sans-serif; } .font-display { font-family: 'Cormorant Garamond', serif; } ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: #f0f2f5; } ::-webkit-scrollbar-thumb { background: #c9a84c66; border-radius: 2px; }
+        @media (max-width: 1024px) {
+          .hide-on-mobile { display: none !important; }
+        }
+        @media (max-width: 640px) {
+          .font-display { font-size: clamp(1.5rem, 6vw, 2.5rem); }
+          table { font-size: 12px; }
+          th, td { padding: 8px 6px !important; }
+        } [data-radix-select-content] { background: white !important; border: 1px solid #e5e7eb !important; color: #1f2937 !important; } [data-radix-select-item] { color: #1f2937 !important; } [data-radix-select-item]:hover, [data-radix-select-item][data-highlighted] { background: #f3f4f6 !important; color: #0a1f44 !important; }`}</style>
       <div className="min-h-screen bg-[#f0f2f5] text-gray-800">
         <div className="grid min-h-screen lg:grid-cols-[260px_1fr]">
           <aside className="border-r border-[#c9a84c]/10 bg-[#0a1f44] flex flex-col">
             <div className="px-6 py-6 border-b border-[#c9a84c]/20">
+              <div className="flex items-center justify-between mb-2 lg:hidden">
+                <span className="text-xs text-gray-400 uppercase tracking-widest">Menu</span>
+                <button onClick={() => setSidebarOpen(false)} className="text-gray-400 hover:text-white p-1">✕</button>
+              </div>
               <div className="flex items-center gap-3 mb-2">
                 <img src="/logo1.JPEG" alt="CapMoon" className="h-12 w-12 object-contain rounded-full" />
                 <div><div className="font-display text-2xl font-bold text-white">CapMoon</div><div className="text-xs text-gray-400 tracking-wide">Lender Intelligence Platform</div></div>
@@ -4051,7 +4083,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
           <main className="p-6 md:p-8 overflow-auto">
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
                 <div>
                   <div className="text-xs uppercase tracking-[0.28em] text-[#0a1f44] font-bold">Institutional Workflow</div>
                   <h1 className="font-display text-4xl font-bold text-[#0a1f44] mt-1">Lender Dashboard</h1>
@@ -4261,7 +4293,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                       <button onClick={() => { setSearch(""); setSelectedLetter("All"); }} className="px-3 py-1 rounded-full text-xs border border-gray-200 text-gray-500 hover:bg-gray-50">Clear filters ✕</button>
                     )}
                   </div>
-                  <div className="overflow-hidden rounded-xl border border-gray-200">
+                  <div className="overflow-hidden rounded-xl border border-gray-200 overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow className="border-gray-200 bg-gray-50 hover:bg-gray-50">
