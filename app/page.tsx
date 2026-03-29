@@ -4631,8 +4631,11 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                   const [requestSent, setRequestSent] = React.useState(false);
 
                   React.useEffect(() => {
-                    fetch("/api/upload?dealId=" + deal.id)
-                      .then(r => r.json()).then(d => { if (Array.isArray(d)) setDealDocs(d); }).catch(() => {});
+                    function loadDocs() {
+                      fetch("/api/upload?dealId=" + deal.id)
+                        .then(r => r.json()).then(d => { if (Array.isArray(d)) setDealDocs(d); }).catch(() => {});
+                    }
+                    loadDocs();
                   }, [deal.id]);
 
                   async function uploadDoc() {
@@ -4649,9 +4652,14 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                     const res = await fetch("/api/upload", { method: "POST", body: formData });
                     const data = await res.json();
                     if (data.success) {
+                      // Refresh docs list
                       const updated = await fetch("/api/upload?dealId=" + deal.id).then(r => r.json());
                       if (Array.isArray(updated)) setDealDocs(updated);
                       setDocFile(null); setDocType("Rent Roll"); setDocLabel("");
+                      // Also show the folder panel
+                      setShowDocUpload(false);
+                    } else {
+                      alert("Upload failed: " + (data.error || "Unknown error"));
                     }
                     setDocUploading(false);
                   }
