@@ -2677,10 +2677,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                 <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Capital Type</label>
                   <div className="w-full px-3 py-2 text-sm bg-gray-100 border border-gray-200 rounded-xl text-gray-600">{capitalType}</div></div>
               </div>
-              <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Advisor Notes</label>
-                <textarea value={assets[0]?.notes || ""} onChange={e => setAssets(prev => prev.map((a,i) => i===0 ? {...a, notes: e.target.value} : a))}
-                  rows={2} placeholder="Add any notes for advisors or lenders..."
-                  className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] resize-none" /></div>
+
             </div>
 
             <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4 mb-6 flex items-center justify-between">
