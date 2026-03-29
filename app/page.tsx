@@ -3051,7 +3051,7 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
         <div className="grid min-h-screen lg:grid-cols-[260px_1fr]">
           <aside className={
             "fixed inset-y-0 left-0 z-50 w-[260px] border-r border-[#c9a84c]/10 bg-[#0a1f44] flex flex-col transition-transform duration-300 lg:relative lg:translate-x-0 " +
-            (sidebarOpen ? "translate-x-0" : "-translate-x-full")
+          <aside className="border-r border-[#c9a84c]/10 bg-[#0a1f44] flex flex-col hidden lg:flex">
           }>
             <div className="px-6 py-8 border-b border-[#c9a84c]/20">
               <div className="flex items-center gap-3 mb-2">
@@ -3062,7 +3062,7 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
             </div>
             <nav className="space-y-1 p-4 flex-1">
               {([["matcher", "Deal Matcher", Filter], ["my-deals", "My Deals", FileSpreadsheet], ["uploads", "Upload Center", Upload]] as [string, string, any][]).map(([key, label, Icon]) => (
-                <button key={key} onClick={() => { setActiveTab(key); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-all ${activeTab === key ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/30" : "text-gray-300 hover:bg-white/5 hover:text-white border border-transparent"}`}>
+                <button key={key} onClick={() => setActiveTab(key)} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-all ${activeTab === key ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/30" : "text-gray-300 hover:bg-white/5 hover:text-white border border-transparent"}`}>
                   <Icon className="h-4 w-4" /><span className="text-sm font-medium">{label}</span>
                   {activeTab === key && <div className="ml-auto w-1 h-4 bg-[#c9a84c] rounded-full" />}
                 </button>
@@ -3076,19 +3076,12 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
               <button onClick={onLogout} className="w-full flex items-center gap-2 px-4 py-2 text-xs text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all"><LogOut className="h-3.5 w-3.5" /> Exit Portal</button>
             </div>
           </aside>
-          <main className="min-w-0 overflow-auto">
-            {/* Mobile top bar */}
-            <div className="sticky top-0 z-30 flex items-center gap-3 bg-[#0a1f44] px-4 py-3 lg:hidden">
-              <button onClick={() => setSidebarOpen(true)} className="text-white p-1">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
+          <main className="p-6 md:p-8 overflow-auto">
               </button>
               <img src="/logo1.JPEG" alt="CapMoon" className="h-7 w-7 object-contain rounded-full" />
               <span className="font-display text-lg font-bold text-white">CapMoon</span>
               <div className="ml-auto text-xs text-gray-400">{session?.user.name}</div>
             </div>
-            <div className="p-4 md:p-6 lg:p-8">
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
               <div className="mb-8">
                 <div className="text-xs uppercase tracking-[0.28em] text-[#0a1f44] font-bold">Capital Search</div>
@@ -3148,7 +3141,6 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
                 </div>
               )}
             </motion.div>
-            </div>{/* end p-4 wrapper */}
           </main>
         </div>
       </div>
