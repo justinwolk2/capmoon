@@ -2762,72 +2762,55 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   <button onClick={resetMatcher} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">New Deal</button>
                 </div>
 
-              {/* Submit to Matched Lenders */}
-              {!capitalSeekerMode && (
-                <div className="mt-4 space-y-3">
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <button type="button" onClick={async () => {
-                      setSendingMatch(true);
-                      const res = await fetch("/api/data?type=deals");
-                      const allDeals = await res.json();
-                      if (!Array.isArray(allDeals) || allDeals.length === 0) {
-                        alert("Please submit the deal first."); setSendingMatch(false); return;
-                      }
-                      const lastDeal = allDeals[0];
-                      const advisor = teamMembers.find((m: TeamMember) => lastDeal.assignedAdvisorIds?.includes(m.id));
-                      const allIds = [...new Set([...matchResults.map((m: any) => m.id), ...selectedExtra])];
-                      let sent = 0;
-                      for (const lid of allIds) {
-                        if (sentMatch.includes(lid)) continue;
-                        const lender = lenderRecords.find((l: LenderRecord) => l.id === lid);
-                        if (!lender) continue;
-                        await fetch("/api/lender-submissions", { method: "POST", headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ action: "send", dealId: lastDeal.id, lenderId: lid,
-                            lenderName: lender.lender, lenderEmail: lender.contacts?.[0]?.email || lender.email || "",
-                            dealTitle: (lastDeal.assets?.[0]?.assetType || "CRE") + " — " + (lastDeal.assets?.[0]?.loanAmount || "TBD"),
-                            advisorName: advisor?.name || "CapMoon", dealNumber: lastDeal.dealNumber || "" }) });
-                        sent++;
-                      }
-                      setSentMatch(p => [...p, ...allIds]);
-                      setSendingMatch(false);
-                      setSelectedExtra([]);
-                      setShowExtra(false);
-                      alert("Deal sent to " + sent + " lender" + (sent !== 1 ? "s" : "") + "!");
-                    }} disabled={sendingMatch}
-                      className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-[#c9a84c] text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/80 disabled:opacity-50">
-                      <Landmark className="h-4 w-4" />
-                      {sendingMatch ? "Sending..." : "Submit Deal to Matched Lenders (" + (matchResults.length + selectedExtra.length) + ")"}
-                    </button>
-                    <button type="button" onClick={() => setShowExtra(p => !p)}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border border-gray-200 text-gray-600 rounded-xl hover:border-[#0a1f44]/30">
-                      + Add Lenders
-                      {selectedExtra.length > 0 && <span className="px-1.5 py-0.5 text-xs bg-[#0a1f44] text-white rounded-full font-bold">{selectedExtra.length}</span>}
-                    </button>
-                    {sentMatch.length > 0 && <span className="text-xs text-green-600 font-semibold">✓ Sent to {sentMatch.length} lender{sentMatch.length !== 1 ? "s" : ""}</span>}
+
+              {/* Submit to Matched Lenders - uses refs to avoid hook scope issues */}
+              {!capitalSeekerMode && matchResults.length > 0 && (
+                <div className="mt-4 p-4 rounded-xl bg-[#c9a84c]/10 border border-[#c9a84c]/30">
+                  <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-3">
+                    Submit Deal to {matchResults.length} Matched Lender{matchResults.length !== 1 ? "s" : ""}
                   </div>
-                  {showExtra && (
-                    <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-                      <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">Add Lenders Not in Ranked Results</div>
-                      <input value={extraSearch} onChange={e => setExtraSearch(e.target.value)}
-                        placeholder="Search lenders..." className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
-                      <div className="max-h-44 overflow-y-auto space-y-1">
-                        {lenderRecords.filter((l: LenderRecord) => l.status === "Active" &&
-                          !matchResults.some((m: any) => m.id === l.id) &&
-                          (!extraSearch || l.lender.toLowerCase().includes(extraSearch.toLowerCase())))
-                          .slice(0, 60).map((l: LenderRecord) => (
-                          <label key={l.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-100 cursor-pointer hover:border-[#0a1f44]/20">
-                            <input type="checkbox" checked={selectedExtra.includes(l.id)}
-                              onChange={() => setSelectedExtra(p => p.includes(l.id) ? p.filter(x => x !== l.id) : [...p, l.id])}
-                              className="accent-[#0a1f44]" />
-                            <div>
-                              <div className="text-xs font-semibold text-[#0a1f44]">{l.lender}</div>
-                              <div className="text-xs text-gray-400">{l.type}</div>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <p className="text-xs text-gray-500 mb-3">
+                    After submitting your deal above, use this button to send it directly to all matched lenders.
+                    Emails will be sent via CapMoon (currently in dev mode — all going to accounting@capmoon.com).
+                  </p>
+                  <button type="button"
+                    onClick={async (e) => {
+                      const btn = e.currentTarget;
+                      btn.disabled = true;
+                      btn.textContent = "Sending...";
+                      try {
+                        const res = await fetch("/api/data?type=deals");
+                        const allDeals = await res.json();
+                        if (!Array.isArray(allDeals) || allDeals.length === 0) {
+                          alert("Please submit the deal first using the Submit Deal button.");
+                          btn.disabled = false;
+                          btn.textContent = "Submit Deal to Matched Lenders";
+                          return;
+                        }
+                        const lastDeal = allDeals[0];
+                        let sent = 0;
+                        for (const match of matchResults) {
+                          const lender = lenderRecords.find((l: LenderRecord) => l.id === match.id);
+                          if (!lender) continue;
+                          await fetch("/api/lender-submissions", { method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "send", dealId: lastDeal.id, lenderId: lender.id,
+                              lenderName: lender.lender, lenderEmail: lender.contacts?.[0]?.email || lender.email || "",
+                              dealTitle: (lastDeal.assets?.[0]?.assetType || "CRE") + " — " + (lastDeal.assets?.[0]?.loanAmount || "TBD"),
+                              advisorName: "CapMoon", dealNumber: lastDeal.dealNumber || "" }) });
+                          sent++;
+                        }
+                        btn.textContent = "✓ Sent to " + sent + " lenders!";
+                        setTimeout(() => { btn.disabled = false; btn.textContent = "Resend to Matched Lenders"; }, 3000);
+                      } catch(err) {
+                        btn.disabled = false;
+                        btn.textContent = "Submit Deal to Matched Lenders";
+                        alert("Error sending: " + err);
+                      }
+                    }}
+                    className="px-5 py-2.5 text-sm font-bold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 disabled:opacity-50">
+                    <Landmark className="h-4 w-4 inline mr-2" />
+                    Submit Deal to Matched Lenders ({matchResults.length})
+                  </button>
                 </div>
               )}
               </div>
