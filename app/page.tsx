@@ -4975,6 +4975,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                     </button>
                                   </div>
                                 )}
+                                </div>
                               ))}
                             </div>
                           </div>
