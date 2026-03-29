@@ -2765,17 +2765,6 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   <button onClick={resetMatcher} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">New Deal</button>
                 </div>
               </div>
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold mb-1">Match Results</div>
-                  <h2 className="font-display text-3xl font-bold text-[#0a1f44]">Ranked Output</h2>
-                  <p className="text-sm text-gray-500 mt-1">{collateralMode === "crossed" ? "Combined portfolio" : collateralMode === "separate" ? "Individual asset matching" : "Single asset"}</p>
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setMatcherStep("review")} className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"><ChevronLeft className="h-4 w-4" /> Back</button>
-                  <button onClick={resetMatcher} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">New Deal</button>
-                </div>
-              </div>
               {matchResults.length === 0 ? (
                 <div className={cardClass + " p-8 text-center"}><div className="text-lg font-bold text-[#0a1f44] mb-2">No matches found</div><div className="text-sm text-gray-500">Try adjusting your deal criteria or add more lenders.</div></div>
               ) : collateralMode === "separate" && assetMode === "multiple" ? (
