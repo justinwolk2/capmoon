@@ -4958,22 +4958,23 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                       {doc.lender_name} · {new Date(doc.uploaded_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                                     </div>
                                   </div>
-                                    <span className="text-gray-300 text-xs ml-1">⋮</span>
-                                  </div>{/* end inner flex */}
-                                  </div>{/* end row */}
-                                  {docMenuOpenId === doc.id && (
-                                    <div className="absolute right-3 top-10 z-50 bg-white rounded-xl border border-gray-200 shadow-xl overflow-hidden w-40">
-                                      <a href={doc.document_url} target="_blank" rel="noopener noreferrer"
-                                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-[#0a1f44] hover:bg-gray-50 border-b border-gray-100">
-                                        📄 View File
-                                      </a>
-                                      <button type="button" onClick={() => deleteDoc(doc.id, doc.document_name)}
-                                        className={"flex items-center gap-2 px-4 py-2.5 text-sm w-full text-left " + (isAdmin ? "text-red-500 hover:bg-red-50" : "text-gray-500 hover:bg-gray-50")}>
-                                        🗑 {isAdmin ? "Delete" : "Request Delete"}
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>{/* end relative */}
+                                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                                    <span className="text-gray-300 text-sm">⋮</span>
+                                  </div>
+                                </div>
+                                {docMenuOpenId === doc.id && (
+                                  <div className="absolute right-3 top-10 z-50 bg-white rounded-xl border border-gray-200 shadow-xl overflow-hidden w-44">
+                                    <a href={doc.document_url} target="_blank" rel="noopener noreferrer"
+                                      onClick={() => setDocMenuOpenId(null)}
+                                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-[#0a1f44] hover:bg-gray-50 border-b border-gray-100">
+                                      📄 View File
+                                    </a>
+                                    <button type="button" onClick={() => deleteDoc(doc.id, doc.document_name)}
+                                      className={"flex items-center gap-2 px-4 py-2.5 text-sm w-full text-left " + (isAdmin ? "text-red-500 hover:bg-red-50" : "text-gray-500 hover:bg-gray-50")}>
+                                      🗑 {isAdmin ? "Delete" : "Request Delete"}
+                                    </button>
+                                  </div>
+                                )}
                               ))}
                             </div>
                           </div>
