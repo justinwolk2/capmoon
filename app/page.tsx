@@ -4928,6 +4928,51 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                             </div>
                           </div>
                         )}
+
+                        {/* Document Folder — always visible when docs exist */}
+                        {dealDocs.length > 0 && !showDocUpload && (
+                          <div className="mt-3 rounded-xl border border-gray-200 bg-white overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+                              <div className="flex items-center gap-2">
+                                <span className="text-base">📁</span>
+                                <span className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">Deal Documents</span>
+                                <span className="px-1.5 py-0.5 text-xs bg-[#0a1f44] text-white rounded-full font-bold">{dealDocs.length}</span>
+                              </div>
+                              {deal.dealNumber && <span className="text-xs text-gray-400">{deal.dealNumber}</span>}
+                            </div>
+                            <div className="divide-y divide-gray-50">
+                              {dealDocs.map((doc: any) => (
+                                <div key={doc.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                                  <span className="text-lg flex-shrink-0">
+                                    {(() => {
+                                      const t = doc.document_type || "";
+                                      if (t.includes("Rent Roll") || t.includes("Financial") || t.includes("Statement") || t.includes("Budget") || t.includes("Proforma")) return "📊";
+                                      if (t.includes("Tax")) return "🧾";
+                                      if (t.includes("Bank")) return "🏦";
+                                      if (t.includes("Contract")) return "📝";
+                                      if (t.includes("Appraisal")) return "🏠";
+                                      if (t.includes("Environmental") || t.includes("Survey")) return "🗺️";
+                                      if (t.includes("Title")) return "📋";
+                                      if (t.includes("Entity") || t.includes("Personal")) return "👤";
+                                      if (t.includes("Construction")) return "🏗️";
+                                      return "📄";
+                                    })()}
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-semibold text-[#0a1f44] truncate">{doc.document_name}</div>
+                                    <div className="text-xs text-gray-400 mt-0.5">
+                                      {doc.lender_name} · {new Date(doc.uploaded_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                    </div>
+                                  </div>
+                                  <a href={doc.document_url} target="_blank" rel="noopener noreferrer"
+                                    className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 text-xs font-semibold border border-[#0a1f44]/15 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/5 transition-colors">
+                                    View →
+                                  </a>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                     {showLenderResponses && (
                         <div className="mt-3 rounded-xl border border-[#0a1f44]/20 bg-white p-4">
                           <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-3">Lender Responses</div>
