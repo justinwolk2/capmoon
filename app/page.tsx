@@ -4667,7 +4667,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
               {activeTab === "add-lender" && <AddLenderPage onSave={handleSaveLender} onCancel={() => setActiveTab("lenders")} existingLenders={lenderRecords} inputClass={inputClass} selectTriggerClass={selectTriggerClass} />}
 
-              {activeTab === "matcher" && <DealMatcher lenderRecords={lenderRecords} teamMembers={teamMembers} prefillDeal={prefillDeal} onPrefillConsumed={() => setPrefillDeal(null)} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />}
+              {activeTab === "matcher" && <DealMatcher lenderRecords={lenderRecords} teamMembers={teamMembers} onSubmitDeal={(assets, capitalType, assetMode, collateralMode) => { const advisors = assignAdvisors(capitalType, teamMembers); const deal = { id: Date.now(), submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Admin", seekerEmail: session?.user.username || "", assets, capitalType, assetMode, collateralMode, status: "pending" as const, assignedAdvisorIds: advisors.map(a => a.id), dealNumber: "" }; const next = [deal, ...submittedDeals]; setSubmittedDeals(next); fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [deal] }) }); setActiveTab("submitted-deals"); }} prefillDeal={prefillDeal} onPrefillConsumed={() => setPrefillDeal(null)} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />}
 
               {/* Deal Team Tab */}
               {activeTab === "deal-team" && (
