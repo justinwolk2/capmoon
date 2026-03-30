@@ -1058,6 +1058,37 @@ function AddressFields({ address, onChange, inputClass }: { address: AssetAddres
   return (
     <div className="md:col-span-2">
       <div className="text-xs uppercase tracking-[0.2em] text-[#c9a84c] font-bold mb-3">Property Address</div>
+      {/* Mapbox Address Search */}
+      <div className="mb-3">
+        <label className="text-xs text-gray-500 mb-1 block font-medium">Search Address</label>
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="🔍 Start typing an address..."
+            className="w-full px-3 py-2 text-sm bg-[#c9a84c]/10 border border-[#c9a84c]/40 rounded-xl focus:outline-none focus:border-[#c9a84c] placeholder-gray-400"
+            onChange={async (e) => {
+              const q = e.target.value.trim();
+              if (q.length < 3) return;
+              try {
+                const token = "undefined";
+                const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?country=us&types=address&access_token=${token}`);
+                const data = await res.json();
+                if (data.features?.length > 0) {
+                  const f = data.features[0];
+                  const ctx = f.context || [];
+                  const get = (id: string) => ctx.find((x: any) => x.id.startsWith(id))?.text || '';
+                  const getShort = (id: string) => ctx.find((x: any) => x.id.startsWith(id))?.short_code?.replace('US-','') || '';
+                  const streetParts = f.place_name?.split(',') || [];
+                  updAddress('street', streetParts[0]?.trim() || '');
+                  updAddress('city', get('place') || get('locality'));
+                  updAddress('state', getShort('region') || get('region').slice(0,2));
+                  updAddress('zip', get('postcode'));
+                }
+              } catch(e) { console.error('Mapbox error:', e); }
+            }}
+          />
+        </div>
+      </div>
       <div className="grid gap-3">
         <div className="grid grid-cols-4 gap-2">
           <div className="col-span-3"><label className="text-xs text-gray-500 mb-1 block font-medium">Street Address</label><Input value={address.street} onChange={(e) => upd("street", e.target.value)} placeholder="123 Main St" className={inputClass} /></div>
