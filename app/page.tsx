@@ -4910,8 +4910,17 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                       <div className="flex items-start justify-between mb-4">
                         <div>
                           <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Deal #{deal.id}</div>
-                          <div className="text-base font-bold text-[#0a1f44]">{deal.seekerName}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">Submitted: {deal.submittedAt}</div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="text-base font-bold text-[#0a1f44]">{deal.seekerName}</div>
+                            {deal.dealNumber && <span className="px-2 py-0.5 text-xs bg-[#c9a84c]/20 text-[#0a1f44] rounded-full font-bold border border-[#c9a84c]/30">{deal.dealNumber}</span>}
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {deal.assets[0]?.assetType && <span className="text-xs text-gray-500 font-medium">{deal.assets[0].assetType}</span>}
+                            {deal.assets[0]?.loanAmount && <span className="text-xs text-[#0a1f44] font-bold">{deal.assets[0].loanAmount}</span>}
+                            {deal.capitalType && <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100">{deal.capitalType}</span>}
+                            {deal.assets[0]?.address?.city && <span className="text-xs text-gray-400">📍 {deal.assets[0].address.city}, {deal.assets[0].address.state}</span>}
+                          </div>
+                          <div className="text-xs text-gray-400 mt-0.5">Submitted: {deal.submittedAt}</div>
                         </div>
                         <select
                           value={deal.status}
@@ -4924,7 +4933,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                         </select>
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                        {[["Capital Type", deal.capitalType], ["Assets", `${deal.assets.length} asset${deal.assets.length > 1 ? "s" : ""}`], ["Loan Amount", deal.assets[0]?.loanAmount || "—"], ["Asset Type", deal.assets[0]?.assetType || "—"]].map(([label, val]) => (
+                        {[["Capital Type", deal.capitalType], ["Loan Amount", deal.assets[0]?.loanAmount || "—"], ["Asset Type", deal.assets[0]?.assetType || "—"], ["Property Value", deal.assets[0]?.propertyValue || "—"], ["DSCR", deal.assets[0]?.dscr || "—"], ["Assets", `${deal.assets.length} asset${deal.assets.length > 1 ? "s" : ""}`]].map(([label, val]) => (
                           <div key={String(label)} className="rounded-lg bg-white border border-gray-200 p-3"><div className="text-xs text-gray-400 mb-1">{label}</div><div className="text-sm font-bold text-[#0a1f44]">{val}</div></div>
                         ))}
                       </div>
@@ -5158,7 +5167,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                          "bg-gray-100 text-gray-500")}>
                                         {sl.status === "info_requested" ? "Info Requested" :
                                          sl.status === "viewed" ? "Viewed" :
-                                         sl.status === "declined" ? "Declined" : "Sent"}
+                                         sl.status === "declined" ? "Declined" : sl.status === "info_requested" ? "Info Requested" : sl.status === "quoted" ? "Quoted" : sl.status === "viewed" ? "Viewed" : "No Response Yet"}
                                       </span>
                                       {isAdmin && (
                                         <select value={sl.status} onChange={e => updateLenderResponseStatus(sl.token, e.target.value)}
