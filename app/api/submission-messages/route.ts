@@ -14,19 +14,47 @@ async function sendEmail(to: string, subject: string, html: string, replyTo?: st
   } catch (e) { console.error("Email notification failed:", e); }
 }
 
+function buildDealLabel(sub: any, deal: any): { title: string; subtitle: string } {
+  // Try to build a meaningful title from deal data
+  const asset = deal?.assets?.[0];
+  const addr = asset?.address;
+
+  // Address line: "123 Main St, Miami, FL" or "Miami, FL" or fallback
+  let addressLine = "";
+  if (addr?.street && addr?.city && addr?.state) {
+    addressLine = `${addr.street}, ${addr.city}, ${addr.state}`;
+  } else if (addr?.city && addr?.state) {
+    addressLine = `${addr.city}, ${addr.state}`;
+  }
+
+  // Deal title: prefer address, fall back to asset type + loan amount
+  const assetType = asset?.assetType || "";
+  const loanAmount = asset?.loanAmount || "";
+  const capitalType = deal?.capitalType || "";
+
+  const title = addressLine
+    ? addressLine
+    : sub.deal_title || [assetType, loanAmount].filter(Boolean).join(" – ") || "Deal";
+
+  const subtitle = [assetType, loanAmount, capitalType].filter(Boolean).join(" · ");
+
+  return { title, subtitle };
+}
+
 function messageEmailHtml({
-  senderName, senderRole, message, dealTitle, dealNumber, portalLink, token
+  senderName, senderRole, message, title, subtitle, dealNumber, portalLink, token
 }: {
   senderName: string; senderRole: string; message: string;
-  dealTitle: string; dealNumber?: string; portalLink: string; token: string;
+  title: string; subtitle: string; dealNumber?: string;
+  portalLink: string; token: string;
 }) {
   const isLender = senderRole === "lender";
-  const replyEmail = `deal+${token}@reply.capmoon.com`;
   return `
     <div style="font-family:Montserrat,sans-serif;max-width:600px;margin:0 auto;background:#f0f2f5;padding:32px 16px;">
       <div style="background:#0a1f44;border-radius:12px;padding:24px 28px;margin-bottom:16px;">
-        <div style="font-size:10px;letter-spacing:0.25em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-bottom:6px;">CapMoon · Deal Message</div>
-        <div style="font-size:18px;font-weight:800;color:white;margin-bottom:4px;">${dealTitle}</div>
+        <div style="font-size:10px;letter-spacing:0.25em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-bottom:8px;">CapMoon · Deal Message</div>
+        <div style="font-size:20px;font-weight:800;color:white;margin-bottom:4px;">${title}</div>
+        ${subtitle ? `<div style="font-size:12px;color:rgba(255,255,255,0.55);margin-bottom:8px;">${subtitle}</div>` : ""}
         ${dealNumber ? `<div style="display:inline-block;padding:2px 10px;background:rgba(201,168,76,0.2);border-radius:20px;font-size:11px;color:#c9a84c;font-weight:700;">Deal #${dealNumber}</div>` : ""}
       </div>
       <div style="background:white;border-radius:12px;padding:24px;margin-bottom:12px;">
@@ -74,70 +102,70 @@ export async function POST(req: NextRequest) {
       RETURNING *
     `;
 
-    // Look up the lender submission to get emails + deal info
+    // Send email notification
     if (token) {
       const [sub] = await sql`SELECT * FROM lender_submissions WHERE token = ${token} LIMIT 1`;
       if (sub) {
         const portalLink = `${BASE_URL}/lender/${token}`;
         const replyTo = `deal+${token}@reply.capmoon.com`;
-        const dealTitle = sub.deal_title || "Deal";
         const dealNumber = sub.deal_number || "";
 
+        // Pull full deal data for address/details
+        let deal: any = null;
+        if (dealId) {
+          const dealRows = await sql`SELECT data FROM submitted_deals WHERE (data->>'id')::text = ${String(dealId)} LIMIT 1`;
+          if (dealRows.length > 0) deal = dealRows[0].data;
+        }
+        // Also try by deal_id column on lender_submissions
+        if (!deal && sub.deal_id) {
+          const dealRows = await sql`SELECT data FROM submitted_deals WHERE (data->>'id')::text = ${String(sub.deal_id)} LIMIT 1`;
+          if (dealRows.length > 0) deal = dealRows[0].data;
+        }
+
+        const { title, subtitle } = buildDealLabel(sub, deal);
+
+        const emailHtml = messageEmailHtml({
+          senderName, senderRole, message, title, subtitle, dealNumber, portalLink, token
+        });
+
         if (senderRole === "lender") {
-          // Lender wrote → notify the advisor
-          // Look up advisor email from submitted_deals + users
-          if (dealId) {
-            const deals = await sql`SELECT data FROM submitted_deals WHERE data->>'id' = ${String(dealId)} LIMIT 1`;
-            if (deals.length > 0) {
-              const deal = deals[0].data as any;
-              // Get assigned advisor emails
-              const advisorIds = deal.assignedAdvisorIds || [];
-              if (advisorIds.length > 0) {
-                const teamRows = await sql`SELECT data FROM team_members`;
-                const team = teamRows.map((r: any) => r.data);
-                const advisors = team.filter((m: any) => advisorIds.includes(m.id));
-                for (const advisor of advisors) {
-                  if (advisor.email) {
-                    await sendEmail(
-                      advisor.email,
-                      `💬 New message from ${senderName} — ${dealTitle}${dealNumber ? ` (#${dealNumber})` : ""}`,
-                      messageEmailHtml({ senderName, senderRole, message, dealTitle, dealNumber, portalLink: `${BASE_URL}/lender/${token}`, token }),
-                      replyTo
-                    );
-                  }
-                }
-              }
-              // Also notify deal owner (admin) if email on deal
-              if (deal.seekerEmail && deal.seekerEmail.includes("capmoon")) {
+          // Lender wrote → notify advisor
+          // Look up advisor by name in users table (username = email)
+          const advisorRows = await sql`SELECT data FROM users WHERE data->>'name' = ${sub.advisor_name} LIMIT 1`;
+          if (advisorRows.length > 0) {
+            const advisor = advisorRows[0].data as any;
+            if (advisor.username) {
+              await sendEmail(
+                advisor.username,
+                `💬 ${senderName} replied — ${title}${dealNumber ? ` (#${dealNumber})` : ""}`,
+                emailHtml,
+                replyTo
+              );
+            }
+          }
+          // Also notify any assigned advisors via team_members email field
+          if (deal?.assignedAdvisorIds?.length > 0) {
+            const teamRows = await sql`SELECT data FROM team_members`;
+            const team = teamRows.map((r: any) => r.data);
+            const assigned = team.filter((m: any) => deal.assignedAdvisorIds.includes(m.id));
+            for (const advisor of assigned) {
+              if (advisor.email) {
                 await sendEmail(
-                  deal.seekerEmail,
-                  `💬 New message from ${senderName} — ${dealTitle}`,
-                  messageEmailHtml({ senderName, senderRole, message, dealTitle, dealNumber, portalLink: `${BASE_URL}/lender/${token}`, token }),
+                  advisor.email,
+                  `💬 ${senderName} replied — ${title}${dealNumber ? ` (#${dealNumber})` : ""}`,
+                  emailHtml,
                   replyTo
                 );
               }
             }
           }
-          // Fallback: also notify advisorName from submission if we have their email
-          const advisorEmailRows = await sql`SELECT data FROM users WHERE data->>'name' = ${sub.advisor_name} LIMIT 1`;
-          if (advisorEmailRows.length > 0) {
-            const advisorUser = advisorEmailRows[0].data as any;
-            if (advisorUser.username) {
-              await sendEmail(
-                advisorUser.username,
-                `💬 New message from ${senderName} — ${dealTitle}${dealNumber ? ` (#${dealNumber})` : ""}`,
-                messageEmailHtml({ senderName, senderRole, message, dealTitle, dealNumber, portalLink, token }),
-                replyTo
-              );
-            }
-          }
         } else {
-          // Advisor/admin wrote → notify the lender
+          // Advisor/admin wrote → notify lender
           if (sub.lender_email) {
             await sendEmail(
               sub.lender_email,
-              `💬 New message from ${senderName} re: ${dealTitle}${dealNumber ? ` (#${dealNumber})` : ""}`,
-              messageEmailHtml({ senderName, senderRole, message, dealTitle, dealNumber, portalLink, token }),
+              `💬 New message re: ${title}${dealNumber ? ` (#${dealNumber})` : ""}`,
+              emailHtml,
               replyTo
             );
           }
