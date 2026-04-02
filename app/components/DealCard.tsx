@@ -2,37 +2,11 @@
 import React from "react";
 import { Filter, Users, Landmark, FileSpreadsheet, FileText } from "lucide-react";
 
-interface Asset {
-  assetType?: string; loanAmount?: string; propertyValue?: string; dscr?: string;
-  currentNetIncome?: string; dealType?: string;
-  address?: { street?: string; city?: string; state?: string; zip?: string };
-  [key: string]: any;
-}
-interface SubmittedDeal {
-  id: number; submittedAt: string; seekerName: string; seekerEmail?: string;
-  seekerPhone?: string; assets: Asset[]; capitalType: string; assetMode?: string;
-  collateralMode?: string; status: "pending" | "assigned" | "closed";
-  assignedAdvisorIds: number[]; invitedUserIds?: number[]; dealNumber?: string;
-  notes?: string; [key: string]: any;
-}
-interface TeamMember { id: number; name: string; title?: string; phone?: string; photo?: string; [key: string]: any; }
-interface AppUser { id: number; name: string; role: string; username?: string; teamMemberId?: number; [key: string]: any; }
-interface LenderRecord { id: number; lender: string; email?: string; contacts?: { email?: string }[]; [key: string]: any; }
-
-interface DealCardProps {
-  deal: SubmittedDeal;
-  session: { user: { id: number; name: string; role: string; username?: string; teamMemberId?: number } } | null;
-  isAdmin: boolean;
-  teamMembers: TeamMember[];
-  users: AppUser[];
-  submittedDeals: SubmittedDeal[];
-  setSubmittedDeals: (deals: SubmittedDeal[]) => void;
-  lenderRecords: LenderRecord[];
-  setPrefillDeal: (deal: SubmittedDeal) => void;
-  setActiveTab: (tab: string) => void;
-}
-
-export function DealCard({ deal, session, isAdmin, teamMembers, users, submittedDeals, setSubmittedDeals, lenderRecords, setPrefillDeal, setActiveTab }: DealCardProps) {
+export function DealCard({ deal, session, isAdmin, teamMembers, users, submittedDeals, setSubmittedDeals, lenderRecords, setPrefillDeal, setActiveTab }: {
+  deal: any; session: any; isAdmin: boolean; teamMembers: any[]; users: any[];
+  submittedDeals: any[]; setSubmittedDeals: (d: any[]) => void;
+  lenderRecords: any[]; setPrefillDeal: (d: any) => void; setActiveTab: (t: string) => void;
+}) {
   const [showInvite, setShowInvite] = React.useState(false);
   const [showLenderResponses, setShowLenderResponses] = React.useState(false);
   const [showSendLenders, setShowSendLenders] = React.useState(false);
@@ -44,7 +18,6 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
   const [threadLoading, setThreadLoading] = React.useState<Record<string, boolean>>({});
   const [replyOpen, setReplyOpen] = React.useState<Record<string, boolean>>({});
   const [sentLenders, setSentLenders] = React.useState<any[]>([]);
-  const [lenderSearch, setLenderSearch] = React.useState("");
   const [selectedLenderIds, setSelectedLenderIds] = React.useState<number[]>([]);
   const [sendingToLenders, setSendingToLenders] = React.useState(false);
   const [dealDocs, setDealDocs] = React.useState<any[]>([]);
@@ -108,9 +81,9 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
 
   async function sendToLenders() {
     setSendingToLenders(true);
-    const advisor = teamMembers.find((m) => deal.assignedAdvisorIds?.includes(m.id));
+    const advisor = teamMembers.find((m: any) => deal.assignedAdvisorIds?.includes(m.id));
     for (const lid of selectedLenderIds) {
-      const lender = lenderRecords.find((l) => l.id === lid);
+      const lender = lenderRecords.find((l: any) => l.id === lid);
       if (!lender) continue;
       const email = lender.contacts?.[0]?.email || lender.email || "";
       await fetch("/api/lender-submissions", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -122,8 +95,8 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
     setSelectedLenderIds([]); setShowSendLenders(false); setSendingToLenders(false);
   }
 
-  function updateDealStatus(status: SubmittedDeal["status"]) {
-    const updated = submittedDeals.map((d) => d.id === deal.id ? { ...d, status } : d);
+  function updateDealStatus(status: string) {
+    const updated = submittedDeals.map((d: any) => d.id === deal.id ? { ...d, status } : d);
     setSubmittedDeals(updated);
     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: "deals", data: updated }) }).catch(console.error);
@@ -132,10 +105,10 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
   function saveDealEdits() {
     const updated = { ...deal, seekerName: editDealFields.seekerName, seekerEmail: editDealFields.seekerEmail,
       seekerPhone: editDealFields.seekerPhone, notes: editDealFields.notes,
-      assets: deal.assets.map((a, i) => i === 0 ? { ...a, loanAmount: editDealFields.loanAmount,
+      assets: deal.assets.map((a: any, i: number) => i === 0 ? { ...a, loanAmount: editDealFields.loanAmount,
         propertyValue: editDealFields.propertyValue, dscr: editDealFields.dscr,
         currentNetIncome: editDealFields.currentNetIncome } : a) };
-    const newDeals = submittedDeals.map(d => d.id === deal.id ? updated : d);
+    const newDeals = submittedDeals.map((d: any) => d.id === deal.id ? updated : d);
     setSubmittedDeals(newDeals);
     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: "deals", data: newDeals }) }).catch(console.error);
@@ -146,7 +119,7 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
     if (!inviteUserId) return;
     const uid = parseInt(inviteUserId);
     if ((deal.invitedUserIds || []).includes(uid)) return;
-    const updated = submittedDeals.map((d) => d.id === deal.id ? { ...d, invitedUserIds: [...(d.invitedUserIds || []), uid] } : d);
+    const updated = submittedDeals.map((d: any) => d.id === deal.id ? { ...d, invitedUserIds: [...(d.invitedUserIds || []), uid] } : d);
     setSubmittedDeals(updated);
     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: "deals", data: updated }) }).catch(console.error);
@@ -154,7 +127,7 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
   }
 
   function removeInvite(uid: number) {
-    const updated = submittedDeals.map((d) => d.id === deal.id ? { ...d, invitedUserIds: (d.invitedUserIds || []).filter(id => id !== uid) } : d);
+    const updated = submittedDeals.map((d: any) => d.id === deal.id ? { ...d, invitedUserIds: (d.invitedUserIds || []).filter((id: number) => id !== uid) } : d);
     setSubmittedDeals(updated);
     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: "deals", data: updated }) }).catch(console.error);
@@ -190,7 +163,7 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
   async function sendDocRequest() {
     if (requestDocs.length === 0) return;
     setRequestSending(true);
-    const advisor = teamMembers.find((m) => deal.assignedAdvisorIds?.includes(m.id));
+    const advisor = teamMembers.find((m: any) => deal.assignedAdvisorIds?.includes(m.id));
     await fetch("/api/document-request", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dealId: deal.id, dealNumber: deal.dealNumber, borrowerName: deal.seekerName,
         borrowerEmail: requestEmail, requestedBy: advisor?.name || session?.user.name || "CapMoon",
@@ -199,8 +172,8 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
     setTimeout(() => { setRequestSent(false); setShowDocRequest(false); setRequestDocs([]); }, 3000);
   }
 
-  const advisors = teamMembers.filter((m) => deal.assignedAdvisorIds.includes(m.id));
-  const invitedUsers = users.filter((u) => (deal.invitedUserIds || []).includes(u.id));
+  const advisors = teamMembers.filter((m: any) => deal.assignedAdvisorIds.includes(m.id));
+  const invitedUsers = users.filter((u: any) => (deal.invitedUserIds || []).includes(u.id));
   const docTypes = ["Rent Roll","T12 Financials","Operating Statement","Tax Returns (2yr)","Bank Statements (3mo)","Purchase Contract","Appraisal","Environmental Report","Survey","Title Report","Loan Application","Personal Financial Statement","Entity Documents","Construction Budget","Proforma","Other"];
   const docEmoji = (t: string) => {
     if (t.includes("Rent Roll")||t.includes("Financial")||t.includes("Statement")||t.includes("Budget")||t.includes("Proforma")) return "📊";
@@ -229,27 +202,24 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
           </div>
           <div className="text-xs text-gray-400 mt-0.5">Submitted: {deal.submittedAt}</div>
         </div>
-        <select value={deal.status} onChange={(e) => updateDealStatus(e.target.value as SubmittedDeal["status"])}
+        <select value={deal.status} onChange={(e) => updateDealStatus(e.target.value)}
           className={`px-3 py-1 rounded-full text-xs font-semibold border cursor-pointer ${deal.status==="pending"?"bg-amber-50 text-amber-600 border-amber-200":deal.status==="assigned"?"bg-blue-50 text-blue-600 border-blue-200":"bg-emerald-50 text-emerald-600 border-emerald-200"}`}>
           <option value="pending">Pending</option><option value="assigned">Assigned</option><option value="closed">Closed</option>
         </select>
       </div>
-
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
         {[["Capital Type",deal.capitalType],["Loan Amount",deal.assets[0]?.loanAmount||"—"],["Asset Type",deal.assets[0]?.assetType||"—"],["Property Value",deal.assets[0]?.propertyValue||"—"],["DSCR",deal.assets[0]?.dscr||"—"],["Assets",`${deal.assets.length} asset${deal.assets.length>1?"s":""}`]].map(([label,val])=>(
           <div key={String(label)} className="rounded-lg bg-white border border-gray-200 p-3"><div className="text-xs text-gray-400 mb-1">{label}</div><div className="text-sm font-bold text-[#0a1f44]">{val}</div></div>
         ))}
       </div>
-
-      {deal.assets.map((asset, idx) => asset.address?.city ? (
+      {deal.assets.map((asset: any, idx: number) => asset.address?.city ? (
         <div key={idx} className="text-xs text-gray-500 mt-1">Asset {idx+1}: {asset.address.street?`${asset.address.street}, `:""}{asset.address.city}, {asset.address.state} {asset.address.zip}</div>
       ) : null)}
-
       {advisors.length > 0 && (
         <div className="mt-4 pt-4 border-t border-gray-200">
           <div className="text-xs uppercase tracking-[0.15em] text-[#0a1f44] font-bold mb-3">Assigned Advisor{advisors.length>1?"s":""}</div>
           <div className="flex gap-3 flex-wrap">
-            {advisors.map((advisor) => (
+            {advisors.map((advisor: any) => (
               <div key={advisor.id} className="flex items-center gap-3 bg-[#0a1f44] rounded-xl px-4 py-3">
                 <img src={advisor.photo||"/logo1.JPEG"} alt={advisor.name} className="h-10 w-10 rounded-lg object-cover border border-[#c9a84c]/30 flex-shrink-0" />
                 <div><div className="text-xs font-bold text-white">{advisor.name}</div><div className="text-xs text-[#c9a84c]">{advisor.title}</div><div className="text-xs text-gray-400 mt-0.5">{advisor.phone}</div></div>
@@ -258,12 +228,11 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
           </div>
         </div>
       )}
-
       {invitedUsers.length > 0 && (
         <div className="mt-3 pt-3 border-t border-gray-200">
           <div className="text-xs uppercase tracking-[0.15em] text-[#0a1f44] font-bold mb-2">Collaborators</div>
           <div className="flex flex-wrap gap-2">
-            {invitedUsers.map((u) => (
+            {invitedUsers.map((u: any) => (
               <div key={u.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#c9a84c]/10 border border-[#c9a84c]/20">
                 <span className="text-xs font-medium text-[#0a1f44]">{u.name}</span><span className="text-xs text-gray-400">· {u.role}</span>
                 {isAdmin && <button onClick={() => removeInvite(u.id)} className="ml-1 text-gray-400 hover:text-red-500 text-xs font-bold">✕</button>}
@@ -272,7 +241,6 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
           </div>
         </div>
       )}
-
       <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-2">
         <button onClick={() => { setPrefillDeal(deal); setActiveTab("matcher"); }} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">
           <Filter className="h-4 w-4" /> Resubmit to Deal Matcher
@@ -286,7 +254,6 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
           {sentLenders.length > 0 && <span className={"ml-1 px-1.5 py-0.5 text-xs rounded-full font-bold "+(showLenderResponses?"bg-white text-[#0a1f44]":"bg-[#c9a84c] text-[#0a1f44]")}>{sentLenders.length}</span>}
         </button>
       </div>
-
       <div className="mt-3 space-y-2">
         <div className="flex gap-2 flex-wrap">
           <button type="button" onClick={() => setShowDocUpload(p => !p)}
@@ -299,7 +266,6 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
             <FileText className="h-3.5 w-3.5" /> Request Docs from Borrower
           </button>
         </div>
-
         {showDocUpload && (
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
             <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">Upload Document</div>
@@ -311,16 +277,15 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
               <div><label className="text-xs text-gray-500 mb-1 block font-bold">File</label>
                 <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" onChange={e => setDocFile(e.target.files?.[0] || null)} className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl" /></div>
             </div>
-            {docType === "Other" && <input value={docLabel} onChange={e => setDocLabel(e.target.value)} placeholder="Describe this document..." className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />}
+            {docType === "Other" && <input value={docLabel} onChange={e => setDocLabel(e.target.value)} placeholder="Describe this document..." className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl" />}
             {docFile && <button type="button" onClick={uploadDoc} disabled={docUploading} className="w-full py-2.5 text-sm font-bold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 disabled:opacity-50">{docUploading?"Uploading...":"Upload "+(docType==="Other"?docLabel||"Document":docType)}</button>}
           </div>
         )}
-
         {showDocRequest && (
           <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4 space-y-3">
             <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">Request Documents from Borrower</div>
             <div><label className="text-xs text-gray-500 mb-1 block font-bold">Borrower Email</label>
-              <input value={requestEmail} onChange={e => setRequestEmail(e.target.value)} placeholder="borrower@email.com" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
+              <input value={requestEmail} onChange={e => setRequestEmail(e.target.value)} placeholder="borrower@email.com" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl" /></div>
             <div><label className="text-xs text-gray-500 mb-2 block font-bold">Documents Needed</label>
               <div className="flex flex-wrap gap-1.5">
                 {docTypes.map(t => <button key={t} type="button" onClick={() => setRequestDocs(p => p.includes(t)?p.filter(x=>x!==t):[...p,t])}
@@ -332,21 +297,19 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
           </div>
         )}
       </div>
-
       {showInvite && (
         <div className="mt-3 rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4">
           <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-3">Invite a Collaborator</div>
           <div className="flex gap-2">
             <select value={inviteUserId} onChange={(e) => setInviteUserId(e.target.value)} className="flex-1 px-3 py-2 text-sm bg-white border border-gray-300 rounded-xl text-gray-800 focus:outline-none focus:border-[#0a1f44]">
               <option value="">Select a user...</option>
-              {users.filter((u) => u.id !== session?.user.id && !(deal.invitedUserIds || []).includes(u.id)).map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+              {users.filter((u: any) => u.id !== session?.user.id && !(deal.invitedUserIds || []).includes(u.id)).map((u: any) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
             </select>
             <button onClick={handleInvite} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Invite</button>
             <button onClick={() => setShowInvite(false)} className="px-3 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">Cancel</button>
           </div>
         </div>
       )}
-
       {dealDocs.length > 0 && (
         <div className="mt-3 rounded-xl overflow-hidden border border-[#0a1f44]/15">
           <div className="flex items-center justify-between px-4 py-3 bg-[#0a1f44]">
@@ -367,7 +330,6 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
           </div>
         </div>
       )}
-
       {showLenderResponses && (
         <div className="mt-3 rounded-xl border border-[#0a1f44]/20 bg-white p-4">
           <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-3">Lender Responses</div>
