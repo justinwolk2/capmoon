@@ -1614,6 +1614,99 @@ function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTr
   const [form, setForm] = useState<NewLenderForm>(blankLenderForm());
   const [openAccordions, setOpenAccordions] = useState<Record<string, boolean>>({});
   const [matchMode, setMatchMode] = useState<Record<string, "manual" | "spreadsheet">>({ programName: "manual", contactPerson: "manual", email: "manual", phone: "manual", website: "manual" });
+  const [pdfUploading, setPdfUploading] = useState(false);
+  const [pdfParsed, setPdfParsed] = useState(false);
+  const [pdfError, setPdfError] = useState("");
+  const [pasteText, setPasteText] = useState("");
+  const [showPaste, setShowPaste] = useState(false);
+  const [pasteProcessing, setPasteProcessing] = useState(false);
+  const [inputMode, setInputMode] = useState<"choose" | "pdf" | "paste" | "manual">("choose");
+
+  async function handlePdfUpload(file: File) {
+    if (!file || file.type !== "application/pdf") { setPdfError("Please upload a PDF file only."); return; }
+    setPdfUploading(true); setPdfError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/parse-lender-pdf", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.success && data.data) {
+        const d = data.data;
+        setForm(prev => ({
+          ...prev,
+          programName: d.programName || prev.programName,
+          contactPerson: d.contactPerson || prev.contactPerson,
+          email: d.email || prev.email,
+          phone: d.phone || prev.phone,
+          website: d.website || prev.website,
+          minLoan: d.minLoan || prev.minLoan,
+          maxLoan: d.maxLoan || prev.maxLoan,
+          maxLtv: d.maxLtv || prev.maxLtv,
+          notes: d.notes || prev.notes,
+          recourse: d.recourse || prev.recourse,
+          typeOfLoans: d.typeOfLoans?.length ? d.typeOfLoans : prev.typeOfLoans,
+          loanTerms: d.loanTerms?.length ? d.loanTerms : prev.loanTerms,
+          propertyTypes: d.propertyTypes?.length ? d.propertyTypes : prev.propertyTypes,
+          capitalTypes: d.capitalTypes?.length ? d.capitalTypes : prev.capitalTypes,
+          targetStates: d.targetStates?.length ? d.targetStates : prev.targetStates,
+          sponsorStates: d.sponsorStates?.length ? d.sponsorStates : prev.sponsorStates,
+        }));
+        setPdfParsed(true);
+        setInputMode("manual");
+      } else {
+        setPdfError(data.error || "Could not parse PDF. Please review and fill in manually.");
+        setInputMode("manual");
+      }
+    } catch(e: any) {
+      setPdfError("Upload failed. Please try again or enter manually.");
+      setInputMode("manual");
+    }
+    setPdfUploading(false);
+  }
+
+  async function handlePasteProcess() {
+    if (!pasteText.trim()) return;
+    setPasteProcessing(true); setPdfError("");
+    try {
+      const res = await fetch("/api/parse-lender-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: pasteText }),
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        const d = data.data;
+        setForm(prev => ({
+          ...prev,
+          programName: d.programName || prev.programName,
+          contactPerson: d.contactPerson || prev.contactPerson,
+          email: d.email || prev.email,
+          phone: d.phone || prev.phone,
+          website: d.website || prev.website,
+          minLoan: d.minLoan || prev.minLoan,
+          maxLoan: d.maxLoan || prev.maxLoan,
+          maxLtv: d.maxLtv || prev.maxLtv,
+          notes: d.notes || prev.notes,
+          recourse: d.recourse || prev.recourse,
+          typeOfLoans: d.typeOfLoans?.length ? d.typeOfLoans : prev.typeOfLoans,
+          loanTerms: d.loanTerms?.length ? d.loanTerms : prev.loanTerms,
+          propertyTypes: d.propertyTypes?.length ? d.propertyTypes : prev.propertyTypes,
+          capitalTypes: d.capitalTypes?.length ? d.capitalTypes : prev.capitalTypes,
+          targetStates: d.targetStates?.length ? d.targetStates : prev.targetStates,
+          sponsorStates: d.sponsorStates?.length ? d.sponsorStates : prev.sponsorStates,
+        }));
+        setPdfParsed(true);
+        setInputMode("manual");
+      } else {
+        setPdfError("Could not parse text. Please review and fill in manually.");
+        setInputMode("manual");
+      }
+    } catch(e) {
+      setPdfError("Processing failed. Please enter manually.");
+      setInputMode("manual");
+    }
+    setPasteProcessing(false);
+  }
 
   function upd(field: keyof NewLenderForm, value: any) { setForm((prev) => ({ ...prev, [field]: value })); }
   function toggleAccordion(ct: string) { setOpenAccordions((prev) => ({ ...prev, [ct]: prev[ct] === false ? true : false })); }
@@ -1631,7 +1724,90 @@ function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTr
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-8">
         <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">New Entry</div>
         <h2 className="font-display text-3xl font-bold text-[#0a1f44] mb-2">Add Lender</h2>
-        <div className="space-y-6">
+
+        {/* AI Import Banner */}
+        {inputMode === "choose" && (
+          <div className="mb-6 rounded-2xl border-2 border-dashed border-[#c9a84c]/40 bg-[#c9a84c]/5 p-6">
+            <div className="text-center mb-4">
+              <div className="text-2xl mb-2">🤖</div>
+              <div className="text-sm font-bold text-[#0a1f44] mb-1">Let AI do the heavy lifting</div>
+              <div className="text-xs text-gray-500">Upload a lender tear sheet PDF or paste your deal memo and Claude will auto-fill the form. You'll review everything before saving.</div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <label className="cursor-pointer">
+                <input type="file" accept="application/pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handlePdfUpload(f); }} />
+                <div className="flex flex-col items-center gap-2 px-4 py-4 bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-all text-center">
+                  <span className="text-xl">📄</span>
+                  <span className="text-xs font-bold">Upload Tear Sheet PDF</span>
+                  <span className="text-xs text-white/60">PDF files only</span>
+                </div>
+              </label>
+              <button type="button" onClick={() => setInputMode("paste")}
+                className="flex flex-col items-center gap-2 px-4 py-4 bg-white border-2 border-[#c9a84c]/30 text-[#0a1f44] rounded-xl hover:border-[#c9a84c] transition-all">
+                <span className="text-xl">📋</span>
+                <span className="text-xs font-bold">Paste Deal Memo / Text</span>
+                <span className="text-xs text-gray-400">Copy & paste any text</span>
+              </button>
+              <button type="button" onClick={() => setInputMode("manual")}
+                className="flex flex-col items-center gap-2 px-4 py-4 bg-white border-2 border-gray-200 text-gray-600 rounded-xl hover:border-[#0a1f44]/30 transition-all">
+                <span className="text-xl">✏️</span>
+                <span className="text-xs font-bold">Enter Manually</span>
+                <span className="text-xs text-gray-400">Fill in all fields yourself</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* PDF uploading state */}
+        {pdfUploading && (
+          <div className="mb-6 rounded-xl bg-[#0a1f44] text-white p-5 flex items-center gap-4">
+            <div className="animate-spin text-2xl">⚙️</div>
+            <div>
+              <div className="font-bold text-sm">Claude is reading your tear sheet...</div>
+              <div className="text-xs text-white/60 mt-0.5">Extracting lender details, loan programs, states, and more</div>
+            </div>
+          </div>
+        )}
+
+        {/* PDF parsed success banner */}
+        {pdfParsed && !pdfUploading && (
+          <div className="mb-6 rounded-xl bg-green-50 border border-green-200 p-4 flex items-center gap-3">
+            <span className="text-xl">✅</span>
+            <div>
+              <div className="text-sm font-bold text-green-800">Form pre-filled from your document!</div>
+              <div className="text-xs text-green-600">Review everything carefully before saving — Claude may not be perfect 😄</div>
+            </div>
+            <button type="button" onClick={() => { setForm(blankLenderForm()); setPdfParsed(false); setInputMode("choose"); }} className="ml-auto text-xs text-green-700 border border-green-300 px-3 py-1 rounded-lg hover:bg-green-100">Start Over</button>
+          </div>
+        )}
+
+        {/* Error banner */}
+        {pdfError && (
+          <div className="mb-6 rounded-xl bg-red-50 border border-red-200 p-4 flex items-center gap-3">
+            <span className="text-xl">⚠️</span>
+            <div className="text-sm text-red-700">{pdfError}</div>
+            <button type="button" onClick={() => setPdfError("")} className="ml-auto text-xs text-red-500">✕</button>
+          </div>
+        )}
+
+        {/* Paste text mode */}
+        {inputMode === "paste" && (
+          <div className="mb-6 rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">Paste Lender Text / Deal Memo</div>
+              <button type="button" onClick={() => setInputMode("choose")} className="text-xs text-gray-400 hover:text-gray-600">✕ Cancel</button>
+            </div>
+            <textarea value={pasteText} onChange={e => setPasteText(e.target.value)} rows={8}
+              placeholder="Paste any text here — deal memo, email, program description, copied PDF text..."
+              className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] resize-none" />
+            <button type="button" onClick={handlePasteProcess} disabled={pasteProcessing || !pasteText.trim()}
+              className="w-full py-3 text-sm font-bold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 disabled:opacity-50">
+              {pasteProcessing ? "🤖 Claude is analyzing..." : "🤖 Auto-Fill Form with AI"}
+            </button>
+          </div>
+        )}
+
+        <div className="space-y-6" style={{ display: inputMode === "choose" ? "none" : "block" }}>
           <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-5">
             <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-4">Lender Information</div>
             <div className="grid gap-4 md:grid-cols-2">
