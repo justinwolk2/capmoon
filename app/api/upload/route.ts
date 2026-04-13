@@ -1,70 +1,77 @@
 import { NextRequest, NextResponse } from "next/server";
-import { put } from "@vercel/blob";
 import { neon } from "@neondatabase/serverless";
+import { put, del } from "@vercel/blob";
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export async function POST(req: NextRequest) {
+async function ensureBigint() {
   try {
-    const formData = await req.formData();
-    const file = formData.get("file") as File;
-    const dealId = formData.get("dealId") as string;
-    const dealNumber = formData.get("dealNumber") as string;
-    const uploadedBy = formData.get("uploadedBy") as string;
-    const uploadedByRole = formData.get("uploadedByRole") as string;
-    const docType = formData.get("docType") as string;
-    const docLabel = formData.get("docLabel") as string;
-
-    if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
-
-    // Upload to Vercel Blob organized by deal number
-    const folder = dealNumber ? `deals/${dealNumber}` : `deals/deal-${dealId}`;
-    const filename = `${folder}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-
-    const blob = await put(filename, file, {
-      access: "public",
-      contentType: file.type,
-    });
-
-    // Save to DB
-    await sql`INSERT INTO lender_documents
-      (deal_id, lender_name, document_name, document_url, document_type, uploaded_at)
-      VALUES (
-        ${parseInt(dealId) || 0},
-        ${uploadedBy || "Unknown"},
-        ${docLabel || docType || file.name},
-        ${blob.url},
-        ${docType || "Other"},
-        NOW()
-      )`;
-
-    return NextResponse.json({ success: true, url: blob.url, filename: blob.pathname });
-  } catch (e: any) {
-    console.error("Upload error:", e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
+    await sql`ALTER TABLE lender_documents ALTER COLUMN deal_id TYPE bigint`;
+  } catch(e) {}
 }
 
 export async function GET(req: NextRequest) {
   const dealId = req.nextUrl.searchParams.get("dealId");
+  const docId = req.nextUrl.searchParams.get("id");
   try {
-    if (dealId) {
-      const docs = await sql`SELECT * FROM lender_documents WHERE deal_id = ${parseInt(dealId)} ORDER BY uploaded_at DESC`;
-      return NextResponse.json(docs);
+    if (docId) {
+      const r = await sql`SELECT * FROM lender_documents WHERE id = ${parseInt(docId)}`;
+      return NextResponse.json(r[0] || null);
     }
-    const docs = await sql`SELECT * FROM lender_documents ORDER BY uploaded_at DESC`;
-    return NextResponse.json(docs);
-  } catch (e: any) {
+    if (dealId) {
+      const r = await sql`SELECT * FROM lender_documents WHERE deal_id = ${BigInt(dealId)} ORDER BY uploaded_at DESC`;
+      return NextResponse.json(r);
+    }
+    const r = await sql`SELECT * FROM lender_documents ORDER BY uploaded_at DESC`;
+    return NextResponse.json(r);
+  } catch(e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    await ensureBigint();
+    const formData = await req.formData();
+    const file = formData.get("file") as File;
+    const dealId = formData.get("dealId") as string;
+    const dealNumber = formData.get("dealNumber") as string || "";
+    const uploadedBy = formData.get("uploadedBy") as string || "Admin";
+    const uploadedByRole = formData.get("uploadedByRole") as string || "admin";
+    const docType = formData.get("docType") as string || "Other";
+    const docLabel = formData.get("docLabel") as string || docType;
+
+    if (!file || !dealId) {
+      return NextResponse.json({ error: "Missing file or dealId" }, { status: 400 });
+    }
+
+    const ext = file.name.split(".").pop() || "bin";
+    const filename = `deals/${dealId}/${Date.now()}-${docLabel.replace(/[^a-z0-9]/gi, "_")}.${ext}`;
+    const blob = await put(filename, file, { access: "public" });
+
+    const result = await sql`
+      INSERT INTO lender_documents (deal_id, deal_number, document_name, document_type, document_url, uploaded_by, uploaded_by_role, uploaded_at, lender_name)
+      VALUES (${BigInt(dealId)}, ${dealNumber}, ${file.name}, ${docType}, ${blob.url}, ${uploadedBy}, ${uploadedByRole}, NOW(), ${uploadedBy})
+      RETURNING *
+    `;
+
+    return NextResponse.json({ success: true, doc: result[0] });
+  } catch(e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
 
 export async function DELETE(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get("id");
+  const docId = req.nextUrl.searchParams.get("id");
+  if (!docId) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   try {
-    await sql`DELETE FROM lender_documents WHERE id = ${parseInt(id!)}`;
+    const [doc] = await sql`SELECT * FROM lender_documents WHERE id = ${parseInt(docId)}`;
+    if (doc?.document_url) {
+      try { await del(doc.document_url); } catch(e) {}
+    }
+    await sql`DELETE FROM lender_documents WHERE id = ${parseInt(docId)}`;
     return NextResponse.json({ success: true });
-  } catch (e: any) {
+  } catch(e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
