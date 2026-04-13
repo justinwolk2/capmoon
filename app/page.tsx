@@ -1538,11 +1538,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
         </div>
       )}
       {m.isSubCap && (<><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Senior Loan Amount</label><Input value={asset.seniorLoanAmount} onChange={(e) => upd("seniorLoanAmount", formatCurrencyInput(e.target.value))} className={inputClass} /></div><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">{subordinateLabel(capitalType)}</label><Input value={asset.subordinateAmount} onChange={(e) => upd("subordinateAmount", formatCurrencyInput(e.target.value))} className={inputClass} /></div><div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500">Stack: Senior {asset.seniorLoanAmount || "$0"} + {subordinateLabel(capitalType)} {asset.subordinateAmount || "$0"}</div></>)}
-      <div className="md:col-span-2">
-        <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">States</label>
-        <div className="mb-2 flex gap-2"><button onClick={() => upd("selectedStates", allStates)} className="px-3 py-1 text-xs border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/10 font-medium">Select All</button><button onClick={() => upd("selectedStates", [])} className="px-3 py-1 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-100">Clear</button></div>
-        <div className="grid max-h-32 grid-cols-6 gap-1.5 overflow-auto rounded-xl border border-gray-200 bg-gray-50 p-3">{allStates.map((s) => (<label key={s} className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={asset.selectedStates.includes(s)} onChange={() => upd("selectedStates", asset.selectedStates.includes(s) ? asset.selectedStates.filter((x) => x !== s) : [...asset.selectedStates, s])} className="accent-[#0a1f44]" /><span className="text-gray-600">{s}</span></label>))}</div>
-      </div>
+
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Property Value / ARV</label><Input value={asset.propertyValue} onChange={(e) => upd("propertyValue", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">LTV Mode</label><Select value={asset.ltvMode} onValueChange={(v) => upd("ltvMode", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="AUTO">Auto Calculate</SelectItem><SelectItem value="MANUAL">Manual Entry</SelectItem></SelectContent></Select></div>
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Net Income (Annual)</label><Input value={asset.currentNetIncome} onChange={(e) => upd("currentNetIncome", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
@@ -1967,7 +1963,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
     if (collateralMode === "crossed" || assetMode === "single") {
       const totalLoan = assets.reduce((sum, a) => sum + calcMetrics(a, capitalType).effectiveAmt, 0);
       const primary = assets[0];
-      const stateSet = [...new Set(assets.flatMap((a) => a.selectedStates))];
+      const stateSet = [...new Set(assets.map((a) => a.address && a.address.state).filter(Boolean))];
       return lenderRecords.map((l) => {
         let score = 0; const nr = normalizeRecourse(l.recourse);
         // Loan size — partial credit if within 2x range
@@ -2003,7 +1999,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
         else if (l.assets.length === 0) score += 8;
         if (l.type && l.type.split(",").map((s: string) => s.trim()).includes(capitalType)) score += 25;
         else if (!l.type) score += 8;
-        if (asset.selectedStates.length === 0 || asset.selectedStates.some((s) => l.states.includes(s))) score += 15;
+        if (!asset.address || !asset.address.state || l.states.length === 0 || l.states.includes(asset.address.state)) score += 15;
         if (nr === asset.recourseType || nr === "CASE BY CASE" || !asset.recourseType) score += 8;
         if (l.maxLtv) {
           const lenderMaxLtv = parseFloat(l.maxLtv.replace(/[^0-9.]/g, ""));
@@ -2680,7 +2676,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                         <button onClick={() => { setCurrentAssetIndex(idx); setMatcherStep("asset-form"); }} className="flex items-center gap-1 px-3 py-1.5 text-xs border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/10 font-medium"><Edit2 className="h-3 w-3" /> Edit</button>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        {[["Loan Amount", asset.loanAmount || "—"], ["Property Value", asset.propertyValue || "—"], ["Senior LTV", formatPercent(m.seniorLtv)], ["States", asset.selectedStates.length > 0 ? asset.selectedStates.slice(0, 3).join(", ") + (asset.selectedStates.length > 3 ? `+${asset.selectedStates.length - 3}` : "") : "None"]].map(([label, val]) => (
+                        {[["Loan Amount", asset.loanAmount || "—"], ["Property Value", asset.propertyValue || "—"], ["Senior LTV", formatPercent(m.seniorLtv)]].map(([label, val]) => (
                           <div key={String(label)} className="rounded-lg bg-gray-50 p-2"><div className="text-xs text-gray-400 mb-0.5">{label}</div><div className="text-xs font-bold text-[#0a1f44]">{val}</div></div>
                         ))}
                       </div>
