@@ -3,7 +3,7 @@ import React, { useMemo, useState, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart3, Building2, FileSpreadsheet, FileText, Filter, Gauge, Landmark, Plus, Search, ShieldCheck, Upload, Users, Trash2, ChevronRight, ChevronLeft, CheckCircle, Edit2, Sparkles, Loader2, Lock, LogOut, Settings, Eye, EyeOff, Bell } from "lucide-react";
+import { BarChart3, Building2, FileSpreadsheet, FileText, Filter, Gauge, Landmark, Plus, Search, ShieldCheck, Upload, Users, Trash2, ChevronRight, ChevronLeft, CheckCircle, Edit2, Sparkles, Loader2, Lock, LogOut, Settings, Eye, EyeOff, Bell, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import { DealCard } from "./components/DealCard";
 import { DealMatcherExpedited } from "./components/DealMatcherExpedited";
@@ -4832,7 +4832,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
               {activeTab === "matcher" && (() => {
                 const [matcherLanding, setMatcherLanding] = React.useState<"choose"|"classic"|"plus">("choose");
-                if (matcherLanding === "plus") return <DealMatcherExpedited lenderRecords={lenderRecords} session={session} teamMembers={teamMembers} onSubmitDeal={(deal) => { setSubmittedDeals(p => [deal, ...p]); fetch("/api/data", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"deals",data:[deal]})}); setActiveTab("submitted-deals"); }} onSendToDealMatcher={(data) => { setMatcherLanding("classic"); }} inputClass={inputClass} cardClass={cardClass} />;
+                if (matcherLanding === "plus") return <DealMatcherExpedited lenderRecords={lenderRecords} session={session} teamMembers={teamMembers} onSubmitDeal={(deal: any) => { setSubmittedDeals((p: any[]) [deal, ...p]); fetch("/api/data", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"deals",data:[deal]})}); setActiveTab("submitted-deals"); }} onSendToDealMatcher={(data) => { setMatcherLanding("classic"); }} inputClass={inputClass} cardClass={cardClass} />;
                 if (matcherLanding === "classic") return <DealMatcher lenderRecords={lenderRecords} teamMembers={teamMembers} onSubmitDeal={(assets, capitalType, assetMode, collateralMode) => {
                 const advisors = assignAdvisors(capitalType, teamMembers);
                 const dealId = Date.now();
@@ -4891,7 +4891,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
               })()}
 
               {/* Deal Team Tab */}
-              {activeTab === "deal-matcher-plus" && <DealMatcherExpedited lenderRecords={lenderRecords} session={session} teamMembers={teamMembers} onSubmitDeal={(deal) => { setSubmittedDeals(p => [deal, ...p]); fetch("/api/data", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"deals",data:[deal]})}); setActiveTab("submitted-deals"); }} onSendToDealMatcher={() => setActiveTab("matcher")} inputClass={inputClass} cardClass={cardClass} />}
+              {activeTab === "deal-matcher-plus" && <DealMatcherExpedited lenderRecords={lenderRecords} session={session} teamMembers={teamMembers} onSubmitDeal={(deal: any) => { setSubmittedDeals((p: any[]) [deal, ...p]); fetch("/api/data", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"deals",data:[deal]})}); setActiveTab("submitted-deals"); }} onSendToDealMatcher={() => setActiveTab("matcher")} inputClass={inputClass} cardClass={cardClass} />}
 
               {activeTab === "deal-team" && (
                 <DealTeamTab teamMembers={teamMembers} setTeamMembers={setTeamMembers} currentUserId={session?.user.teamMemberId || -1} isAdmin={isAdmin} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />
