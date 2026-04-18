@@ -1125,7 +1125,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
   metricBoxes.push(["Total Capital", formatCurrencyInput(String(m.totalCap || 0))]);
   const arvVal = parseCurrency(asset.propertyValue);
   const loanVal = parseCurrency(asset.loanAmount) || parseCurrency(asset.seniorLoanAmount);
-  const equityAvailable = arvVal > 0 && loanVal > 0 ? formatCurrency(arvVal - loanVal) : "—";
+  const equityAvailable = arvVal > 0 && loanVal > 0 ? formatCurrencyInput(String(arvVal - loanVal)) : "—";
   metricBoxes.push(["Equity Available", equityAvailable]);
   metricBoxes.push(["Cap Rate", capRate > 0 ? formatPercent(capRate) : "—"]);
   return (
