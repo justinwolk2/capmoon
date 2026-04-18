@@ -4714,67 +4714,6 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
                                     <div className="mt-4 flex gap-2">
                                       <button onClick={() => { setEditingLenderId(item.id); setViewingLenderId(null); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#0a1f44] text-white rounded-lg hover:bg-[#0a1f44]/80"><Edit2 className="h-3 w-3" /> Edit Lender</button>
-                                      <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-[#c9a84c] text-[#c9a84c] rounded-lg hover:bg-[#c9a84c]/10 cursor-pointer">
-                                        <Sparkles className="h-3 w-3" /> AI Tear Sheet
-                                        <input type="file" accept=".pdf,.txt" className="hidden" onChange={async (e) => {
-                                          const file = e.target.files?.[0]; if (!file) return;
-                                          setTearSheetLenderId(item.id); setTearSheetParsing(true); setTearSheetDiff(null); setTearSheetAccepted({});
-                                          setViewingLenderId(null); setEditingLenderId(null);
-                                          try {
-                                            const formData = new FormData(); formData.append("file", file);
-                                            const res = await fetch("/api/parse-lender-pdf", { method: "POST", body: formData });
-                                            const parsed = await res.json();
-                                            if (parsed.error) throw new Error(parsed.error);
-                                            const scalarFields = [
-                                              { key: "lender", label: "Lender Name" },
-                                              { key: "type", label: "Capital Type" },
-                                              { key: "minLoan", label: "Min Loan" },
-                                              { key: "maxLoan", label: "Max Loan" },
-                                              { key: "maxLtv", label: "Max LTV" },
-                                              { key: "minDscr", label: "Min DSCR" },
-                                              { key: "recourse", label: "Recourse" },
-                                              { key: "contactPerson", label: "Contact Person" },
-                                              { key: "email", label: "Email" },
-                                              { key: "phone", label: "Phone" },
-                                              { key: "website", label: "Website" },
-                                              { key: "loanTerms", label: "Loan Terms" },
-                                              { key: "notes", label: "Notes" },
-                                            ];
-                                            const arrayFields = [
-                                              { key: "states", label: "States" },
-                                              { key: "assets", label: "Property Types" },
-                                              { key: "typeOfLoans", label: "Loan Types" },
-                                            ];
-                                            const unchanged: any[] = [], changed: any[] = [], added: any[] = [], missing: any[] = [];
-                                            scalarFields.forEach(({ key, label }) => {
-                                              const cur = (item as any)[key] || "";
-                                              const nw = (parsed as any)[key] || "";
-                                              if (!nw) { if (cur) missing.push({ key, label, value: cur }); return; }
-                                              if (cur === nw) unchanged.push({ key, label, value: cur });
-                                              else if (!cur) added.push({ key, label, newVal: nw });
-                                              else changed.push({ key, label, oldVal: cur, newVal: nw });
-                                            });
-                                            arrayFields.forEach(({ key, label }) => {
-                                              const cur: string[] = (item as any)[key] || [];
-                                              const nw: string[] = (parsed as any)[key] || [];
-                                              if (!nw.length) { if (cur.length) missing.push({ key, label, value: cur.join(", ") }); return; }
-                                              const curStr = [...cur].sort().join(", ");
-                                              const nwStr = [...nw].sort().join(", ");
-                                              if (curStr === nwStr) unchanged.push({ key, label, value: curStr });
-                                              else if (!cur.length) added.push({ key, label, newVal: nwStr });
-                                              else changed.push({ key, label, oldVal: curStr, newVal: nwStr });
-                                            });
-                                            setTearSheetDiff({ unchanged, changed, added, missing });
-                                            const defaults: Record<string, boolean> = {};
-                                            [...changed, ...added].forEach(f => { defaults[f.key] = true; });
-                                            missing.forEach(f => { defaults["keep_" + f.key] = true; });
-                                            setTearSheetAccepted(defaults);
-                                          } catch (err: any) {
-                                            alert("Error parsing tear sheet: " + err.message);
-                                            setTearSheetLenderId(null);
-                                          } finally { setTearSheetParsing(false); }
-                                        }} />
-                                      </label>
                                       <button onClick={() => toggleLenderStatus(item.id)} className="px-3 py-1.5 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50">{item.status === "Inactive" ? "Activate" : "Deactivate"}</button>
                                       <button onClick={() => setViewingLenderId(null)} className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-600">Close ✕</button>
                                     </div>
@@ -4915,13 +4854,63 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                       </div>
                                       <div className="flex gap-2">
                                         {isAdmin ? (
+                                          <><label className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-[#c9a84c] text-[#c9a84c] rounded-xl hover:bg-[#c9a84c]/10 cursor-pointer">
+                                            <Sparkles className="h-4 w-4" /> AI Tear Sheet
+                                            <input type="file" accept=".pdf,.txt" className="hidden" onChange={async (e) => {
+                                              const file = e.target.files?.[0]; if (!file) return;
+                                              setTearSheetLenderId(item.id); setTearSheetParsing(true); setTearSheetDiff(null); setTearSheetAccepted({});
+                                              setEditingLenderId(null);
+                                              try {
+                                                const formData = new FormData(); formData.append("file", file);
+                                                const res = await fetch("/api/parse-lender-pdf", { method: "POST", body: formData });
+                                                const parsed = await res.json();
+                                                if (parsed.error) throw new Error(parsed.error);
+                                                const scalarFields = [
+                                                  { key: "lender", label: "Lender Name" }, { key: "type", label: "Capital Type" },
+                                                  { key: "minLoan", label: "Min Loan" }, { key: "maxLoan", label: "Max Loan" },
+                                                  { key: "maxLtv", label: "Max LTV" }, { key: "minDscr", label: "Min DSCR" },
+                                                  { key: "recourse", label: "Recourse" }, { key: "contactPerson", label: "Contact Person" },
+                                                  { key: "email", label: "Email" }, { key: "phone", label: "Phone" },
+                                                  { key: "website", label: "Website" }, { key: "loanTerms", label: "Loan Terms" },
+                                                  { key: "notes", label: "Notes" },
+                                                ];
+                                                const arrayFields = [
+                                                  { key: "states", label: "States" }, { key: "assets", label: "Property Types" }, { key: "typeOfLoans", label: "Loan Types" },
+                                                ];
+                                                const unchanged: any[] = [], changed: any[] = [], added: any[] = [], missing: any[] = [];
+                                                scalarFields.forEach(({ key, label }) => {
+                                                  const cur = (item as any)[key] || ""; const nw = (parsed as any)[key] || "";
+                                                  if (!nw) { if (cur) missing.push({ key, label, value: cur }); return; }
+                                                  if (cur === nw) unchanged.push({ key, label, value: cur });
+                                                  else if (!cur) added.push({ key, label, newVal: nw });
+                                                  else changed.push({ key, label, oldVal: cur, newVal: nw });
+                                                });
+                                                arrayFields.forEach(({ key, label }) => {
+                                                  const cur: string[] = (item as any)[key] || []; const nw: string[] = (parsed as any)[key] || [];
+                                                  if (!nw.length) { if (cur.length) missing.push({ key, label, value: cur.join(", ") }); return; }
+                                                  const curStr = [...cur].sort().join(", "); const nwStr = [...nw].sort().join(", ");
+                                                  if (curStr === nwStr) unchanged.push({ key, label, value: curStr });
+                                                  else if (!cur.length) added.push({ key, label, newVal: nwStr });
+                                                  else changed.push({ key, label, oldVal: curStr, newVal: nwStr });
+                                                });
+                                                setTearSheetDiff({ unchanged, changed, added, missing });
+                                                const defaults: Record<string, boolean> = {};
+                                                [...changed, ...added].forEach(f => { defaults[f.key] = true; });
+                                                missing.forEach(f => { defaults["keep_" + f.key] = true; });
+                                                setTearSheetAccepted(defaults);
+                                              } catch (err: any) {
+                                                alert("Error parsing tear sheet: " + err.message);
+                                                setTearSheetLenderId(null);
+                                              } finally { setTearSheetParsing(false); }
+                                            }} />
+                                          </label>
                                           <button onClick={() => {
                                             const updated = lenderRecords.map(l => l.id === item.id ? { ...l, source: "Dashboard" } : l);
                                             setLenderRecords(updated);
                                             const toSave = updated.filter(l => l.source === "Dashboard");
                                             if (toSave.length > 0) fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: toSave }) }).catch(console.error);
                                             setEditingLenderId(null);
-                                          }} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Save Changes</button>
+                                          }} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Save Changes</button></>
                                         ) : (
                                           <button onClick={() => submitLenderEditRequest(item)} className="px-4 py-2 text-sm font-semibold bg-[#c9a84c] text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/80">Submit for Approval</button>
                                         )}
