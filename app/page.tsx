@@ -25,7 +25,7 @@ type AssetData = {
   propertyValue: string; purchasePrice: string; currentLoanAmount: string;
   landCost: string; softCosts: string; originationClosingCosts: string;
   hardCosts: string; carryingCosts: string; borrowerEquity: string;
-  ltvMode: string; currentNetIncome: string; manualLtv: string; dscr: string; dy: string; currentRate: string;
+  ltvMode: string; currentNetIncome: string; manualLtv: string; dy: string; currentRate: string;
   purchaseYear?: string; fullyEntitled?: "yes" | "no"; currentPropertyValue?: string; additionalEquity?: string; arvNetIncome?: string; valueAddCurrentNoi?: string;
   selectedStates: string[]; recourseType: string;
   numUnits: string; numBuildings: string; numAcres: string; retailUnits: RetailUnit[];
@@ -115,7 +115,6 @@ type HybridProperty = {
   numAcres: string;
   currentNetIncome: string;
   valueAddCurrentNoi?: string;
-  dscr: string; // reused as cap rate % for acquisitions
   dy?: string;
   arvValue: string; // manually entered or auto-calc'd
   selectedStates: string[];
@@ -894,7 +893,7 @@ function matchLabel(score: number): { label: string; color: string; bg: string; 
 function normalizeRecourse(v: string) { return v === "SELECTIVE" || !v ? "CASE BY CASE" : v; }
 function blankAddress(): AssetAddress { return { street: "", unit: "", city: "", state: "", zip: "" }; }
 function blankAsset(id: number): AssetData {
-  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "Apartments", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dscr: "", dy: "", currentRate: "", purchaseYear: String(new Date().getFullYear()), fullyEntitled: undefined, currentPropertyValue: "", additionalEquity: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
+  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "Apartments", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dy: "", currentRate: "", purchaseYear: String(new Date().getFullYear()), fullyEntitled: undefined, currentPropertyValue: "", additionalEquity: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
 }
 function blankLenderForm(): NewLenderForm {
   return { programName: "", contactPerson: "", email: "", phone: "", website: "", typeOfLenders: [], typeOfLoans: [], programTypes: [], propertyTypes: [], loanTerms: [], notes: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalTypes: [], capitalTypePrograms: [], contacts: [], status: "Active" };
@@ -1124,7 +1123,10 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
   }
   metricBoxes.push([m.isSubCap ? "Subordinated LTV - Last Dollar" : "Subordinated Last $ LTV", m.isSubCap ? formatPercent(m.autoLtv) : "N/A"]);
   metricBoxes.push(["Total Capital", formatCurrencyInput(String(m.totalCap || 0))]);
-  metricBoxes.push(["Equity %", formatPercent(m.equityPct)]);
+  const arvVal = parseCurrency(asset.propertyValue);
+  const loanVal = parseCurrency(asset.loanAmount) || parseCurrency(asset.seniorLoanAmount);
+  const equityAvailable = arvVal > 0 && loanVal > 0 ? formatCurrency(arvVal - loanVal) : "—";
+  metricBoxes.push(["Equity Available", equityAvailable]);
   metricBoxes.push(["Cap Rate", capRate > 0 ? formatPercent(capRate) : "—"]);
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -1554,127 +1556,9 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
         </div>
       )}
       {m.isRefinance ? (
-        <div>
-          <div className="flex items-center gap-1.5 mb-1">
-            <label className="text-xs text-gray-500 font-medium uppercase">DSCR</label>
-            <div className="relative group">
-              <div className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold cursor-help">i</div>
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-[#0a1f44] text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
-                DSCR is calculated based on an interest only payment
-                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a1f44]" />
-              </div>
-            </div>
-          </div>
-          {(() => {
-            const netIncome = parseCurrency(asset.currentNetIncome);
-            const isNewDevRefi = m.isRefinance && asset.dealType === "New Development";
-            const loanAmt = isNewDevRefi
-              ? parseCurrency(asset.currentLoanAmount)
-              : parseCurrency(asset.loanAmount) || parseCurrency(asset.seniorLoanAmount);
-            const rate = parseFloat(asset.currentRate || "0") / 100;
-            const autoDscr = netIncome > 0 && loanAmt > 0 && rate > 0
-              ? (netIncome / (loanAmt * rate)).toFixed(2)
-              : "";
-            return autoDscr ? (
-              <div className="rounded-xl border border-[#0a1f44]/20 bg-[#0a1f44]/5 px-3 py-2">
-                <div className="text-lg font-bold text-[#0a1f44]">{autoDscr}x</div>
-                <div className="text-xs text-gray-500 mt-0.5">Auto-calculated (I/O)</div>
-              </div>
-            ) : (
-              <>
-              <Input
-                value={asset.dscr}
-                onChange={(e) => upd("dscr", e.target.value)}
-                onFocus={() => {
-                  if (!asset.dscr) {
-                    const noi = parseFloat((asset.currentNetIncome || "").replace(/[^0-9.]/g, ""));
-                    const loan = parseFloat((asset.loanAmount || "").replace(/[^0-9.]/g, ""));
-                    if (noi > 0 && loan > 0) upd("dscr", (noi / loan).toFixed(2));
-                  }
-                }}
-                placeholder={(() => {
-                  const noi = parseFloat((asset.currentNetIncome || "").replace(/[^0-9.]/g, ""));
-                  const loan = parseFloat((asset.loanAmount || "").replace(/[^0-9.]/g, ""));
-                  return noi > 0 && loan > 0 ? `Auto: ${(noi / loan).toFixed(2)}` : "e.g. 1.25";
-                })()}
-                className={inputClass}
-              />
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">DY</label>
-                <Input
-                  value={asset.dy}
-                  onChange={(e) => upd("dy", e.target.value)}
-                  onFocus={() => {
-                    if (!asset.dy) {
-                      const noi = parseFloat((asset.currentNetIncome || "").replace(/[^0-9.]/g, ""));
-                      const loan = parseFloat((asset.loanAmount || "").replace(/[^0-9.]/g, ""));
-                      if (noi > 0 && loan > 0) upd("dy", (noi / loan * 100).toFixed(2) + "%");
-                    }
-                  }}
-                  placeholder={(() => {
-                    const noi = parseFloat((asset.currentNetIncome || "").replace(/[^0-9.]/g, ""));
-                    const loan = parseFloat((asset.loanAmount || "").replace(/[^0-9.]/g, ""));
-                    return noi > 0 && loan > 0 ? `Auto: ${(noi / loan * 100).toFixed(2)}%` : "e.g. 8.50%";
-                  })()}
-                  className={inputClass}
-                />
-              </div>
-              </>
-            );
-          })()}
-        </div>
+
       ) : (
-        <div>
-          <div className="flex items-center gap-1.5 mb-1">
-            <label className="text-xs text-gray-500 font-medium uppercase">DSCR</label>
-            <div className="relative group">
-              <div className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold cursor-help">i</div>
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-[#0a1f44] text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
-                DSCR is calculated based on an interest only payment
-                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a1f44]" />
-              </div>
-            </div>
-          </div>
-          <>
-          <Input
-                value={asset.dscr}
-                onChange={(e) => upd("dscr", e.target.value)}
-                onFocus={() => {
-                  if (!asset.dscr) {
-                    const noi = parseFloat((asset.currentNetIncome || "").replace(/[^0-9.]/g, ""));
-                    const loan = parseFloat((asset.loanAmount || "").replace(/[^0-9.]/g, ""));
-                    if (noi > 0 && loan > 0) upd("dscr", (noi / loan).toFixed(2));
-                  }
-                }}
-                placeholder={(() => {
-                  const noi = parseFloat((asset.currentNetIncome || "").replace(/[^0-9.]/g, ""));
-                  const loan = parseFloat((asset.loanAmount || "").replace(/[^0-9.]/g, ""));
-                  return noi > 0 && loan > 0 ? `Auto: ${(noi / loan).toFixed(2)}` : "e.g. 1.25";
-                })()}
-                className={inputClass}
-              />
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">DY</label>
-                <Input
-                  value={asset.dy}
-                  onChange={(e) => upd("dy", e.target.value)}
-                  onFocus={() => {
-                    if (!asset.dy) {
-                      const noi = parseFloat((asset.currentNetIncome || "").replace(/[^0-9.]/g, ""));
-                      const loan = parseFloat((asset.loanAmount || "").replace(/[^0-9.]/g, ""));
-                      if (noi > 0 && loan > 0) upd("dy", (noi / loan * 100).toFixed(2) + "%");
-                    }
-                  }}
-                  placeholder={(() => {
-                    const noi = parseFloat((asset.currentNetIncome || "").replace(/[^0-9.]/g, ""));
-                    const loan = parseFloat((asset.loanAmount || "").replace(/[^0-9.]/g, ""));
-                    return noi > 0 && loan > 0 ? `Auto: ${(noi / loan * 100).toFixed(2)}%` : "e.g. 8.50%";
-                  })()}
-                  className={inputClass}
-                />
-              </div>
-          </>
-        </div>
+
       )}
       {asset.ltvMode === "MANUAL" && <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Manual LTV</label><Input value={asset.manualLtv} onChange={(e) => upd("manualLtv", e.target.value)} className={inputClass} /></div>}
       {asset.ltvMode === "AUTO" && <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Calculated LTV</label><div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold text-[#0a1f44]">{formatPercent(m.autoLtv)}</div></div>}
@@ -2146,7 +2030,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
       borrowerEquity: "", currentLoan: "",
       address: blankAddress(),
       numUnits: "", numBuildings: "", numAcres: "",
-      currentNetIncome: "", valueAddCurrentNoi: "", dscr: "", dy: "", arvValue: "",
+      currentNetIncome: "", valueAddCurrentNoi: "", dy: "", arvValue: "",
       selectedStates: [], recourseType: "CASE BY CASE", notes: "",
     };
   }
@@ -2774,10 +2658,10 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                         })()}
                       </>
                     ) : (
-                      /* Refinance: keep current net income + DSCR */
+                      /* Refinance: keep current net income */
                       <div className="grid gap-3 md:grid-cols-2">
                         <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Net Income (Annual)</label><Input value={prop.currentNetIncome} onChange={(e) => updHybrid("currentNetIncome", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
-                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">DSCR</label><Input value={prop.dscr} onChange={(e) => updHybrid("dscr", e.target.value)} placeholder="e.g. 1.25" className={inputClass} /></div>
+
                       </div>
                     )}
 
@@ -2954,8 +2838,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                 <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Property Value</label>
                   <input value={assets[0]?.propertyValue || ""} onChange={e => setAssets(prev => prev.map((a,i) => i===0 ? {...a, propertyValue: e.target.value} : a))}
                     className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
-                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">DSCR</label>
-                  <input value={assets[0]?.dscr || ""} onChange={e => setAssets(prev => prev.map((a,i) => i===0 ? {...a, dscr: e.target.value} : a))}
+                <div style={{display:'none'}}><input value={""} onChange={e => {}}
                     className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
                 <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Net Income (NOI)</label>
                   <input value={assets[0]?.currentNetIncome || ""} onChange={e => setAssets(prev => prev.map((a,i) => i===0 ? {...a, currentNetIncome: e.target.value} : a))}
@@ -3603,7 +3486,6 @@ function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, in
       propertyValue: asset.propertyValue || "",
       purchasePrice: asset.purchasePrice || "",
       ltv: asset.manualLtv || "",
-      dscr: asset.dscr || "",
       currentNetIncome: asset.currentNetIncome || "",
       numUnits: asset.numUnits || "",
       recourse: asset.recourseType || "",
@@ -3613,9 +3495,9 @@ function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, in
       advisorPhone: advisors.map(a => a.phone).join(", "),
       executiveSummary: `${selectedDeal.seekerName} is seeking ${asset.loanAmount || "TBD"} in ${selectedDeal.capitalType} financing for a ${asset.dealType?.toLowerCase() || ""} ${asset.assetType?.toLowerCase() || ""} located at ${asset.address?.city || ""}, ${asset.address?.state || ""}.`,
       propertyOverview: `The subject property is a ${asset.numUnits ? asset.numUnits + "-unit " : ""}${asset.assetType?.toLowerCase() || ""} located at ${asset.address?.street || ""}, ${asset.address?.city || ""}, ${asset.address?.state || ""}. The deal is structured as a ${asset.dealType?.toLowerCase() || ""} with a ${asset.ownershipStatus?.toLowerCase() || ""}.`,
-      capitalStackSection: `Loan Amount: ${asset.loanAmount || "TBD"}\nProperty Value / ARV: ${asset.propertyValue || "TBD"}\nCapital Type: ${selectedDeal.capitalType}\nLTV: ${asset.manualLtv || "TBD"}\nDSCR: ${asset.dscr || "TBD"}\nRecourse: ${asset.recourseType || "TBD"}`,
+      capitalStackSection: `Loan Amount: ${asset.loanAmount || "TBD"}\nProperty Value / ARV: ${asset.propertyValue || "TBD"}\nCapital Type: ${selectedDeal.capitalType}\nLTV: ${asset.manualLtv || "TBD"}\nRecourse: ${asset.recourseType || "TBD"}`,
       sponsorProfile: `Borrower: ${selectedDeal.seekerName}\nCapital Requested: ${asset.loanAmount || "TBD"}\nProperty Type Experience: ${asset.assetType || "TBD"}`,
-      financialSummary: `Net Operating Income: ${asset.currentNetIncome || "TBD"}\nLoan Amount: ${asset.loanAmount || "TBD"}\nProperty Value: ${asset.propertyValue || "TBD"}\nDSCR: ${asset.dscr || "TBD"}`,
+      financialSummary: `Net Operating Income: ${asset.currentNetIncome || "TBD"}\nLoan Amount: ${asset.loanAmount || "TBD"}\nProperty Value: ${asset.propertyValue || "TBD"}`,
     });
     // Pre-load deal photos if available
     if (selectedDeal.photos && selectedDeal.photos.length > 0) {
@@ -3859,7 +3741,7 @@ function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, in
               <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Loan Amount</label><Input value={memoFields.loanAmount || ""} onChange={e => upd("loanAmount", e.target.value)} className={inputClass} /></div>
               <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Property Value / ARV</label><Input value={memoFields.propertyValue || ""} onChange={e => upd("propertyValue", e.target.value)} className={inputClass} /></div>
               <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">LTV</label><Input value={memoFields.ltv || ""} onChange={e => upd("ltv", e.target.value)} className={inputClass} /></div>
-              <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">DSCR</label><Input value={memoFields.dscr || ""} onChange={e => upd("dscr", e.target.value)} className={inputClass} /></div>
+
               <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Net Operating Income</label><Input value={memoFields.currentNetIncome || ""} onChange={e => upd("currentNetIncome", e.target.value)} className={inputClass} /></div>
               <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Number of Units</label><Input value={memoFields.numUnits || ""} onChange={e => upd("numUnits", e.target.value)} className={inputClass} /></div>
               <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Recourse</label><Input value={memoFields.recourse || ""} onChange={e => upd("recourse", e.target.value)} className={inputClass} /></div>
