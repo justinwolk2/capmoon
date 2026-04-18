@@ -3913,7 +3913,7 @@ function MatcherHub({ session, submittedDeals, setSubmittedDeals, lenderRecords,
     setActiveTab("submitted-deals");
   };
   if (tab === "plus") return <DealMatcherExpedited lenderRecords={lenderRecords} session={session} teamMembers={teamMembers} onSubmitDeal={handlePlusSubmit} onSendToDealMatcher={() => setTab("choose")} inputClass={inputClass} cardClass={cardClass} />;
-  if (tab === "classic") return <DealMatcher lenderRecords={lenderRecords} teamMembers={teamMembers} onSubmitDeal={(assets: any, capitalType: string, assetMode: string, collateralMode: string) => {
+  if (tab === "classic") return (<div><button onClick={() => setTab("choose")} className="flex items-center gap-2 text-sm text-gray-400 hover:text-[#0a1f44] mb-4 transition-colors"><ChevronLeft className="h-4 w-4" /> Back to Deal Finder</button><DealMatcher lenderRecords={lenderRecords} teamMembers={teamMembers} onSubmitDeal={(assets: any, capitalType: string, assetMode: string, collateralMode: string) => {
     const advisors = assignAdvisors(capitalType, teamMembers);
     const dealId = Date.now();
     fetch("/api/deal-number", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ advisorId: session?.user.id }) })
@@ -3926,7 +3926,7 @@ function MatcherHub({ session, submittedDeals, setSubmittedDeals, lenderRecords,
         setSubmittedDeals([deal, ...submittedDeals.filter((d: any) => d.id !== deal.id)] as any);
         fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [deal] }) });
       });
-  }} prefillDeal={prefillDeal} onPrefillConsumed={() => setPrefillDeal(null)} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />;
+  }} prefillDeal={prefillDeal} onPrefillConsumed={() => setPrefillDeal(null)} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} /></div>);
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="text-center pt-4">
