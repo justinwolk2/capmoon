@@ -462,10 +462,12 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
                 <label className={labelClass}>Number of Units *</label>
                 <input value={asset.numUnits} onChange={e => updAsset(idx, "numUnits", e.target.value)} placeholder="e.g. 48" className={inp} />
               </div>
-              <div>
-                <label className={labelClass}>Years Owned</label>
-                <input value={asset.timeOwned} onChange={e => updAsset(idx, "timeOwned", e.target.value)} placeholder="e.g. 3" className={inp} />
-              </div>
+              {(deal.loanPurpose === "refinance" || deal.loanPurpose === "cash-out-refinance") && (
+                <div>
+                  <label className={labelClass}>Years Owned</label>
+                  <input value={asset.timeOwned} onChange={e => updAsset(idx, "timeOwned", e.target.value)} placeholder="e.g. 3" className={inp} />
+                </div>
+              )}
             </div>
 
             {/* Address with Mapbox autocomplete */}
@@ -564,8 +566,8 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
               <input value={deal.loanAmount} onChange={e => updDeal("loanAmount", formatCurrencyInput(e.target.value))} placeholder="$5,000,000" className={inp} />
             </div>
             <div>
-              <label className={labelClass}>Estimated Property Value *</label>
-              <input value={deal.estimatedValue} onChange={e => updDeal("estimatedValue", formatCurrencyInput(e.target.value))} placeholder="$7,500,000" className={inp} />
+              <label className={labelClass}>{deal.loanPurpose === "acquisition" ? "Purchase Price *" : "Estimated Property Value *"}</label>
+              <input value={deal.estimatedValue} onChange={e => updDeal("estimatedValue", formatCurrencyInput(e.target.value))} placeholder={deal.loanPurpose === "acquisition" ? "$7,500,000" : "$7,500,000"} className={inp} />
             </div>
           </div>
           <div>
