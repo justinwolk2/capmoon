@@ -4087,6 +4087,10 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const [filterLenderTypes, setFilterLenderTypes] = useState<string[]>([]);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [editingLenderId, setEditingLenderId] = useState<number | null>(null);
+  const [tearSheetLenderId, setTearSheetLenderId] = useState<number | null>(null);
+  const [tearSheetParsing, setTearSheetParsing] = useState(false);
+  const [tearSheetDiff, setTearSheetDiff] = useState<{unchanged: any[], changed: any[], added: any[], missing: any[]} | null>(null);
+  const [tearSheetAccepted, setTearSheetAccepted] = useState<Record<string, boolean>>({});
   const [viewingLenderId, setViewingLenderId] = useState<number | null>(null);
   const [newUserForm, setNewUserForm] = useState({ name: "", username: "", password: "", role: "capital-seeker" as AppUser["role"],
     emailPrefs: { dealSubmitted: true, lenderResponded: true, documentRequested: true, statusChanged: true, dealAssigned: true } });
@@ -4710,6 +4714,67 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
                                     <div className="mt-4 flex gap-2">
                                       <button onClick={() => { setEditingLenderId(item.id); setViewingLenderId(null); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#0a1f44] text-white rounded-lg hover:bg-[#0a1f44]/80"><Edit2 className="h-3 w-3" /> Edit Lender</button>
+                                      <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-[#c9a84c] text-[#c9a84c] rounded-lg hover:bg-[#c9a84c]/10 cursor-pointer">
+                                        <Sparkles className="h-3 w-3" /> AI Tear Sheet
+                                        <input type="file" accept=".pdf,.txt" className="hidden" onChange={async (e) => {
+                                          const file = e.target.files?.[0]; if (!file) return;
+                                          setTearSheetLenderId(item.id); setTearSheetParsing(true); setTearSheetDiff(null); setTearSheetAccepted({});
+                                          setViewingLenderId(null); setEditingLenderId(null);
+                                          try {
+                                            const formData = new FormData(); formData.append("file", file);
+                                            const res = await fetch("/api/parse-lender-pdf", { method: "POST", body: formData });
+                                            const parsed = await res.json();
+                                            if (parsed.error) throw new Error(parsed.error);
+                                            const scalarFields = [
+                                              { key: "lender", label: "Lender Name" },
+                                              { key: "type", label: "Capital Type" },
+                                              { key: "minLoan", label: "Min Loan" },
+                                              { key: "maxLoan", label: "Max Loan" },
+                                              { key: "maxLtv", label: "Max LTV" },
+                                              { key: "minDscr", label: "Min DSCR" },
+                                              { key: "recourse", label: "Recourse" },
+                                              { key: "contactPerson", label: "Contact Person" },
+                                              { key: "email", label: "Email" },
+                                              { key: "phone", label: "Phone" },
+                                              { key: "website", label: "Website" },
+                                              { key: "loanTerms", label: "Loan Terms" },
+                                              { key: "notes", label: "Notes" },
+                                            ];
+                                            const arrayFields = [
+                                              { key: "states", label: "States" },
+                                              { key: "assets", label: "Property Types" },
+                                              { key: "typeOfLoans", label: "Loan Types" },
+                                            ];
+                                            const unchanged: any[] = [], changed: any[] = [], added: any[] = [], missing: any[] = [];
+                                            scalarFields.forEach(({ key, label }) => {
+                                              const cur = (item as any)[key] || "";
+                                              const nw = (parsed as any)[key] || "";
+                                              if (!nw) { if (cur) missing.push({ key, label, value: cur }); return; }
+                                              if (cur === nw) unchanged.push({ key, label, value: cur });
+                                              else if (!cur) added.push({ key, label, newVal: nw });
+                                              else changed.push({ key, label, oldVal: cur, newVal: nw });
+                                            });
+                                            arrayFields.forEach(({ key, label }) => {
+                                              const cur: string[] = (item as any)[key] || [];
+                                              const nw: string[] = (parsed as any)[key] || [];
+                                              if (!nw.length) { if (cur.length) missing.push({ key, label, value: cur.join(", ") }); return; }
+                                              const curStr = [...cur].sort().join(", ");
+                                              const nwStr = [...nw].sort().join(", ");
+                                              if (curStr === nwStr) unchanged.push({ key, label, value: curStr });
+                                              else if (!cur.length) added.push({ key, label, newVal: nwStr });
+                                              else changed.push({ key, label, oldVal: curStr, newVal: nwStr });
+                                            });
+                                            setTearSheetDiff({ unchanged, changed, added, missing });
+                                            const defaults: Record<string, boolean> = {};
+                                            [...changed, ...added].forEach(f => { defaults[f.key] = true; });
+                                            missing.forEach(f => { defaults["keep_" + f.key] = true; });
+                                            setTearSheetAccepted(defaults);
+                                          } catch (err: any) {
+                                            alert("Error parsing tear sheet: " + err.message);
+                                            setTearSheetLenderId(null);
+                                          } finally { setTearSheetParsing(false); }
+                                        }} />
+                                      </label>
                                       <button onClick={() => toggleLenderStatus(item.id)} className="px-3 py-1.5 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50">{item.status === "Inactive" ? "Activate" : "Deactivate"}</button>
                                       <button onClick={() => setViewingLenderId(null)} className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-600">Close ✕</button>
                                     </div>
@@ -4718,7 +4783,126 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                               </TableRow>
                             )}
 
-                            {/* Inline edit form */}
+                            {/* AI Tear Sheet Diff Review */}
+                            {tearSheetLenderId === item.id && (
+                              <TableRow className="border-0">
+                                <TableCell colSpan={4} className="p-0">
+                                  <div className="border-t-2 border-[#c9a84c]/40 bg-[#c9a84c]/5 p-6">
+                                    {tearSheetParsing && (
+                                      <div className="flex items-center gap-3 py-8 justify-center">
+                                        <Loader2 className="h-5 w-5 animate-spin text-[#c9a84c]" />
+                                        <div className="text-sm text-gray-500">Claude is analyzing the tear sheet...</div>
+                                      </div>
+                                    )}
+                                    {!tearSheetParsing && tearSheetDiff && (
+                                      <div>
+                                        <div className="flex items-center justify-between mb-5">
+                                          <div>
+                                            <div className="text-xs uppercase tracking-[0.2em] text-[#c9a84c] font-bold mb-1">AI Tear Sheet Analysis</div>
+                                            <div className="text-lg font-bold text-[#0a1f44]">{item.lender}</div>
+                                            <div className="text-xs text-gray-400 mt-0.5">Review each change — accept or skip before saving</div>
+                                          </div>
+                                          <button onClick={() => { setTearSheetLenderId(null); setTearSheetDiff(null); }} className="text-xs text-gray-400 hover:text-gray-600">✕ Cancel</button>
+                                        </div>
+                                        {tearSheetDiff.changed.length > 0 && (
+                                          <div className="mb-5">
+                                            <div className="text-xs font-bold uppercase tracking-wide text-amber-600 mb-2">⚠️ Changed ({tearSheetDiff.changed.length})</div>
+                                            <div className="space-y-2">
+                                              {tearSheetDiff.changed.map((f: any) => (
+                                                <div key={f.key} className="flex items-start gap-3 bg-white rounded-xl border border-amber-100 px-4 py-3">
+                                                  <input type="checkbox" checked={!!tearSheetAccepted[f.key]} onChange={e => setTearSheetAccepted(p => ({ ...p, [f.key]: e.target.checked }))} className="mt-0.5 accent-[#c9a84c]" />
+                                                  <div className="flex-1 min-w-0">
+                                                    <div className="text-xs font-bold text-gray-500 uppercase mb-1">{f.label}</div>
+                                                    <div className="flex items-start gap-2 flex-wrap">
+                                                      <span className="text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded line-through">{f.oldVal}</span>
+                                                      <span className="text-xs text-gray-400">→</span>
+                                                      <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded font-semibold">{f.newVal}</span>
+                                                    </div>
+                                                  </div>
+                                                  <div className="text-xs text-gray-400">{tearSheetAccepted[f.key] ? "✓ Accept" : "Skip"}</div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                        {tearSheetDiff.added.length > 0 && (
+                                          <div className="mb-5">
+                                            <div className="text-xs font-bold uppercase tracking-wide text-green-600 mb-2">✨ New ({tearSheetDiff.added.length})</div>
+                                            <div className="space-y-2">
+                                              {tearSheetDiff.added.map((f: any) => (
+                                                <div key={f.key} className="flex items-start gap-3 bg-white rounded-xl border border-green-100 px-4 py-3">
+                                                  <input type="checkbox" checked={!!tearSheetAccepted[f.key]} onChange={e => setTearSheetAccepted(p => ({ ...p, [f.key]: e.target.checked }))} className="mt-0.5 accent-[#c9a84c]" />
+                                                  <div className="flex-1 min-w-0">
+                                                    <div className="text-xs font-bold text-gray-500 uppercase mb-1">{f.label}</div>
+                                                    <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded font-semibold">{f.newVal}</span>
+                                                  </div>
+                                                  <div className="text-xs text-gray-400">{tearSheetAccepted[f.key] ? "✓ Accept" : "Skip"}</div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                        {tearSheetDiff.missing.length > 0 && (
+                                          <div className="mb-5">
+                                            <div className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">❓ Not on tear sheet — keep anyway? ({tearSheetDiff.missing.length})</div>
+                                            <div className="space-y-2">
+                                              {tearSheetDiff.missing.map((f: any) => (
+                                                <div key={f.key} className="flex items-start gap-3 bg-white rounded-xl border border-gray-100 px-4 py-3">
+                                                  <input type="checkbox" checked={!!tearSheetAccepted["keep_" + f.key]} onChange={e => setTearSheetAccepted(p => ({ ...p, ["keep_" + f.key]: e.target.checked }))} className="mt-0.5 accent-[#0a1f44]" />
+                                                  <div className="flex-1 min-w-0">
+                                                    <div className="text-xs font-bold text-gray-500 uppercase mb-1">{f.label}</div>
+                                                    <span className="text-xs text-gray-500 px-2 py-0.5 bg-gray-50 rounded">{f.value}</span>
+                                                  </div>
+                                                  <div className="text-xs text-gray-400">{tearSheetAccepted["keep_" + f.key] ? "Keep" : "Remove"}</div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                        {tearSheetDiff.unchanged.length > 0 && (
+                                          <div className="mb-5">
+                                            <div className="text-xs font-bold uppercase tracking-wide text-gray-300 mb-2">✓ Unchanged ({tearSheetDiff.unchanged.length})</div>
+                                            <div className="flex flex-wrap gap-2">
+                                              {tearSheetDiff.unchanged.map((f: any) => (
+                                                <span key={f.key} className="text-xs text-gray-400 bg-gray-50 border border-gray-100 px-2 py-1 rounded-lg">{f.label}</span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                        <div className="flex gap-3 pt-4 border-t border-gray-200">
+                                          <button onClick={() => {
+                                            const updated: any = { ...item };
+                                            tearSheetDiff.changed.forEach((f: any) => {
+                                              if (tearSheetAccepted[f.key]) {
+                                                updated[f.key] = ["states","assets","typeOfLoans"].includes(f.key) ? f.newVal.split(", ").filter(Boolean) : f.newVal;
+                                              }
+                                            });
+                                            tearSheetDiff.added.forEach((f: any) => {
+                                              if (tearSheetAccepted[f.key]) {
+                                                updated[f.key] = ["states","assets","typeOfLoans"].includes(f.key) ? f.newVal.split(", ").filter(Boolean) : f.newVal;
+                                              }
+                                            });
+                                            tearSheetDiff.missing.forEach((f: any) => {
+                                              if (!tearSheetAccepted["keep_" + f.key]) updated[f.key] = "";
+                                            });
+                                            updated.source = "Dashboard";
+                                            const newRecords = lenderRecords.map((l: any) => l.id === item.id ? updated : l);
+                                            setLenderRecords(newRecords);
+                                            const toSave = newRecords.filter((l: any) => l.source === "Dashboard");
+                                            fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: toSave }) }).catch(console.error);
+                                            setTearSheetLenderId(null); setTearSheetDiff(null);
+                                          }} className="flex items-center gap-2 px-5 py-2 text-sm font-bold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">
+                                            <CheckCircle className="h-4 w-4" /> Confirm Selected Changes
+                                          </button>
+                                          <button onClick={() => { setTearSheetLenderId(null); setTearSheetDiff(null); }} className="px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">Cancel</button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                                                        {/* Inline edit form */}
                             {editingLenderId === item.id && (
                               <TableRow className="border-0">
                                 <TableCell colSpan={4} className="p-0">
