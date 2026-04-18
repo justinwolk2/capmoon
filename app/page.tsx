@@ -3912,7 +3912,7 @@ function MatcherHub({ session, submittedDeals, setSubmittedDeals, lenderRecords,
     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [deal] }) });
     setActiveTab("submitted-deals");
   };
-  if (tab === "plus") return <DealMatcherExpedited lenderRecords={lenderRecords} session={session} teamMembers={teamMembers} onSubmitDeal={handlePlusSubmit} onSendToDealMatcher={() => setTab("classic")} inputClass={inputClass} cardClass={cardClass} />;
+  if (tab === "plus") return <DealMatcherExpedited lenderRecords={lenderRecords} session={session} teamMembers={teamMembers} onSubmitDeal={handlePlusSubmit} onSendToDealMatcher={() => setTab("choose")} inputClass={inputClass} cardClass={cardClass} />;
   if (tab === "classic") return <DealMatcher lenderRecords={lenderRecords} teamMembers={teamMembers} onSubmitDeal={(assets: any, capitalType: string, assetMode: string, collateralMode: string) => {
     const advisors = assignAdvisors(capitalType, teamMembers);
     const dealId = Date.now();
