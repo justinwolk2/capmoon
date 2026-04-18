@@ -3905,6 +3905,57 @@ function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, in
   );
 }
 
+function MatcherHub({ session, submittedDeals, setSubmittedDeals, lenderRecords, teamMembers, prefillDeal, setPrefillDeal, setActiveTab, inputClass, selectTriggerClass, cardClass }: { session: any; submittedDeals: any[]; setSubmittedDeals: (d: any) => void; lenderRecords: any[]; teamMembers: any[]; prefillDeal: any; setPrefillDeal: (d: any) => void; setActiveTab: (t: string) => void; inputClass: string; selectTriggerClass: string; cardClass: string; }) {
+  const [tab, setTab] = React.useState<"choose"|"classic"|"plus">("choose");
+  const handlePlusSubmit = (deal: any) => {
+    setSubmittedDeals([deal, ...submittedDeals] as any);
+    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [deal] }) });
+    setActiveTab("submitted-deals");
+  };
+  if (tab === "plus") return <DealMatcherExpedited lenderRecords={lenderRecords} session={session} teamMembers={teamMembers} onSubmitDeal={handlePlusSubmit} onSendToDealMatcher={() => setTab("classic")} inputClass={inputClass} cardClass={cardClass} />;
+  if (tab === "classic") return <DealMatcher lenderRecords={lenderRecords} teamMembers={teamMembers} onSubmitDeal={(assets: any, capitalType: string, assetMode: string, collateralMode: string) => {
+    const advisors = assignAdvisors(capitalType, teamMembers);
+    const dealId = Date.now();
+    fetch("/api/deal-number", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ advisorId: session?.user.id }) })
+      .then(r => r.json()).then(dn => {
+        const deal: any = { id: dealId, submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Admin", seekerEmail: session?.user.username || "", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a: any) => a.id), dealNumber: dn.dealNumber || "" };
+        setSubmittedDeals([deal, ...submittedDeals.filter((d: any) => d.id !== deal.id)] as any);
+        fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [deal] }) });
+      }).catch(() => {
+        const deal: any = { id: dealId, submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Admin", seekerEmail: session?.user.username || "", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a: any) => a.id), dealNumber: "" };
+        setSubmittedDeals([deal, ...submittedDeals.filter((d: any) => d.id !== deal.id)] as any);
+        fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [deal] }) });
+      });
+  }} prefillDeal={prefillDeal} onPrefillConsumed={() => setPrefillDeal(null)} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />;
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="text-center pt-4">
+        <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">CapMoon</div>
+        <h2 className="font-display text-3xl font-bold text-[#0a1f44] mb-2">Find Your Lender</h2>
+        <p className="text-sm text-gray-500">Choose your path based on the complexity of your deal</p>
+      </div>
+      <div className="grid md:grid-cols-2 gap-5">
+        <button onClick={() => setTab("classic")} className="text-left rounded-2xl border-2 border-gray-200 bg-white p-6 hover:border-[#0a1f44] hover:shadow-md transition-all group">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-xl bg-[#0a1f44] flex items-center justify-center"><Filter className="h-5 w-5 text-white" /></div>
+            <div><div className="font-display text-xl font-bold text-[#0a1f44]">Deal Matcher</div><div className="text-xs text-gray-400">Full Platform</div></div>
+          </div>
+          <p className="text-sm text-gray-500 mb-4">The widest range of options. Any deal, any asset class, any capital type. Best for complex deals that need deep analysis.</p>
+          <div className="flex flex-wrap gap-1.5">{["Bridge","CMBS","Mezz","JV Equity","Construction","Perm","Any Asset"].map(t => <span key={t} className="px-2 py-1 text-xs bg-gray-100 text-gray-500 rounded-full">{t}</span>)}</div>
+        </button>
+        <button onClick={() => setTab("plus")} className="text-left rounded-2xl border-2 border-[#c9a84c]/30 bg-gradient-to-br from-[#0a1f44] to-[#1a3a6e] p-6 hover:border-[#c9a84c] hover:shadow-md transition-all">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-xl bg-[#c9a84c] flex items-center justify-center"><Zap className="h-5 w-5 text-[#0a1f44]" /></div>
+            <div><div className="flex items-center gap-1"><span className="font-display text-xl font-bold text-white">Deal Matcher</span><span className="font-display text-xl font-black text-[#c9a84c]">+</span></div><div className="text-xs text-white/40">Expedited Agency</div></div>
+          </div>
+          <p className="text-sm text-white/60 mb-4">Fast-track Fannie Mae and Freddie Mac pre-qualification. Live rates, instant underwriting, matched lenders in minutes.</p>
+          <div className="flex flex-wrap gap-1.5">{["Fannie Mae","Freddie Mac","Live Rates","Instant DSCR","Auto-Match"].map(t => <span key={t} className="px-2 py-1 text-xs bg-white/10 text-[#c9a84c] rounded-full">{t}</span>)}</div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, users, setUsers, teamMembers, setTeamMembers, deleteRequests, setDeleteRequests, lenderChangeRequests, setLenderChangeRequests }: {
   session: AuthSession; onLogout: () => void;
   submittedDeals: SubmittedDeal[]; setSubmittedDeals: (d: SubmittedDeal[]) => void;
@@ -4830,68 +4881,10 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
               {activeTab === "add-lender" && <AddLenderPage onSave={handleSaveLender} onCancel={() => setActiveTab("lenders")} existingLenders={lenderRecords} inputClass={inputClass} selectTriggerClass={selectTriggerClass} />}
 
-              {activeTab === "matcher" && (() => {
-                const [matcherLanding, setMatcherLanding] = React.useState<"choose"|"classic"|"plus">("choose");
-                if (matcherLanding === "plus") return <DealMatcherExpedited lenderRecords={lenderRecords} session={session} teamMembers={teamMembers} onSubmitDeal={(deal: any) => { setSubmittedDeals([deal, ...submittedDeals] as any); fetch("/api/data", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"deals",data:[deal]})}); setActiveTab("submitted-deals"); }} onSendToDealMatcher={(data) => { setMatcherLanding("classic"); }} inputClass={inputClass} cardClass={cardClass} />;
-                if (matcherLanding === "classic") return <DealMatcher lenderRecords={lenderRecords} teamMembers={teamMembers} onSubmitDeal={(assets, capitalType, assetMode, collateralMode) => {
-                const advisors = assignAdvisors(capitalType, teamMembers);
-                const dealId = Date.now();
-                fetch("/api/deal-number", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ advisorId: session?.user.id }) })
-                  .then(r => r.json()).then(dn => {
-                    const deal: SubmittedDeal = { id: dealId, submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Admin", seekerEmail: session?.user.username || "", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a: any) => a.id), dealNumber: dn.dealNumber || "" };
-                    setSubmittedDeals([deal, ...submittedDeals.filter(d => d.id !== deal.id)]);
-                    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [deal] }) });
-                  }).catch(() => {
-                    const deal: SubmittedDeal = { id: dealId, submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Admin", seekerEmail: session?.user.username || "", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a: any) => a.id), dealNumber: "" };
-                    setSubmittedDeals([deal, ...submittedDeals.filter(d => d.id !== deal.id)]);
-                    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [deal] }) });
-                  });
-              }} prefillDeal={prefillDeal} onPrefillConsumed={() => setPrefillDeal(null)} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />;
-                // Choose screen
-                return (
-                  <div className="max-w-3xl mx-auto space-y-6">
-                    <div className="text-center pt-4">
-                      <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">CapMoon</div>
-                      <h2 className="font-display text-3xl font-bold text-[#0a1f44] mb-2">Find Your Lender</h2>
-                      <p className="text-sm text-gray-500">Choose your path based on the complexity of your deal</p>
-                    </div>
-                    <div className="grid md:grid-cols-2 gap-5">
-                      <button onClick={() => setMatcherLanding("classic")} className="text-left rounded-2xl border-2 border-gray-200 bg-white p-6 hover:border-[#0a1f44] hover:shadow-md transition-all group">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="w-12 h-12 rounded-xl bg-[#0a1f44] flex items-center justify-center"><Filter className="h-5 w-5 text-white" /></div>
-                          <div>
-                            <div className="font-display text-xl font-bold text-[#0a1f44] group-hover:text-[#0a1f44]">Deal Matcher</div>
-                            <div className="text-xs text-gray-400">Full Platform</div>
-                          </div>
-                        </div>
-                        <p className="text-sm text-gray-500 mb-4">The widest range of options. Any deal, any asset class, any capital type. Best for complex deals that need deep analysis and custom matching.</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {["Bridge","CMBS","Mezz","JV Equity","Construction","Perm","Any Asset"].map(t => <span key={t} className="px-2 py-1 text-xs bg-gray-100 text-gray-500 rounded-full">{t}</span>)}
-                        </div>
-                      </button>
-                      <button onClick={() => setMatcherLanding("plus")} className="text-left rounded-2xl border-2 border-[#c9a84c]/30 bg-gradient-to-br from-[#0a1f44] to-[#1a3a6e] p-6 hover:border-[#c9a84c] hover:shadow-md transition-all group">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="w-12 h-12 rounded-xl bg-[#c9a84c] flex items-center justify-center"><Zap className="h-5 w-5 text-[#0a1f44]" /></div>
-                          <div>
-                            <div className="flex items-center gap-1">
-                              <span className="font-display text-xl font-bold text-white">Deal Matcher</span>
-                              <span className="font-display text-xl font-black text-[#c9a84c]">+</span>
-                            </div>
-                            <div className="text-xs text-white/40">Expedited Agency</div>
-                          </div>
-                        </div>
-                        <p className="text-sm text-white/60 mb-4">Fast-track pre-qualification for Fannie Mae and Freddie Mac conventional deals. Live rates, instant underwriting, matched lenders in minutes.</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {["Fannie Mae","Freddie Mac","Live Rates","Instant DSCR","Auto-Match"].map(t => <span key={t} className="px-2 py-1 text-xs bg-white/10 text-[#c9a84c] rounded-full">{t}</span>)}
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()}
+              {activeTab === "matcher" && <MatcherHub session={session} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals} lenderRecords={lenderRecords} teamMembers={teamMembers} prefillDeal={prefillDeal} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />}
 
               {/* Deal Team Tab */}
-              {activeTab === "deal-matcher-plus" && <DealMatcherExpedited lenderRecords={lenderRecords} session={session} teamMembers={teamMembers} onSubmitDeal={(deal: any) => { setSubmittedDeals([deal, ...submittedDeals] as any); fetch("/api/data", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"deals",data:[deal]})}); setActiveTab("submitted-deals"); }} onSendToDealMatcher={() => setActiveTab("matcher")} inputClass={inputClass} cardClass={cardClass} />}
+              {activeTab === "deal-matcher-plus" && <MatcherHub session={session} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals} lenderRecords={lenderRecords} teamMembers={teamMembers} prefillDeal={prefillDeal} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />}
 
               {activeTab === "deal-team" && (
                 <DealTeamTab teamMembers={teamMembers} setTeamMembers={setTeamMembers} currentUserId={session?.user.teamMemberId || -1} isAdmin={isAdmin} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />
