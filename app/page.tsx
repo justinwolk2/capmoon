@@ -116,6 +116,7 @@ type HybridProperty = {
   currentNetIncome: string;
   valueAddCurrentNoi?: string;
   dy?: string;
+  capRate?: string;
   arvValue: string; // manually entered or auto-calc'd
   selectedStates: string[];
   recourseType: string;
@@ -2026,7 +2027,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
       borrowerEquity: "", currentLoan: "",
       address: blankAddress(),
       numUnits: "", numBuildings: "", numAcres: "",
-      currentNetIncome: "", valueAddCurrentNoi: "", dy: "", arvValue: "",
+      currentNetIncome: "", valueAddCurrentNoi: "", dy: "", capRate: "", arvValue: "",
       selectedStates: [], recourseType: "CASE BY CASE", notes: "",
     };
   }
@@ -2605,12 +2606,12 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                         <div className="grid gap-3 md:grid-cols-2">
                           <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current NOI (In-Place)</label><Input value={prop.valueAddCurrentNoi || ""} onChange={(e) => updHybrid("valueAddCurrentNoi", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
                           <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">ARV Net Income (Estimated)</label><Input value={prop.currentNetIncome} onChange={(e) => { const v = formatCurrencyInput(e.target.value); updHybrid("currentNetIncome", v); }} placeholder="$0" className={inputClass} /></div>
-                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Cap Rate % (Estimated)</label><Input value={prop.dscr} onChange={(e) => updHybrid("dscr", e.target.value)} placeholder="e.g. 5.5" className={inputClass} /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Cap Rate % (Estimated)</label><Input value={prop.capRate || ""} onChange={(e) => updHybrid("capRate", e.target.value)} placeholder="e.g. 5.5" className={inputClass} /></div>
                         </div>
                         {/* ARV Value — auto-calc or manual */}
                         {(() => {
                           const arvNetIncome = parseCurrency(prop.currentNetIncome);
-                          const capRate = parseFloat(prop.dscr || "0") / 100;
+                          const capRate = parseFloat(prop.capRate || "0") / 100;
                           const autoArv = arvNetIncome > 0 && capRate > 0 ? arvNetIncome / capRate : 0;
                           const displayArv = parseCurrency(prop.arvValue || "") || autoArv;
                           return (
@@ -2630,7 +2631,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                         {/* Total ARV LTV metric boxes */}
                         {(() => {
                           const arvNetIncome = parseCurrency(prop.currentNetIncome);
-                          const capRate = parseFloat(prop.dscr || "0") / 100;
+                          const capRate = parseFloat(prop.capRate || "0") / 100;
                           const autoArv = arvNetIncome > 0 && capRate > 0 ? arvNetIncome / capRate : 0;
                           const arvVal = parseCurrency(prop.arvValue || "") || autoArv;
                           const totalDebtNow = (isProjectDeal ? totalProjectCost : parseCurrency(prop.seniorLoan)) + subLayers.reduce((s, l) => s + parseCurrency(l.amount), 0);
