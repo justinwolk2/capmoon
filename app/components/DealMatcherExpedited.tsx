@@ -286,7 +286,7 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
         {/* Hero */}
         <div className="rounded-2xl bg-[#0a1f44] p-8 mb-6 text-center">
           <div className="flex items-center justify-center gap-2 mb-3">
-            <span className="font-display text-xl font-bold text-[#0a1f44]">Deal Matcher <span className="text-[#c9a84c]">PLUS+</span></span>
+            <span className="font-display text-xl font-bold text-white">Deal Matcher <span className="text-[#c9a84c]">PLUS+</span></span>
           </div>
           <p className="text-sm text-white/60 max-w-lg mx-auto">Fast-track agency pre-qualification with live rates. For Fannie Mae and Freddie Mac conventional deals — get estimated rates, underwriting metrics, and matched lenders in minutes.</p>
         </div>
@@ -802,7 +802,7 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
           </button>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-display text-xl font-bold text-[#0a1f44]">Deal Matcher <span className="text-[#c9a84c]">PLUS+</span></span>
+              <span className="font-display text-xl font-bold text-white">Deal Matcher <span className="text-[#c9a84c]">PLUS+</span></span>
               <span className="text-sm text-gray-400 ml-2">Results</span>
             </div>
             <div className="text-xs text-gray-400">{programLabel} · {deal.desiredTerm}</div>
