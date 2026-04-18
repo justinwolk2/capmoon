@@ -114,7 +114,9 @@ type HybridProperty = {
   numBuildings: string;
   numAcres: string;
   currentNetIncome: string;
+  valueAddCurrentNoi?: string;
   dscr: string; // reused as cap rate % for acquisitions
+  dy?: string;
   arvValue: string; // manually entered or auto-calc'd
   selectedStates: string[];
   recourseType: string;
@@ -2144,7 +2146,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
       borrowerEquity: "", currentLoan: "",
       address: blankAddress(),
       numUnits: "", numBuildings: "", numAcres: "",
-      currentNetIncome: "", dscr: "", arvValue: "",
+      currentNetIncome: "", valueAddCurrentNoi: "", dscr: "", dy: "", arvValue: "",
       selectedStates: [], recourseType: "CASE BY CASE", notes: "",
     };
   }
