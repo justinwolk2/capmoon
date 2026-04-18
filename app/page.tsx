@@ -3,7 +3,7 @@ import React, { useMemo, useState, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart3, Building2, FileSpreadsheet, FileText, Filter, Gauge, Landmark, Plus, Search, ShieldCheck, Upload, Users, Trash2, ChevronRight, ChevronLeft, CheckCircle, Edit2, Sparkles, Loader2, Lock, LogOut, Settings, Eye, EyeOff, Bell, Zap } from "lucide-react";
+import { BarChart3, Building2, FileSpreadsheet, FileText, Filter, Gauge, Landmark, Plus, Search, ShieldCheck, Upload, Users, Trash2, ChevronRight, ChevronLeft, CheckCircle, Edit2, Sparkles, Loader2, Lock, LogOut, Settings, Eye, EyeOff, Bell, Zap, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { DealCard } from "./components/DealCard";
 import { DealMatcherExpedited } from "./components/DealMatcherExpedited";
@@ -2209,7 +2209,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
       {matcherStep === "start" && (
         <div className="max-w-2xl">
           <div className={cardClass + " p-8"}>
-            <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Deal Matcher</div>
+            <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Deal Matcher <span className="text-[#c9a84c]">Premier</span></div>
             <h2 className="font-display text-3xl font-bold text-[#0a1f44] mb-2">Let's get started</h2>
             <div className="grid gap-5 md:grid-cols-2 mb-8">
               <div><label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Market</label><Select value={marketScope} onValueChange={setMarketScope}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{marketOptions.map((i) => <SelectItem key={i} value={i}>{i === "US" ? "US" : "International"}</SelectItem>)}</SelectContent></Select></div>
@@ -3359,8 +3359,8 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
               <div className="text-xs uppercase tracking-[0.35em] text-[#c9a84c] font-bold mt-3">Find Capital</div>
             </div>
             <nav className="space-y-1 p-4 flex-1">
-              {([["matcher", "Deal Matcher", Filter],
-    ["deal-matcher-plus", "Deal Matcher+", Zap, "sub"], ["my-deals", "My Deals", FileSpreadsheet], ["uploads", "Upload Center", Upload]] as [string, string, any][]).map(([key, label, Icon]) => (
+              {([["matcher", "Deal Matcher Premier", Filter],
+    ["deal-matcher-plus", "Deal Matcher PLUS+", Zap, "sub"], ["my-deals", "My Deals", FileSpreadsheet], ["uploads", "Upload Center", Upload]] as [string, string, any][]).map(([key, label, Icon]) => (
                 <button key={key} onClick={() => setActiveTab(key)} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-all ${activeTab === key ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/30" : "text-gray-300 hover:bg-white/5 hover:text-white border border-transparent"}`}>
                   <Icon className="h-4 w-4" /><span className="text-sm font-medium">{label}</span>
                   {activeTab === key && <div className="ml-auto w-1 h-4 bg-[#c9a84c] rounded-full" />}
@@ -3938,7 +3938,7 @@ function MatcherHub({ session, submittedDeals, setSubmittedDeals, lenderRecords,
         <button onClick={() => setTab("classic")} className="text-left rounded-2xl border-2 border-gray-200 bg-white p-6 hover:border-[#0a1f44] hover:shadow-md transition-all group">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-xl bg-[#0a1f44] flex items-center justify-center"><Filter className="h-5 w-5 text-white" /></div>
-            <div><div className="font-display text-xl font-bold text-[#0a1f44]">Deal Matcher</div><div className="text-xs text-gray-400">Full Platform</div></div>
+            <div><div className="font-display text-xl font-bold text-[#0a1f44]">Deal Matcher <span className="text-[#c9a84c]">Premier</span></div><div className="text-xs text-gray-400">Full Platform</div></div>
           </div>
           <p className="text-sm text-gray-500 mb-4">The widest range of options. Any deal, any asset class, any capital type. Best for complex deals that need deep analysis.</p>
           <div className="flex flex-wrap gap-1.5">{["Bridge","CMBS","Mezz","JV Equity","Construction","Perm","Any Asset"].map(t => <span key={t} className="px-2 py-1 text-xs bg-gray-100 text-gray-500 rounded-full">{t}</span>)}</div>

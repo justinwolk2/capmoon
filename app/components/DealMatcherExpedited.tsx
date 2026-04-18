@@ -40,6 +40,7 @@ interface AssetInput {
   mixedUseCommercialPct: string;
   mixedUseIncomePct: string;
   isMixedUse: boolean;
+  zip: string;
 }
 
 const ELIGIBLE_PROPERTY_TYPES = [
@@ -152,7 +153,7 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
   const blankAsset = (id: number): AssetInput => ({
     id, propertyType: "", numUnits: "", address: "", city: "", state: "",
     lat: null, lng: null, msaResult: null, timeOwned: "", isMixedUse: false,
-    mixedUseCommercialPct: "", mixedUseIncomePct: "",
+    mixedUseCommercialPct: "", mixedUseIncomePct: "", zip: "",
   });
 
   const [deal, setDeal] = useState<DealInput>({
@@ -277,6 +278,9 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
   if (step === "landing") {
     return (
       <div className="max-w-3xl mx-auto">
+        <button onClick={onSendToDealMatcher} className="flex items-center gap-2 text-sm text-gray-400 hover:text-[#0a1f44] mb-4 transition-colors">
+          <ArrowLeft className="h-4 w-4" /> Back to Deal Finder
+        </button>
         {/* Hero */}
         <div className="rounded-2xl bg-[#0a1f44] p-8 mb-6 text-center">
           <div className="flex items-center justify-center gap-2 mb-3">
@@ -411,8 +415,18 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
         {/* Asset Forms */}
         {deal.assets.map((asset, idx) => (
           <div key={asset.id} className="rounded-2xl border border-gray-200 bg-white p-5 space-y-4">
-            <div className="text-xs font-bold uppercase tracking-wide text-[#0a1f44]">
-              {deal.numAssets > 1 ? `Property ${idx + 1}` : "Property Details"}
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-bold uppercase tracking-wide text-[#0a1f44]">
+                {deal.numAssets > 1 ? `Property ${idx + 1}` : "Property Details"}
+              </div>
+              {deal.numAssets > 1 && (
+                <button type="button" onClick={() => {
+                  const newAssets = deal.assets.filter((_, i) => i !== idx);
+                  setDeal(p => ({ ...p, numAssets: p.numAssets - 1, assets: newAssets }));
+                }} className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-red-400 border border-red-200 rounded-lg hover:bg-red-50">
+                  ✕ Remove Property
+                </button>
+              )}
             </div>
 
             {/* Property Type */}
@@ -454,19 +468,57 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
               </div>
             </div>
 
-            {/* Address */}
-            <div>
-              <label className={labelClass}>Property Address *</label>
-              <input value={asset.address} onChange={e => updAsset(idx, "address", e.target.value)} placeholder="123 Main St" className={inp} />
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2">
-                <label className={labelClass}>City</label>
-                <input value={asset.city} onChange={e => updAsset(idx, "city", e.target.value)} placeholder="Miami" className={inp} />
+            {/* Address with Mapbox autocomplete */}
+            <div className="space-y-2">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block font-bold uppercase">🔍 Search Address (auto-fills below)</label>
+                <input
+                  type="text"
+                  placeholder="Start typing an address..."
+                  className="w-full px-3 py-2 text-sm bg-[#c9a84c]/10 border border-[#c9a84c]/40 rounded-xl focus:outline-none focus:border-[#c9a84c] placeholder-gray-400"
+                  onChange={async (e) => {
+                    const q = e.target.value.trim();
+                    if (q.length < 3) return;
+                    try {
+                      const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
+                      if (!token) return;
+                      const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?country=us&types=address&access_token=${token}`);
+                      const data = await res.json();
+                      if (data.features?.[0]) {
+                        const f = data.features[0];
+                        const ctx = f.context || [];
+                        const get = (id: string) => ctx.find((x: any) => x.id.startsWith(id))?.text || "";
+                        const getShort = (id: string) => ctx.find((x: any) => x.id.startsWith(id))?.short_code?.replace("US-","") || "";
+                        const street = (f.place_name || "").split(",")[0]?.trim() || "";
+                        const city = get("place") || get("locality");
+                        const state = getShort("region");
+                        const zip = get("postcode");
+                        const lat = f.center?.[1] || null;
+                        const lng = f.center?.[0] || null;
+                        setDeal(p => ({ ...p, assets: p.assets.map((a, i) => i === idx ? { ...a, address: street, city, state, zip: zip || "", lat, lng } : a) }));
+                        if (lat && lng) lookupMSA(idx, lat, lng, city);
+                      }
+                    } catch(err) { console.error("Mapbox:", err); }
+                  }}
+                />
               </div>
               <div>
-                <label className={labelClass}>State</label>
-                <input value={asset.state} onChange={e => updAsset(idx, "state", e.target.value.toUpperCase())} placeholder="FL" maxLength={2} className={inp} />
+                <label className={labelClass}>Street Address *</label>
+                <input value={asset.address} onChange={e => updAsset(idx, "address", e.target.value)} placeholder="123 Main St" className={inp} />
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                <div className="col-span-2">
+                  <label className={labelClass}>City</label>
+                  <input value={asset.city} onChange={e => updAsset(idx, "city", e.target.value)} placeholder="Miami" className={inp} />
+                </div>
+                <div>
+                  <label className={labelClass}>State</label>
+                  <input value={asset.state} onChange={e => updAsset(idx, "state", e.target.value.toUpperCase())} placeholder="FL" maxLength={2} className={inp} />
+                </div>
+                <div>
+                  <label className={labelClass}>Zip</label>
+                  <input value={(asset as any).zip || ""} onChange={e => updAsset(idx, "zip" as any, e.target.value)} placeholder="33101" className={inp} />
+                </div>
               </div>
             </div>
 
@@ -475,8 +527,8 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
               <button type="button"
                 onClick={() => lookupMSA(idx, asset.lat || 0, asset.lng || 0, asset.city)}
                 disabled={msaLoading || !asset.city}
-                className="px-4 py-2 text-xs font-bold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 disabled:opacity-50">
-                {msaLoading ? "Looking up MSA..." : "Look up MSA / Market"}
+                className="px-3 py-1.5 text-xs font-semibold border border-gray-200 text-gray-500 rounded-xl hover:border-[#0a1f44]/30 disabled:opacity-50">
+                {msaLoading ? "Checking MSA..." : "🔍 Check MSA"}
               </button>
               {asset.msaResult && (
                 <div className={`px-3 py-1.5 rounded-xl text-xs font-bold ${asset.msaResult.tier === 1 ? "bg-green-50 text-green-700 border border-green-200" : "bg-gray-50 text-gray-600 border border-gray-200"}`}>
@@ -698,7 +750,7 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-display text-xl font-bold text-[#0a1f44]">Deal Matcher</span>
-              <span className="text-xl font-black text-[#c9a84c]">+</span>
+              <span className="font-display text-xl font-bold text-[#c9a84c]"> PLUS</span><span className="text-xl font-black text-[#c9a84c]">+</span>
               <span className="text-sm text-gray-400 ml-2">Results</span>
             </div>
             <div className="text-xs text-gray-400">{programLabel} · {deal.desiredTerm}</div>
