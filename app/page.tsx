@@ -4485,7 +4485,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                     <div>
                       <div className="text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold mb-1">Registry</div>
                       <h2 className="font-display text-2xl font-bold text-[#0a1f44]">Lender Programs</h2>
-                      <p className="text-xs text-gray-500 mt-0.5">Click a lender name to view profile. Click Edit to modify.</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Click a lender name to view profile. Click Edit to modify. To automatically update a lender with their tear sheet, click the AI Tear Sheet button inside Edit Lender and upload a PDF.</p>
                     </div>
                     <button onClick={() => setActiveTab("add-lender")} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80"><Plus className="h-4 w-4" /> Add Lender</button>
                   </div>
