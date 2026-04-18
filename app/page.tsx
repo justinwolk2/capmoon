@@ -1579,6 +1579,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                 <div className="text-xs text-gray-500 mt-0.5">Auto-calculated (I/O)</div>
               </div>
             ) : (
+              <>
               <Input
                 value={asset.dscr}
                 onChange={(e) => upd("dscr", e.target.value)}
@@ -1616,6 +1617,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                   className={inputClass}
                 />
               </div>
+              </>
             );
           })()}
         </div>
@@ -1631,6 +1633,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
               </div>
             </div>
           </div>
+          <>
           <Input
                 value={asset.dscr}
                 onChange={(e) => upd("dscr", e.target.value)}
@@ -1668,6 +1671,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                   className={inputClass}
                 />
               </div>
+          </>
         </div>
       )}
       {asset.ltvMode === "MANUAL" && <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Manual LTV</label><Input value={asset.manualLtv} onChange={(e) => upd("manualLtv", e.target.value)} className={inputClass} /></div>}
