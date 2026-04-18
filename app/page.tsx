@@ -3946,7 +3946,7 @@ function MatcherHub({ session, submittedDeals, setSubmittedDeals, lenderRecords,
         <button onClick={() => setTab("plus")} className="text-left rounded-2xl border-2 border-[#c9a84c]/30 bg-gradient-to-br from-[#0a1f44] to-[#1a3a6e] p-6 hover:border-[#c9a84c] hover:shadow-md transition-all">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-xl bg-[#c9a84c] flex items-center justify-center"><Zap className="h-5 w-5 text-[#0a1f44]" /></div>
-            <div><div className="flex items-center gap-1"><span className="font-display text-xl font-bold text-white">Deal Matcher</span><span className="font-display text-xl font-black text-[#c9a84c]">+</span></div><div className="text-xs text-white/40">Expedited Agency</div></div>
+            <div><div className="flex items-center gap-1"><span className="font-display text-xl font-bold text-white">Deal Matcher <span className="font-display text-xl font-bold text-[#c9a84c]">PLUS+</span></span></div><div className="text-xs text-white/40">Expedited Agency</div></div>
           </div>
           <p className="text-sm text-white/60 mb-4">Fast-track Fannie Mae and Freddie Mac pre-qualification. Live rates, instant underwriting, matched lenders in minutes.</p>
           <div className="flex flex-wrap gap-1.5">{["Fannie Mae","Freddie Mac","Live Rates","Instant DSCR","Auto-Match"].map(t => <span key={t} className="px-2 py-1 text-xs bg-white/10 text-[#c9a84c] rounded-full">{t}</span>)}</div>

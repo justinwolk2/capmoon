@@ -802,8 +802,7 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
           </button>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-display text-xl font-bold text-[#0a1f44]">Deal Matcher</span>
-          <span className="font-display text-xl font-bold text-[#c9a84c]"> PLUS+</span>
+              <span className="font-display text-xl font-bold text-[#0a1f44]">Deal Matcher <span className="text-[#c9a84c]">PLUS+</span></span>
               <span className="text-sm text-gray-400 ml-2">Results</span>
             </div>
             <div className="text-xs text-gray-400">{programLabel} · {deal.desiredTerm}</div>
