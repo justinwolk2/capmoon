@@ -239,11 +239,13 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
     if (program === "freddie-small" && loanAmt > 7_500_000) disqual.push(`Loan amount of ${formatMoney(loanAmt)} exceeds Freddie Mac Small Balance maximum of $7.5M`);
     if ((program === "fannie-conventional" || program === "freddie-conventional") && loanAmt < 750_000) disqual.push(`Loan amount of ${formatMoney(loanAmt)} is below minimum $750,000 for conventional programs`);
 
-    // Soft warnings (guarantor)
-    const g = deal.guarantors[0];
-    if (g.creditScore && parseInt(g.creditScore) < 680) warnings.push("Credit score below typical 680 minimum — may affect eligibility");
-    if (g.liquidity && parseMoney(g.liquidity) < loanAmt * 0.05) warnings.push("Liquidity appears below typical 5% of loan amount requirement");
-    if (g.netWorth && parseMoney(g.netWorth) < loanAmt) warnings.push("Net worth below typical 1x loan amount guideline");
+    // Soft warnings (combined guarantor totals)
+    const combinedNW = deal.guarantors.reduce((s, g) => s + parseMoney(g.netWorth), 0);
+    const combinedLiq = deal.guarantors.reduce((s, g) => s + parseMoney(g.liquidity), 0);
+    const topCreditScore = Math.max(...deal.guarantors.map(g => parseInt(g.creditScore || "0") || 0));
+    if (topCreditScore > 0 && topCreditScore < 680) warnings.push(`Highest credit score (${topCreditScore}) is below typical 680 minimum — may affect eligibility`);
+    if (combinedLiq > 0 && combinedLiq < loanAmt * 0.05) warnings.push(`Combined liquidity (${formatMoney(combinedLiq)}) is below typical 5% of loan amount requirement`);
+    if (combinedNW > 0 && combinedNW < loanAmt) warnings.push(`Combined net worth (${formatMoney(combinedNW)}) is below typical 1x loan amount guideline`);
 
     // Match lenders
     const programKeywords = program.includes("fannie") ? ["fannie", "fnma", "agency", "dus"] : ["freddie", "fhlmc", "agency", "optigo"];
@@ -587,21 +589,34 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
               <input value={deal.grossExpenses} onChange={e => updDeal("grossExpenses", formatCurrencyInput(e.target.value))} placeholder="$200,000" className={inp} />
             </div>
           </div>
-          {noi > 0 && (
-            <div className="flex items-center gap-3 px-4 py-3 bg-[#0a1f44]/5 border border-[#0a1f44]/10 rounded-xl">
-              <TrendingUp className="h-4 w-4 text-[#0a1f44]" />
-              <div>
-                <div className="text-xs text-gray-500">Net Operating Income (NOI)</div>
-                <div className="text-sm font-bold text-[#0a1f44]">{formatMoney(noi)} / year</div>
-              </div>
-              {ltv > 0 && (
-                <div className="ml-auto text-right">
-                  <div className="text-xs text-gray-500">Current LTV</div>
-                  <div className={`text-sm font-bold ${ltv > 80 ? "text-red-500" : ltv > 65 ? "text-amber-500" : "text-green-600"}`}>{ltv.toFixed(1)}%</div>
+          {(noi > 0 || parseMoney(deal.estimatedValue) > 0 || parseMoney(deal.loanAmount) > 0) && (() => {
+            const propValCalc = parseMoney(deal.estimatedValue);
+            const loanAmtCalc = parseMoney(deal.loanAmount);
+            const capRate = propValCalc > 0 && noi > 0 ? (noi / propValCalc) * 100 : 0;
+            const debtYieldCalc = loanAmtCalc > 0 && noi > 0 ? (noi / loanAmtCalc) * 100 : 0;
+            const equityCalc = propValCalc > 0 && loanAmtCalc > 0 ? propValCalc - loanAmtCalc : 0;
+            const isRefi = deal.loanPurpose === "refinance" || deal.loanPurpose === "cash-out-refinance";
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+                <div className="rounded-xl border border-[#0a1f44]/10 bg-[#0a1f44]/5 p-3">
+                  <div className="text-xs text-gray-400 mb-1 uppercase tracking-wide">NOI</div>
+                  <div className="text-sm font-bold text-[#0a1f44]">{noi > 0 ? formatMoney(noi) + "/yr" : "—"}</div>
                 </div>
-              )}
-            </div>
-          )}
+                <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-3">
+                  <div className="text-xs text-gray-400 mb-1 uppercase tracking-wide">Cap Rate</div>
+                  <div className={`text-sm font-bold ${capRate >= 5 ? "text-green-600" : capRate > 0 ? "text-amber-500" : "text-gray-400"}`}>{capRate > 0 ? capRate.toFixed(2) + "%" : "—"}</div>
+                </div>
+                <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+                  <div className="text-xs text-gray-400 mb-1 uppercase tracking-wide">Debt Yield</div>
+                  <div className={`text-sm font-bold ${debtYieldCalc >= 7.5 ? "text-green-600" : debtYieldCalc > 0 ? "text-amber-500" : "text-gray-400"}`}>{debtYieldCalc > 0 ? debtYieldCalc.toFixed(2) + "%" : "—"}</div>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-white p-3">
+                  <div className="text-xs text-gray-400 mb-1 uppercase tracking-wide">{isRefi ? "Equity" : "Equity Required"}</div>
+                  <div className={`text-sm font-bold ${equityCalc > 0 ? "text-[#0a1f44]" : "text-gray-400"}`}>{equityCalc > 0 ? formatMoney(equityCalc) : "—"}</div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Guarantors */}
@@ -623,7 +638,15 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
           </div>
           {deal.guarantors.map((g, gi) => (
             <div key={gi} className="space-y-3 pt-3 border-t border-gray-100">
-              {deal.guarantors.length > 1 && <div className="text-xs font-bold text-gray-400">Guarantor {gi + 1}</div>}
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-bold text-gray-400">{deal.guarantors.length > 1 ? `Guarantor ${gi + 1}` : "Primary Guarantor"}</div>
+                {deal.guarantors.length > 1 && (
+                  <button type="button" onClick={() => updDeal("guarantors", deal.guarantors.filter((_, i) => i !== gi))}
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-red-400 border border-red-200 rounded-lg hover:bg-red-50">
+                    ✕ Remove
+                  </button>
+                )}
+              </div>
               <div>
                 <label className={labelClass}>Guarantor Name</label>
                 <input value={g.name} onChange={e => { const gs = [...deal.guarantors]; gs[gi] = { ...gs[gi], name: e.target.value }; updDeal("guarantors", gs); }} placeholder="Full name" className={inp} />
@@ -632,29 +655,61 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
                 <div>
                   <label className={labelClass}>Net Worth</label>
                   <input value={g.netWorth} onChange={e => { const gs = [...deal.guarantors]; gs[gi] = { ...gs[gi], netWorth: formatCurrencyInput(e.target.value) }; updDeal("guarantors", gs); }} placeholder="$5,000,000" className={inp} />
-                  {g.netWorth && parseMoney(g.netWorth) < parseMoney(deal.loanAmount) && parseMoney(deal.loanAmount) > 0 && (
-                    <div className="text-xs text-amber-500 mt-1">⚠️ Below 1x loan amount guideline</div>
-                  )}
                 </div>
                 <div>
                   <label className={labelClass}>Liquidity</label>
                   <input value={g.liquidity} onChange={e => { const gs = [...deal.guarantors]; gs[gi] = { ...gs[gi], liquidity: formatCurrencyInput(e.target.value) }; updDeal("guarantors", gs); }} placeholder="$500,000" className={inp} />
-                  {g.liquidity && parseMoney(g.liquidity) < parseMoney(deal.loanAmount) * 0.05 && parseMoney(deal.loanAmount) > 0 && (
-                    <div className="text-xs text-amber-500 mt-1">⚠️ Below typical 5% minimum</div>
-                  )}
                 </div>
                 <div>
                   <label className={labelClass}>Credit Score</label>
                   <input value={g.creditScore} onChange={e => { const gs = [...deal.guarantors]; gs[gi] = { ...gs[gi], creditScore: e.target.value }; updDeal("guarantors", gs); }} placeholder="720" className={inp} />
-                  {g.creditScore && parseInt(g.creditScore) < 680 && (
-                    <div className="text-xs text-amber-500 mt-1">⚠️ Below typical 680 minimum</div>
-                  )}
                 </div>
               </div>
             </div>
           ))}
+          {/* Combined guarantor summary */}
+          {deal.guarantors.length > 1 && (() => {
+            const combinedNW = deal.guarantors.reduce((s, g) => s + parseMoney(g.netWorth), 0);
+            const combinedLiq = deal.guarantors.reduce((s, g) => s + parseMoney(g.liquidity), 0);
+            const topScore = Math.max(...deal.guarantors.map(g => parseInt(g.creditScore || "0") || 0));
+            const loanAmt = parseMoney(deal.loanAmount);
+            return (
+              <div className="mt-2 p-3 bg-[#0a1f44]/5 border border-[#0a1f44]/10 rounded-xl">
+                <div className="text-xs font-bold text-[#0a1f44] mb-2 uppercase tracking-wide">Combined Guarantor Totals</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <div className="text-xs text-gray-400">Total Net Worth</div>
+                    <div className="text-sm font-bold text-[#0a1f44]">{formatMoney(combinedNW)}</div>
+                    {loanAmt > 0 && combinedNW < loanAmt && <div className="text-xs text-amber-500">⚠️ Below 1x loan</div>}
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Total Liquidity</div>
+                    <div className="text-sm font-bold text-[#0a1f44]">{formatMoney(combinedLiq)}</div>
+                    {loanAmt > 0 && combinedLiq < loanAmt * 0.05 && <div className="text-xs text-amber-500">⚠️ Below 5% min</div>}
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Highest Score</div>
+                    <div className="text-sm font-bold text-[#0a1f44]">{topScore || "—"}</div>
+                    {topScore > 0 && topScore < 680 && <div className="text-xs text-amber-500">⚠️ Below 680</div>}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          {/* Individual warnings when single guarantor */}
+          {deal.guarantors.length === 1 && (() => {
+            const g = deal.guarantors[0];
+            const loanAmt = parseMoney(deal.loanAmount);
+            return (
+              <div className="space-y-1">
+                {g.netWorth && parseMoney(g.netWorth) < loanAmt && loanAmt > 0 && <div className="text-xs text-amber-500">⚠️ Net worth below 1x loan amount guideline</div>}
+                {g.liquidity && parseMoney(g.liquidity) < loanAmt * 0.05 && loanAmt > 0 && <div className="text-xs text-amber-500">⚠️ Liquidity below typical 5% minimum</div>}
+                {g.creditScore && parseInt(g.creditScore) < 680 && <div className="text-xs text-amber-500">⚠️ Credit score below typical 680 minimum</div>}
+              </div>
+            );
+          })()}
           <button type="button" onClick={() => updDeal("guarantors", [...deal.guarantors, { name: "", netWorth: "", liquidity: "", creditScore: "" }])}
-            className="text-xs font-semibold text-[#0a1f44] hover:underline">
+            className="text-xs font-semibold text-[#0a1f44] hover:underline mt-1 block">
             + Add Additional Guarantor
           </button>
         </div>
@@ -750,7 +805,7 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-display text-xl font-bold text-[#0a1f44]">Deal Matcher</span>
-              <span className="font-display text-xl font-bold text-[#c9a84c]"> PLUS</span><span className="text-xl font-black text-[#c9a84c]">+</span>
+          <span className="font-display text-xl font-bold text-[#c9a84c]"> PLUS+</span>
               <span className="text-sm text-gray-400 ml-2">Results</span>
             </div>
             <div className="text-xs text-gray-400">{programLabel} · {deal.desiredTerm}</div>
