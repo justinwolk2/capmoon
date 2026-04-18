@@ -734,7 +734,7 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
             <div className="flex items-center gap-2 text-xs font-bold text-amber-700 uppercase tracking-wide">
               <AlertTriangle className="h-4 w-4" /> Below Market Indicators — Review with Lender
             </div>
-            {warnings.map((w, i) => <div key={i} className="text-xs text-amber-700 flex items-start gap-2"><span>⚠️</span>{w}</div>)}
+            {warnings.map((w: string, i: number) => <div key={i} className="text-xs text-amber-700 flex items-start gap-2"><span>⚠️</span>{w}</div>)}
           </div>
         )}
 
