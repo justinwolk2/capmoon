@@ -462,12 +462,7 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
                 <label className={labelClass}>Number of Units *</label>
                 <input value={asset.numUnits} onChange={e => updAsset(idx, "numUnits", e.target.value)} placeholder="e.g. 48" className={inp} />
               </div>
-              {(deal.loanPurpose === "refinance" || deal.loanPurpose === "cash-out-refinance") && (
-                <div>
-                  <label className={labelClass}>Years Owned</label>
-                  <input value={asset.timeOwned} onChange={e => updAsset(idx, "timeOwned", e.target.value)} placeholder="e.g. 3" className={inp} />
-                </div>
-              )}
+
             </div>
 
             {/* Address with Mapbox autocomplete */}
@@ -560,6 +555,12 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
               </select>
             </div>
           </div>
+          {(deal.loanPurpose === "refinance" || deal.loanPurpose === "cash-out-refinance") && (
+            <div>
+              <label className={labelClass}>Years Owned</label>
+              <input value={deal.assets[0]?.timeOwned || ""} onChange={e => deal.assets.forEach((_: any, i: number) => updAsset(i, "timeOwned", e.target.value))} placeholder="e.g. 3" className={inp} />
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>Loan Amount *</label>
