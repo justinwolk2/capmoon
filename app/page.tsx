@@ -47,7 +47,7 @@ type TeamMember = {
   geographicMarket: string; specialtyAreas: string[]; title: string;
 };
 type AppUser = {
-  id: number; username: string; password: string; role: "admin" | "advisor" | "staff" | "capital-seeker" | "lender"; linkedLenderId?: number; emailPrefs?: EmailPrefs; advisorCode?: string; dealSequenceStart?: number; blocked?: boolean;
+  id: number; username: string; password: string; role: "admin" | "advisor" | "staff" | "intern" | "capital-seeker" | "lender"; linkedLenderId?: number; emailPrefs?: EmailPrefs; advisorCode?: string; dealSequenceStart?: number; blocked?: boolean;
   name: string; blockedLenderIds: number[]; teamMemberId?: number; phone?: string; email?: string;
 };
 type SubmittedDeal = {
@@ -1581,6 +1581,10 @@ function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTr
   const [showPaste, setShowPaste] = useState(false);
   const [pasteProcessing, setPasteProcessing] = useState(false);
   const [inputMode, setInputMode] = useState<"choose" | "pdf" | "paste" | "manual">("choose");
+  const [lenderQuery, setLenderQuery] = useState("");
+  const [showTypeahead, setShowTypeahead] = useState(false);
+  const [addMode, setAddMode] = useState<"new" | "program" | null>(null);
+  const [parentLender, setParentLender] = useState<LenderRecord | null>(null);
 
   async function handlePdfUpload(file: File) {
     if (!file || file.type !== "application/pdf") { setPdfError("Please upload a PDF file only."); return; }
@@ -1781,6 +1785,44 @@ function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTr
                   </div>
                   {matchMode[String(field)] === "spreadsheet" ? (
                     <Select value={String(form[field])} onValueChange={(v) => upd(field, v)}><SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Select from spreadsheet..." /></SelectTrigger><SelectContent>{(spreadsheetSuggestions[String(field)] || []).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select>
+                  ) : field === "programName" ? (
+                    <div className="relative">
+                      <input type="text" value={String(form[field])} placeholder="Type lender name to search or add new..." className="w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-xl focus:outline-none focus:border-[#0a1f44]"
+                        onChange={e => { upd(field, e.target.value); setLenderQuery(e.target.value); setShowTypeahead(true); }}
+                        onFocus={() => setShowTypeahead(true)} onBlur={() => setTimeout(() => setShowTypeahead(false), 200)} />
+                      {showTypeahead && lenderQuery.length >= 2 && (() => {
+                        const matches = existingLenders.filter(l => l.lender.toLowerCase().includes(lenderQuery.toLowerCase()));
+                        const unique = Array.from(new Map(matches.map(l => [l.lender, l])).values()).slice(0, 6);
+                        return (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                            {unique.map(l => {
+                              const count = existingLenders.filter(x => x.lender === l.lender).length;
+                              return (
+                                <button key={l.id} type="button" onMouseDown={() => {
+                                  setParentLender(l); setAddMode("program"); setLenderQuery(l.lender);
+                                  upd("programName", l.lender + " - ");
+                                  upd("contactPerson", l.contactPerson || ""); upd("email", l.email || "");
+                                  upd("phone", l.phone || ""); upd("website", l.website || "");
+                                  setShowTypeahead(false);
+                                }} className="w-full text-left px-4 py-2.5 hover:bg-[#0a1f44]/5 flex items-center justify-between border-b border-gray-50 last:border-0">
+                                  <div><div className="text-sm font-semibold text-[#0a1f44]">{l.lender}</div><div className="text-xs text-gray-400">+ Add program to this lender</div></div>
+                                  <span className="text-xs bg-[#0a1f44]/10 text-[#0a1f44] px-2 py-0.5 rounded-full">{count} program{count !== 1 ? "s" : ""}</span>
+                                </button>
+                              );
+                            })}
+                            <button type="button" onMouseDown={() => { setAddMode("new"); setParentLender(null); setShowTypeahead(false); }}
+                              className="w-full text-left px-4 py-2.5 hover:bg-green-50 flex items-center gap-2 text-green-600 font-semibold text-sm">
+                              <span>+</span> Add "{lenderQuery}" as New Lender
+                            </button>
+                          </div>
+                        );
+                      })()}
+                      {addMode === "program" && parentLender && (
+                        <div className="mt-2 px-3 py-2 bg-[#0a1f44]/5 border border-[#0a1f44]/10 rounded-xl text-xs text-[#0a1f44]">
+                          ✓ Adding program to <strong>{parentLender.lender}</strong> — contact info pre-filled
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <Input value={String(form[field])} onChange={(e) => upd(field, e.target.value)} placeholder={`Enter ${label.toLowerCase()}`} className={inputClass} />
                   )}
@@ -3966,6 +4008,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 }) {
   const isAdmin = session?.user.role === "admin";
   const isStaff = session?.user.role === "staff";
+  const isIntern = session?.user.role === "intern";
   const isLender = session?.user.role === "lender";
   const [activeTab, setActiveTab] = useState("overview");
   React.useEffect(() => { (window as any).__setActiveTab = setActiveTab; }, [setActiveTab]);
@@ -5323,6 +5366,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                       { key: "admin",         label: "Administrators",      color: "#0a1f44", emoji: "🔐" },
                       { key: "advisor",        label: "Capital Advisors",    color: "#c9a84c", emoji: "💼" },
                       { key: "staff",          label: "Staff",               color: "#6366f1", emoji: "👤" },
+                      { key: "intern",         label: "Interns",             color: "#10b981", emoji: "🎓" },
                       { key: "lender",         label: "Lenders",             color: "#10b981", emoji: "🏦" },
                       { key: "capital-seeker", label: "Clients / Borrowers", color: "#f59e0b", emoji: "🏢" },
                     ].map(group => {
