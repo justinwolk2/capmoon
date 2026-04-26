@@ -208,10 +208,50 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
           <div className="text-xs text-gray-400 mt-0.5">Submitted: {deal.submittedAt}</div>
         </div>
         <select value={deal.status} onChange={(e) => updateDealStatus(e.target.value)}
-          className={`px-3 py-1 rounded-full text-xs font-semibold border cursor-pointer ${deal.status==="pending"?"bg-amber-50 text-amber-600 border-amber-200":deal.status==="assigned"?"bg-blue-50 text-blue-600 border-blue-200":"bg-emerald-50 text-emerald-600 border-emerald-200"}`}>
-          <option value="pending">Pending</option><option value="assigned">Assigned</option><option value="closed">Closed</option>
+          className={`px-3 py-1 rounded-full text-xs font-semibold border cursor-pointer ${deal.status==="pending"?"bg-amber-50 text-amber-600 border-amber-200":deal.status==="assigned"?"bg-blue-50 text-blue-600 border-blue-200":deal.status==="sent-to-lenders"?"bg-indigo-50 text-indigo-600 border-indigo-200":deal.status==="term-sheet-accepted"?"bg-green-50 text-green-600 border-green-200":"bg-purple-50 text-purple-600 border-purple-200"}`}>
+          <option value="pending">Pending</option><option value="assigned">Assigned</option><option value="sent-to-lenders">Sent to Lenders</option><option value="term-sheet-accepted">Term Sheet Accepted</option><option value="closed">Closed</option>
         </select>
       </div>
+      {/* Stage action buttons */}
+      {(isAdmin || session?.user.role === "advisor" || session?.user.role === "staff" || session?.user.role === "intern") && (
+        <div className="flex flex-wrap gap-2 mb-3">
+          {(deal.status === "sent-to-lenders" || deal.status === "assigned") && (
+            <button onClick={() => setShowAcceptTermSheet(!showAcceptTermSheet)}
+              className="px-3 py-1.5 text-xs font-bold bg-green-600 text-white rounded-xl hover:bg-green-700">
+              ✓ Accept Term Sheet
+            </button>
+          )}
+          {deal.status === "term-sheet-accepted" && (
+            <button onClick={() => { if(window.confirm("Mark this deal as CLOSED?")) updateDealStatus("closed"); }}
+              className="px-3 py-1.5 text-xs font-bold bg-purple-600 text-white rounded-xl hover:bg-purple-700">
+              🏆 Mark as Closed
+            </button>
+          )}
+        </div>
+      )}
+      {showAcceptTermSheet && (
+        <div className="mb-3 p-4 rounded-xl border border-green-200 bg-green-50 space-y-3">
+          <div className="text-sm font-bold text-green-800">Which lender accepted the term sheet?</div>
+          <select value={acceptingLender} onChange={e => setAcceptingLender(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-green-200 rounded-xl focus:outline-none bg-white">
+            <option value="">Select lender...</option>
+            {sentLenders.map((s: any) => <option key={s.id} value={s.lender_name}>{s.lender_name}</option>)}
+          </select>
+          <div className="flex gap-2">
+            <button onClick={() => {
+              if (!acceptingLender) return alert("Please select a lender");
+              updateDealStatus("term-sheet-accepted", { acceptedLenderName: acceptingLender, acceptedAt: new Date().toISOString() });
+              setShowAcceptTermSheet(false);
+            }} className="px-4 py-2 text-xs font-bold bg-green-600 text-white rounded-xl">Confirm</button>
+            <button onClick={() => setShowAcceptTermSheet(false)} className="px-3 py-2 text-xs border border-gray-200 text-gray-500 rounded-xl">Cancel</button>
+          </div>
+        </div>
+      )}
+      {deal.status === "term-sheet-accepted" && deal.acceptedLenderName && (
+        <div className="mb-3 px-3 py-2 rounded-xl bg-green-50 border border-green-200 text-xs text-green-800">
+          ✓ Term sheet accepted from <strong>{deal.acceptedLenderName}</strong>
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
         {[["Capital Type",deal.capitalType],["Loan Amount",deal.assets[0]?.loanAmount||"—"],["Asset Type",deal.assets[0]?.assetType||"—"],["Property Value",deal.assets[0]?.propertyValue||"—"],["DSCR",deal.assets[0]?.dscr||"—"],["Assets",`${deal.assets.length} asset${deal.assets.length>1?"s":""}`]].map(([label,val])=>(
           <div key={String(label)} className="rounded-lg bg-white border border-gray-200 p-3"><div className="text-xs text-gray-400 mb-1">{label}</div><div className="text-sm font-bold text-[#0a1f44]">{val}</div></div>
