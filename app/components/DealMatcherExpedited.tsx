@@ -326,10 +326,10 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
 
         {/* Program Dropdown */}
         <div className="mb-6">
-          <label className="text-xs font-bold uppercase tracking-[0.2em] text-white/60 mb-2 block">Select Program</label>
+          <label className="text-xs font-bold uppercase tracking-[0.2em] text-[#c9a84c] mb-2 block">Select Program</label>
           <div className="relative">
             <select value={deal.capitalType || ""} onChange={e => updDeal("capitalType", e.target.value)}
-              className="w-full px-4 py-3 text-sm font-semibold bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-[#c9a84c] appearance-none cursor-pointer">
+              className="w-full px-4 py-3 text-sm font-semibold bg-[#0a1f44] border-2 border-[#c9a84c]/40 rounded-xl text-white focus:outline-none focus:border-[#c9a84c] appearance-none cursor-pointer hover:border-[#c9a84c] transition-colors">
               <option value="" disabled className="text-gray-800 bg-white">— Choose a program —</option>
               <optgroup label="── Agency: Fannie Mae / Freddie Mac" className="text-gray-800 bg-white">
                 <option value="fannie-conventional" className="text-gray-800 bg-white">Fannie Mae Conventional DUS — 80% LTV · 1.25x DSCR · 5–15yr</option>
@@ -353,7 +353,7 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
                 <option value="sba-504" className="text-gray-800 bg-white">SBA 504 — 90% LTC · owner-occupied · 10/20/25yr</option>
               </optgroup>
             </select>
-            <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/60 text-xs">▼</div>
+            <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#c9a84c] text-xs">▼</div>
           </div>
           {deal.capitalType && (
             <button onClick={() => setStep("intake")}
