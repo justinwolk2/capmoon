@@ -26,7 +26,7 @@ type AssetData = {
   propertyValue: string; purchasePrice: string; currentLoanAmount: string;
   landCost: string; softCosts: string; originationClosingCosts: string;
   hardCosts: string; carryingCosts: string; borrowerEquity: string;
-  ltvMode: string; currentNetIncome: string; manualLtv: string; dy: string; currentRate: string;
+  ltvMode: string; currentNetIncome: string; manualLtv: string; dy: string; currentRate: string; arvValue: string; stabilizedNoi: string; constructionBudget: string;
   purchaseYear?: string; fullyEntitled?: "yes" | "no"; currentPropertyValue?: string; additionalEquity?: string; arvNetIncome?: string; valueAddCurrentNoi?: string;
   selectedStates: string[]; recourseType: string;
   numUnits: string; numBuildings: string; numAcres: string; retailUnits: RetailUnit[];
@@ -895,7 +895,7 @@ function matchLabel(score: number): { label: string; color: string; bg: string; 
 function normalizeRecourse(v: string) { return v === "SELECTIVE" || !v ? "CASE BY CASE" : v; }
 function blankAddress(): AssetAddress { return { street: "", unit: "", city: "", state: "", zip: "" }; }
 function blankAsset(id: number): AssetData {
-  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "Apartments", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dy: "", currentRate: "", purchaseYear: String(new Date().getFullYear()), fullyEntitled: undefined, currentPropertyValue: "", additionalEquity: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
+  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "Apartments", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dy: "", currentRate: "", arvValue: "", stabilizedNoi: "", constructionBudget: "", purchaseYear: String(new Date().getFullYear()), fullyEntitled: undefined, currentPropertyValue: "", additionalEquity: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
 }
 function blankLenderForm(): NewLenderForm {
   return { programName: "", contactPerson: "", email: "", phone: "", website: "", typeOfLenders: [], typeOfLoans: [], programTypes: [], propertyTypes: [], loanTerms: [], notes: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalTypes: [], capitalTypePrograms: [], contacts: [], status: "Active" };
@@ -944,7 +944,11 @@ function calcMetrics(asset: AssetData, capitalType: string) {
   } else {
     seniorLtc = purchaseVal > 0 && seniorLoanForLtv > 0 ? (seniorLoanForLtv / purchaseVal) * 100 : 0;
   }
-  return { effectiveAmt, totalCap, seniorLtv, autoLtv, equityPct, cashOut, seniorLtc, isSubCap, isConstruction, isAcquisition, isRefinance, isAcqNonConst, acqConstLoan, isNewDev, isProjectDealType };
+  const arvVal2 = parseCurrency(asset.arvValue) || 0;
+  const stabilizedNoi2 = parseCurrency(asset.stabilizedNoi) || 0;
+  const arltv = arvVal2 > 0 && effectiveAmt > 0 ? (effectiveAmt / arvVal2) * 100 : 0;
+  const stabilizedCapRate = stabilizedNoi2 > 0 && arvVal2 > 0 ? (stabilizedNoi2 / arvVal2) * 100 : 0;
+  return { effectiveAmt, totalCap, seniorLtv, autoLtv, equityPct, cashOut, seniorLtc, isSubCap, isConstruction, isAcquisition, isRefinance, isAcqNonConst, acqConstLoan, isNewDev, isProjectDealType, arltv, stabilizedCapRate, stabilizedNoi: stabilizedNoi2 };
 }
 
 // Advisor matching logic
@@ -1550,6 +1554,36 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Net Income (Annual)</label><Input value={asset.currentNetIncome} onChange={(e) => upd("currentNetIncome", formatCurrencyInput(e.target.value))} className={inputClass} /></div>
       {m.isRefinance && (
         <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">ARV Net Income (Annual)</label><Input value={asset.arvNetIncome || ""} onChange={(e) => upd("arvNetIncome", formatCurrencyInput(e.target.value))} placeholder="Projected stabilized income" className={inputClass} /></div>
+      )}
+      {(asset.dealType === "Construction" || asset.dealType === "New Development" || asset.dealType === "Value add") && (
+        <div className="md:col-span-2 rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4 space-y-3">
+          <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44] mb-2">{asset.dealType === "Value add" ? "Value-Add / Stabilization Details" : "Construction / Development Details"}</div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {(asset.dealType === "Construction" || asset.dealType === "New Development") && (<>
+              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Land / As-Is Value</label><Input value={asset.landCost} onChange={(e) => upd("landCost", formatCurrencyInput(e.target.value))} placeholder="$2,000,000" className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Hard Costs</label><Input value={asset.hardCosts} onChange={(e) => upd("hardCosts", formatCurrencyInput(e.target.value))} placeholder="$8,000,000" className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Soft Costs</label><Input value={asset.softCosts} onChange={(e) => upd("softCosts", formatCurrencyInput(e.target.value))} placeholder="$1,500,000" className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Carrying / Financing Costs</label><Input value={asset.carryingCosts} onChange={(e) => upd("carryingCosts", formatCurrencyInput(e.target.value))} placeholder="$500,000" className={inputClass} /></div>
+            </>)}
+            {asset.dealType === "Value add" && (<>
+              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Renovation / CapEx Budget</label><Input value={asset.constructionBudget} onChange={(e) => upd("constructionBudget", formatCurrencyInput(e.target.value))} placeholder="$2,000,000" className={inputClass} /></div>
+              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current As-Is Value</label><Input value={asset.propertyValue} onChange={(e) => upd("propertyValue", formatCurrencyInput(e.target.value))} placeholder="$8,000,000" className={inputClass} /></div>
+            </>)}
+            <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">After Repair / Stabilized Value (ARV)</label><Input value={asset.arvValue} onChange={(e) => upd("arvValue", formatCurrencyInput(e.target.value))} placeholder="$15,000,000" className={inputClass} /></div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Expected Stabilized NOI <span className="ml-1 font-normal normal-case text-[#c9a84c] text-xs">{asset.assetType === "Apartments" ? "• Typical cap: 4.5-5.5%" : asset.assetType === "Office" ? "• Typical cap: 6.5-8.0%" : asset.assetType === "Light Industrial" ? "• Typical cap: 5.0-6.5%" : asset.assetType === "Retail-Multi Tenant" ? "• Typical cap: 6.0-7.5%" : asset.assetType === "Hotel/Hospitality" ? "• Typical cap: 7.0-9.0%" : asset.assetType === "Self-storage" ? "• Typical cap: 5.5-6.5%" : ""}</span></label>
+              <Input value={asset.stabilizedNoi} onChange={(e) => upd("stabilizedNoi", formatCurrencyInput(e.target.value))} placeholder="$900,000/yr" className={inputClass} />
+            </div>
+          </div>
+          {(parseCurrency(asset.arvValue) > 0 || parseCurrency(asset.stabilizedNoi) > 0) && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 pt-3 border-t border-[#c9a84c]/20">
+              <div className="rounded-xl bg-white border border-gray-200 p-3"><div className="text-xs text-gray-400 uppercase tracking-wide mb-1">ARLTV</div><div className={`text-sm font-bold ${m.arltv > 80 ? "text-red-500" : m.arltv > 65 ? "text-amber-500" : "text-green-600"}`}>{m.arltv > 0 ? m.arltv.toFixed(1) + "%" : "—"}</div></div>
+              <div className="rounded-xl bg-white border border-gray-200 p-3"><div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Stabilized Cap</div><div className={`text-sm font-bold ${m.stabilizedCapRate >= 5 ? "text-green-600" : m.stabilizedCapRate > 0 ? "text-amber-500" : "text-gray-400"}`}>{m.stabilizedCapRate > 0 ? m.stabilizedCapRate.toFixed(2) + "%" : "—"}</div></div>
+              <div className="rounded-xl bg-white border border-gray-200 p-3"><div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Stabilized NOI</div><div className="text-sm font-bold text-[#0a1f44]">{m.stabilizedNoi > 0 ? "$" + (m.stabilizedNoi / 1000).toFixed(0) + "K/yr" : "—"}</div></div>
+              <div className="rounded-xl bg-white border border-gray-200 p-3"><div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Equity at Stab.</div><div className="text-sm font-bold text-[#0a1f44]">{parseCurrency(asset.arvValue) > 0 && parseCurrency(asset.loanAmount) > 0 ? "$" + ((parseCurrency(asset.arvValue) - parseCurrency(asset.loanAmount)) / 1000000).toFixed(2) + "M" : "—"}</div></div>
+            </div>
+          )}
+        </div>
       )}
       {m.isRefinance && (
         <div>
