@@ -16,6 +16,8 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
   const [showAcceptTermSheet, setShowAcceptTermSheet] = React.useState(false);
   const [acceptingLender, setAcceptingLender] = React.useState("");
   const [expanded, setExpanded] = React.useState(false);
+  const [showMemo, setShowMemo] = React.useState(false);
+  const [memoFields, setMemoFields] = React.useState<Record<string,string>>({});
   const [threadMessages, setThreadMessages] = React.useState<Record<string, any[]>>({});
   const [threadInput, setThreadInput] = React.useState<Record<string, string>>({});
   const [threadLoading, setThreadLoading] = React.useState<Record<string, boolean>>({});
@@ -195,12 +197,12 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => setExpanded(true)}>
         {/* Property photo hero */}
         {asset?.propertyPhoto ? (
-          <div className="w-full h-44 overflow-hidden">
-            <img src={asset.propertyPhoto} alt="Property" className="w-full h-full object-cover" />
+          <div className="w-full h-56 overflow-hidden">
+            <img src={asset.propertyPhoto} alt="Property" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
           </div>
         ) : (
-          <div className="w-full h-24 bg-gradient-to-br from-[#0a1f44] to-[#1a3a6e] flex items-center justify-center">
-            <div className="text-white/20 text-4xl">{asset?.assetType?.includes("Apartment") ? "🏢" : asset?.assetType?.includes("Office") ? "🏛" : asset?.assetType?.includes("Hotel") ? "🏨" : asset?.assetType?.includes("Retail") ? "🏪" : asset?.assetType?.includes("Industrial") ? "🏭" : "🏗"}</div>
+          <div className="w-full h-44 bg-gradient-to-br from-[#0a1f44] to-[#1a3a6e] flex flex-col items-center justify-center gap-2">
+            <div className="text-6xl opacity-20">{asset?.assetType?.includes("Apartment") ? "🏢" : asset?.assetType?.includes("Office") ? "🏛" : asset?.assetType?.includes("Hotel") ? "🏨" : asset?.assetType?.includes("Retail") ? "🏪" : asset?.assetType?.includes("Industrial") ? "🏭" : "🏗"}</div>
           </div>
         )}
         <div className="p-4">
@@ -248,15 +250,18 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
 
   // ── Expanded full deal view ─────────────────────────────────────────────────
   return (
-    <div className="md:col-span-2 rounded-xl border border-[#0a1f44]/20 bg-white shadow-md overflow-hidden">
-      {/* Header bar with collapse button */}
-      <div className="flex items-center justify-between px-5 py-3 bg-[#0a1f44] text-white">
-        <div className="flex items-center gap-3">
+    <div className="md:col-span-2 rounded-xl border border-[#0a1f44]/10 bg-white shadow-lg overflow-hidden">
+      {asset?.propertyPhoto && <div className="w-full h-64 overflow-hidden"><img src={asset.propertyPhoto} alt="Property" className="w-full h-full object-cover" /></div>}
+      <div className="flex items-center justify-between px-5 py-4 bg-[#0a1f44] text-white flex-wrap gap-2">
+        <div className="flex items-center gap-3 flex-wrap">
+          <button onClick={() => setExpanded(false)} className="text-white/70 hover:text-white text-sm font-semibold transition-colors">← Back</button>
+          <span className="text-white/30">|</span>
           <span className="font-display text-lg font-bold">{deal.seekerName}</span>
           {deal.dealNumber && <span className="px-2 py-0.5 text-xs bg-[#c9a84c]/20 text-[#c9a84c] rounded-full font-bold border border-[#c9a84c]/30">{deal.dealNumber}</span>}
+          {asset?.address?.city && <span className="text-white/50 text-sm">📍 {asset.address.city}{asset.address.state ? ", " + asset.address.state : ""}</span>}
         </div>
-        <button onClick={() => setExpanded(false)} className="text-white/60 hover:text-white text-sm font-semibold px-3 py-1 rounded-lg hover:bg-white/10">
-          ✕ Close
+        <button onClick={() => setShowMemo(!showMemo)} className="px-3 py-1.5 text-xs font-bold bg-[#c9a84c] text-[#0a1f44] rounded-lg hover:bg-[#c9a84c]/80">
+          📄 {showMemo ? "Hide Memo" : "Edit Deal Memo"}
         </button>
       </div>
       <div className="p-5">
