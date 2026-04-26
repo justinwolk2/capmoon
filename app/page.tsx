@@ -4025,6 +4025,7 @@ function MatcherHub({ session, submittedDeals, setSubmittedDeals, lenderRecords,
   const handlePlusSubmit = (deal: any) => {
     setSubmittedDeals([deal, ...submittedDeals] as any);
     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [deal] }) });
+    fetch("/api/pipedrive", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", deal }) }).catch(console.error);
     setActiveTab("submitted-deals");
   };
   if (tab === "plus") return <DealMatcherExpedited lenderRecords={lenderRecords} session={session} teamMembers={teamMembers} onSubmitDeal={handlePlusSubmit} onSendToDealMatcher={() => setTab("choose")} inputClass={inputClass} cardClass={cardClass} />;
@@ -4036,6 +4037,7 @@ function MatcherHub({ session, submittedDeals, setSubmittedDeals, lenderRecords,
         const deal: any = { id: dealId, submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Admin", seekerEmail: session?.user.username || "", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a: any) => a.id), dealNumber: dn.dealNumber || "" };
         setSubmittedDeals([deal, ...submittedDeals.filter((d: any) => d.id !== deal.id)] as any);
         fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [deal] }) });
+        fetch("/api/pipedrive", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", deal }) }).catch(console.error);
       }).catch(() => {
         const deal: any = { id: dealId, submittedAt: new Date().toLocaleString(), seekerName: session?.user.name || "Admin", seekerEmail: session?.user.username || "", assets, capitalType, assetMode, collateralMode, status: "pending", assignedAdvisorIds: advisors.map((a: any) => a.id), dealNumber: "" };
         setSubmittedDeals([deal, ...submittedDeals.filter((d: any) => d.id !== deal.id)] as any);
