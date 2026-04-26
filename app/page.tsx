@@ -55,7 +55,7 @@ type SubmittedDeal = {
   seekerEmail?: string; seekerPhone?: string; notes?: string; dealNumber?: string;
   assets: AssetData[]; capitalType: string; assetMode: string; collateralMode: string;
   status: "pending" | "assigned" | "sent-to-lenders" | "term-sheet-accepted" | "closed"; assignedAdvisorIds: number[];
-  acceptedLenderName?: string; acceptedAt?: string; closedAt?: string; pipedriveId?: string;
+  acceptedLenderName?: string; acceptedAt?: string; closedAt?: string; pipedriveId?: string; propertyPhoto?: string;
   invitedUserIds?: number[];
   photos?: { id: number; url: string; caption: string }[];
 };
@@ -1138,6 +1138,11 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <AddressFields address={asset.address || blankAddress()} onChange={(a) => upd("address", a)} inputClass={inputClass} />
+      <div className="md:col-span-2">
+        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Property Photo URL <span className="text-gray-400 font-normal normal-case">(optional — paste image URL or upload in Upload Center)</span></label>
+        <Input value={(asset as any).propertyPhoto || ""} onChange={(e) => upd("propertyPhoto" as any, e.target.value)} placeholder="https://... or leave blank" className={inputClass} />
+        {(asset as any).propertyPhoto && <img src={(asset as any).propertyPhoto} alt="Property" className="mt-2 h-32 w-full object-cover rounded-xl border border-gray-200" />}
+      </div>
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Ownership Status</label><Select value={asset.ownershipStatus} onValueChange={(v) => upd("ownershipStatus", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
       <div>
         <div className="flex items-center gap-1.5 mb-1">

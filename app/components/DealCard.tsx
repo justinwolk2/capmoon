@@ -288,7 +288,7 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
       )}
       <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-2">
         <button onClick={() => { setPrefillDeal(deal); setActiveTab("matcher"); }} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">
-          <Filter className="h-4 w-4" /> Resubmit to Deal Matcher
+          <Filter className="h-4 w-4" /> Make Edits in Deal Matcher
         </button>
         <button onClick={() => setShowInvite(!showInvite)} className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-[#c9a84c]/30 text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/10">
           <Users className="h-4 w-4" /> Invite Collaborator
