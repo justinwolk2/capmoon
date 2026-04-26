@@ -54,7 +54,8 @@ type SubmittedDeal = {
   id: number; submittedAt: string; seekerName: string;
   seekerEmail?: string; seekerPhone?: string; notes?: string; dealNumber?: string;
   assets: AssetData[]; capitalType: string; assetMode: string; collateralMode: string;
-  status: "pending" | "assigned" | "closed"; assignedAdvisorIds: number[];
+  status: "pending" | "assigned" | "sent-to-lenders" | "term-sheet-accepted" | "closed"; assignedAdvisorIds: number[];
+  acceptedLenderName?: string; acceptedAt?: string; closedAt?: string; pipedriveId?: string;
   invitedUserIds?: number[];
   photos?: { id: number; url: string; caption: string }[];
 };

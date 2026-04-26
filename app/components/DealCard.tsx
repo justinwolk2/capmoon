@@ -13,6 +13,8 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
   const [showDocUpload, setShowDocUpload] = React.useState(false);
   const [showDocRequest, setShowDocRequest] = React.useState(false);
   const [editingDeal, setEditingDeal] = React.useState(false);
+  const [showAcceptTermSheet, setShowAcceptTermSheet] = React.useState(false);
+  const [acceptingLender, setAcceptingLender] = React.useState("");
   const [threadMessages, setThreadMessages] = React.useState<Record<string, any[]>>({});
   const [threadInput, setThreadInput] = React.useState<Record<string, string>>({});
   const [threadLoading, setThreadLoading] = React.useState<Record<string, boolean>>({});
@@ -95,7 +97,7 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
     setSelectedLenderIds([]); setShowSendLenders(false); setSendingToLenders(false);
   }
 
-  function updateDealStatus(status: string) {
+  function updateDealStatus(status: string, extra?: any) {
     const updated = submittedDeals.map((d: any) => d.id === deal.id ? { ...d, status } : d);
     setSubmittedDeals(updated);
     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -193,6 +195,9 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
           <div className="flex items-center gap-2 flex-wrap">
             <div className="text-base font-bold text-[#0a1f44]">{deal.seekerName}</div>
             {deal.dealNumber && <span className="px-2 py-0.5 text-xs bg-[#c9a84c]/20 text-[#0a1f44] rounded-full font-bold border border-[#c9a84c]/30">{deal.dealNumber}</span>}
+            {deal.status === "sent-to-lenders" && <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full font-bold border border-blue-200">Out to Lenders</span>}
+            {deal.status === "term-sheet-accepted" && <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full font-bold border border-green-200">✓ Term Sheet Accepted</span>}
+            {deal.status === "closed" && <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full font-bold border border-purple-200">Closed</span>}
           </div>
           <div className="flex flex-wrap gap-2 mt-1">
             {deal.assets[0]?.assetType && <span className="text-xs text-gray-500 font-medium">{deal.assets[0].assetType}</span>}
