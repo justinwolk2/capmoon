@@ -15,6 +15,7 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
   const [editingDeal, setEditingDeal] = React.useState(false);
   const [showAcceptTermSheet, setShowAcceptTermSheet] = React.useState(false);
   const [acceptingLender, setAcceptingLender] = React.useState("");
+  const [expanded, setExpanded] = React.useState(false);
   const [threadMessages, setThreadMessages] = React.useState<Record<string, any[]>>({});
   const [threadInput, setThreadInput] = React.useState<Record<string, string>>({});
   const [threadLoading, setThreadLoading] = React.useState<Record<string, boolean>>({});
@@ -187,15 +188,79 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
   const statusBadge = (s: string) => s==="declined"?"bg-red-100 text-red-600":s==="info_requested"?"bg-blue-100 text-blue-700":s==="viewed"?"bg-yellow-100 text-yellow-700":s==="quoted"?"bg-green-100 text-green-700":"bg-gray-100 text-gray-500";
   const statusLabel = (s: string) => s==="info_requested"?"Info Requested":s==="viewed"?"Viewed":s==="declined"?"Declined":s==="quoted"?"Quoted":"No Response Yet";
 
-  return (
-    <div className="rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
-      {deal.assets?.[0]?.propertyPhoto && (
-        <div className="w-full h-44 overflow-hidden">
-          <img src={deal.assets[0].propertyPhoto} alt="Property" className="w-full h-full object-cover" />
+  const asset = deal.assets?.[0];
+
+  if (!expanded) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => setExpanded(true)}>
+        {/* Property photo hero */}
+        {asset?.propertyPhoto ? (
+          <div className="w-full h-44 overflow-hidden">
+            <img src={asset.propertyPhoto} alt="Property" className="w-full h-full object-cover" />
+          </div>
+        ) : (
+          <div className="w-full h-24 bg-gradient-to-br from-[#0a1f44] to-[#1a3a6e] flex items-center justify-center">
+            <div className="text-white/20 text-4xl">{asset?.assetType?.includes("Apartment") ? "🏢" : asset?.assetType?.includes("Office") ? "🏛" : asset?.assetType?.includes("Hotel") ? "🏨" : asset?.assetType?.includes("Retail") ? "🏪" : asset?.assetType?.includes("Industrial") ? "🏭" : "🏗"}</div>
+          </div>
+        )}
+        <div className="p-4">
+          {/* Status + deal number */}
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {deal.dealNumber && <span className="px-2 py-0.5 text-xs bg-[#c9a84c]/20 text-[#0a1f44] rounded-full font-bold border border-[#c9a84c]/30">{deal.dealNumber}</span>}
+              {deal.status === "pending" && <span className="px-2 py-0.5 text-xs bg-amber-50 text-amber-600 rounded-full font-bold border border-amber-200">Pending</span>}
+              {deal.status === "assigned" && <span className="px-2 py-0.5 text-xs bg-blue-50 text-blue-600 rounded-full font-bold border border-blue-200">Assigned</span>}
+              {deal.status === "sent-to-lenders" && <span className="px-2 py-0.5 text-xs bg-indigo-50 text-indigo-600 rounded-full font-bold border border-indigo-200">Out to Lenders</span>}
+              {deal.status === "term-sheet-accepted" && <span className="px-2 py-0.5 text-xs bg-green-50 text-green-700 rounded-full font-bold border border-green-200">✓ Term Sheet</span>}
+              {deal.status === "closed" && <span className="px-2 py-0.5 text-xs bg-purple-50 text-purple-700 rounded-full font-bold border border-purple-200">🏆 Closed</span>}
+            </div>
+            <span className="text-xs text-gray-400">{deal.submittedAt?.split(",")[0]}</span>
+          </div>
+          {/* Borrower + asset info */}
+          <div className="font-display text-lg font-bold text-[#0a1f44] leading-tight mb-1">{deal.seekerName}</div>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {asset?.assetType && <span className="text-xs text-gray-500">{asset.assetType}</span>}
+            {asset?.dealType && <span className="text-xs text-gray-400">• {asset.dealType}</span>}
+            {asset?.loanAmount && <span className="text-xs font-bold text-[#0a1f44]">• {asset.loanAmount}</span>}
+            {asset?.address?.city && <span className="text-xs text-gray-400">📍 {asset.address.city}{asset.address.state ? ", " + asset.address.state : ""}</span>}
+            {deal.capitalType && <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full border border-blue-100">{deal.capitalType}</span>}
+          </div>
+          {/* Advisor avatars */}
+          {advisors.length > 0 && (
+            <div className="flex items-center gap-2 mb-3">
+              {advisors.map((a: any) => (
+                <div key={a.id} className="flex items-center gap-1.5">
+                  <img src={a.photo || "/logo1.JPEG"} alt={a.name} className="h-6 w-6 rounded-full object-cover border border-[#c9a84c]/30" />
+                  <span className="text-xs text-gray-500">{a.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {/* Open Deal button */}
+          <button onClick={e => { e.stopPropagation(); setExpanded(true); }}
+            className="w-full py-2 text-xs font-bold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-colors">
+            Open Deal →
+          </button>
         </div>
-      )}
+      </div>
+    );
+  }
+
+  // ── Expanded full deal view ─────────────────────────────────────────────────
+  return (
+    <div className="md:col-span-2 rounded-xl border border-[#0a1f44]/20 bg-white shadow-md overflow-hidden">
+      {/* Header bar with collapse button */}
+      <div className="flex items-center justify-between px-5 py-3 bg-[#0a1f44] text-white">
+        <div className="flex items-center gap-3">
+          <span className="font-display text-lg font-bold">{deal.seekerName}</span>
+          {deal.dealNumber && <span className="px-2 py-0.5 text-xs bg-[#c9a84c]/20 text-[#c9a84c] rounded-full font-bold border border-[#c9a84c]/30">{deal.dealNumber}</span>}
+        </div>
+        <button onClick={() => setExpanded(false)} className="text-white/60 hover:text-white text-sm font-semibold px-3 py-1 rounded-lg hover:bg-white/10">
+          ✕ Close
+        </button>
+      </div>
       <div className="p-5">
-      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start justify-between mb-4">
         <div>
           <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Deal #{deal.id}</div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -440,6 +505,7 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
           )}
         </div>
       )}
+
       </div>
     </div>
   );
