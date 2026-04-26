@@ -4501,8 +4501,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
           table { font-size: 12px; }
           th, td { padding: 8px 6px !important; }
         } [data-radix-select-content] { background: white !important; border: 1px solid #e5e7eb !important; color: #1f2937 !important; } [data-radix-select-item] { color: #1f2937 !important; } [data-radix-select-item]:hover, [data-radix-select-item][data-highlighted] { background: #f3f4f6 !important; color: #0a1f44 !important; }`}</style>
-      <div className="min-h-screen bg-[#f0f2f5] text-gray-800">
-        <div className="grid min-h-screen lg:grid-cols-[260px_1fr]">
+      <div className="h-screen bg-[#f0f2f5] text-gray-800 overflow-hidden">
+        <div className="grid h-screen lg:grid-cols-[260px_1fr] overflow-hidden">
           <aside className="border-r border-[#c9a84c]/10 bg-[#0a1f44] flex flex-col h-screen sticky top-0 overflow-y-auto">
             <div className="px-6 py-6 border-b border-[#c9a84c]/20">
               <div className="flex items-center justify-between mb-2 lg:hidden">
