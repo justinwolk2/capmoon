@@ -3971,7 +3971,7 @@ function DealMemoTab({ submittedDeals, teamMembers, lenderRecords, cardClass, in
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {photos.map(photo => (
                   <div key={photo.id} className="rounded-xl border border-gray-200 overflow-hidden">
-                    <img src={photo.url} alt={photo.name} className="w-full h-32 object-cover" />
+                    <img src={photo.url} alt={photo.name} className="w-full h-56 object-cover" />
                     <div className="p-2">
                       <input
                         value={photo.caption}
