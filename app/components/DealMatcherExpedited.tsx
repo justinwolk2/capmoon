@@ -66,6 +66,15 @@ const PROGRAM_LABELS: Record<string, string> = {
   "freddie-conventional": "Freddie Mac Optigo Conventional",
   "fannie-small": "Fannie Mae Small Loan ($750K–$9M)",
   "freddie-small": "Freddie Mac Small Balance ($1M–$7.5M)",
+  "hud-223f": "HUD 223(f) — Acq / Refi",
+  "hud-221d4": "HUD 221(d)(4) — New Construction",
+  "hud-223a7": "HUD 223(a)(7) — HUD-to-HUD Refi",
+  "hud-232": "HUD 232 — Senior / Healthcare",
+  "bridge": "Bridge Loan",
+  "construction": "Construction Loan",
+  "cmbs": "CMBS Conduit",
+  "life-co": "Life Company",
+  "sba-504": "SBA 504",
 };
 
 // Rate grids from Greystone 04/14/2026
@@ -315,35 +324,43 @@ export function DealMatcherExpedited({ lenderRecords, onSendToDealMatcher, sessi
           )}
         </div>
 
-        {/* Program Cards */}
-        <div className="grid md:grid-cols-2 gap-4 mb-6">
-          {[
-            { key: "fannie-conventional", label: "Fannie Mae", sub: "Conventional DUS", min: "$750K+", ltv: "80%", dscr: "1.25x", term: "5–15yr", color: "#003087" },
-            { key: "freddie-conventional", label: "Freddie Mac", sub: "Optigo Conventional", min: "$750K+", ltv: "80%", dscr: "1.25x", term: "5–15yr", color: "#00529b" },
-            { key: "fannie-small", label: "Fannie Mae", sub: "Small Loan", min: "$750K–$9M", ltv: "80%", dscr: "1.25x", term: "5–15yr", color: "#1a5276" },
-            { key: "freddie-small", label: "Freddie Mac", sub: "Small Balance", min: "$1M–$7.5M", ltv: "80%", dscr: "1.20x", term: "5–10yr", color: "#154360" },
-          ].map(prog => (
-            <button key={prog.key} onClick={() => { updDeal("capitalType", prog.key); setStep("intake"); }}
-              className="text-left rounded-2xl border-2 border-gray-200 bg-white p-5 hover:border-[#c9a84c] hover:shadow-md transition-all group">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-bold" style={{ background: prog.color }}>
-                  {prog.label.includes("Fannie") ? "FM" : "FR"}
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-[#0a1f44] group-hover:text-[#c9a84c] transition-colors">{prog.label}</div>
-                  <div className="text-xs text-gray-400">{prog.sub}</div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {[["Loan Size", prog.min], ["Max LTV", prog.ltv], ["Min DSCR", prog.dscr], ["Terms", prog.term]].map(([k, v]) => (
-                  <div key={k} className="bg-[#f0f2f5] rounded-lg px-2.5 py-1.5">
-                    <div className="text-xs text-gray-400">{k}</div>
-                    <div className="text-xs font-bold text-[#0a1f44]">{v}</div>
-                  </div>
-                ))}
-              </div>
+        {/* Program Dropdown */}
+        <div className="mb-6">
+          <label className="text-xs font-bold uppercase tracking-[0.2em] text-white/60 mb-2 block">Select Program</label>
+          <div className="relative">
+            <select value={deal.capitalType || ""} onChange={e => updDeal("capitalType", e.target.value)}
+              className="w-full px-4 py-3 text-sm font-semibold bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-[#c9a84c] appearance-none cursor-pointer">
+              <option value="" disabled className="text-gray-800 bg-white">— Choose a program —</option>
+              <optgroup label="── Agency: Fannie Mae / Freddie Mac" className="text-gray-800 bg-white">
+                <option value="fannie-conventional" className="text-gray-800 bg-white">Fannie Mae Conventional DUS — 80% LTV · 1.25x DSCR · 5–15yr</option>
+                <option value="freddie-conventional" className="text-gray-800 bg-white">Freddie Mac Optigo Conventional — 80% LTV · 1.25x DSCR · 5–15yr</option>
+                <option value="fannie-small" className="text-gray-800 bg-white">Fannie Mae Small Loan ($750K–$9M) — 80% LTV · 1.25x DSCR</option>
+                <option value="freddie-small" className="text-gray-800 bg-white">Freddie Mac Small Balance ($1M–$7.5M) — 80% LTV · 1.20x DSCR</option>
+              </optgroup>
+              <optgroup label="── HUD / FHA Programs" className="text-gray-800 bg-white">
+                <option value="hud-223f" className="text-gray-800 bg-white">HUD 223(f) — Acq / Refi — 85% LTV · 1.18x DSCR · 35yr fixed</option>
+                <option value="hud-221d4" className="text-gray-800 bg-white">HUD 221(d)(4) — New Construction — 87% LTC · 1.15x DSCR · 40yr</option>
+                <option value="hud-223a7" className="text-gray-800 bg-white">HUD 223(a)(7) — HUD-to-HUD Refinance — 100% eligible costs</option>
+                <option value="hud-232" className="text-gray-800 bg-white">HUD 232 — Senior / Healthcare — 75% LTC · 1.45x DSCR · 40yr</option>
+              </optgroup>
+              <optgroup label="── Bridge / Construction" className="text-gray-800 bg-white">
+                <option value="bridge" className="text-gray-800 bg-white">Bridge Loan — 65–75% LTV · SOFR + 250–450bps · 12–36mo</option>
+                <option value="construction" className="text-gray-800 bg-white">Construction Loan — 65–70% LTC · SOFR + 200–350bps · 12–36mo</option>
+              </optgroup>
+              <optgroup label="── Permanent / Other" className="text-gray-800 bg-white">
+                <option value="cmbs" className="text-gray-800 bg-white">CMBS Conduit — 65–75% LTV · 1.25x DSCR · 5/7/10yr fixed</option>
+                <option value="life-co" className="text-gray-800 bg-white">Life Company — 55–65% LTV · 1.25x DSCR · 10–25yr fixed</option>
+                <option value="sba-504" className="text-gray-800 bg-white">SBA 504 — 90% LTC · owner-occupied · 10/20/25yr</option>
+              </optgroup>
+            </select>
+            <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/60 text-xs">▼</div>
+          </div>
+          {deal.capitalType && (
+            <button onClick={() => setStep("intake")}
+              className="mt-3 w-full py-3 text-sm font-bold bg-[#c9a84c] text-[#0a1f44] rounded-xl hover:bg-[#c9a84c]/90 transition-colors">
+              Continue with {PROGRAM_LABELS[deal.capitalType as keyof typeof PROGRAM_LABELS] || deal.capitalType} →
             </button>
-          ))}
+          )}
         </div>
 
         {/* Placeholders */}
