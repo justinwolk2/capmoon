@@ -188,7 +188,13 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
   const statusLabel = (s: string) => s==="info_requested"?"Info Requested":s==="viewed"?"Viewed":s==="declined"?"Declined":s==="quoted"?"Quoted":"No Response Yet";
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+    <div className="rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
+      {deal.assets?.[0]?.propertyPhoto && (
+        <div className="w-full h-44 overflow-hidden">
+          <img src={deal.assets[0].propertyPhoto} alt="Property" className="w-full h-full object-cover" />
+        </div>
+      )}
+      <div className="p-5">
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Deal #{deal.id}</div>
@@ -434,6 +440,7 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

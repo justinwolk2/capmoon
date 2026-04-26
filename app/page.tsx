@@ -3514,7 +3514,7 @@ function CapitalSeekerPortal({ lenderRecords, onLogout, onSubmitDeal, session, t
                       <button onClick={() => setActiveTab("matcher")} className="px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Go to Deal Matcher</button>
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {myDeals.map((deal) => (
                         <div key={deal.id} className="rounded-xl border border-gray-200 bg-gray-50 p-5">
                           <div className="flex items-start justify-between mb-3">
