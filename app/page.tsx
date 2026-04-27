@@ -4105,6 +4105,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const [showAdvisorDeals, setShowAdvisorDeals] = useState(true);
   const [showClientDeals, setShowClientDeals] = useState(true);
   const [prefillDeal, setPrefillDeal] = useState<SubmittedDeal | null>(null);
+  const [viewingDealId, setViewingDealId] = useState<number | null>(null);
+  const [trashedDeals, setTrashedDeals] = useState<any[]>([]);
   const [lenderRecords, setLenderRecords] = useState<LenderRecord[]>(seedLenders);
   const [lendersLoaded, setLendersLoaded] = useState(false);
 
@@ -4272,6 +4274,24 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     alert(`Your edit request for "${lender.lender}" has been submitted for admin approval.`);
     setEditingLenderId(null);
   }
+  function deleteDeal(dealId: number) {
+    const deal = submittedDeals.find((d: any) => d.id === dealId);
+    if (!deal) return;
+    const trashed = { ...deal, trashedAt: new Date().toISOString() };
+    setTrashedDeals((prev: any[]) => [trashed, ...prev]);
+    setSubmittedDeals(submittedDeals.filter((d: any) => d.id !== dealId) as any);
+    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "deals", data: submittedDeals.filter((d: any) => d.id !== dealId) }) }).catch(console.error);
+  }
+
+  function restoreDeal(dealId: number) {
+    const deal = trashedDeals.find((d: any) => d.id === dealId);
+    if (!deal) return;
+    const { trashedAt, ...restored } = deal;
+    setSubmittedDeals([restored, ...submittedDeals] as any);
+    setTrashedDeals((prev: any[]) => prev.filter((d: any) => d.id !== dealId));
+  }
+
   function handleSaveLender(form: NewLenderForm) {
     if (!form.programName.trim()) { alert("Please enter a program/lender name."); return; }
     if (form.capitalTypes.length === 0) { alert("Please select at least one Capital Type."); return; }
@@ -4377,6 +4397,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     ["uploads", "Upload Center", Upload],
     ...(isAdmin ? [["user-management", "Admin Portal", Settings] as [string, string, any]] : []),
     ...(isAdmin ? [["deal-memos", "Deal Memos", FileText] as [string, string, any]] : []),
+    ...(isAdmin && trashedDeals.length > 0 ? [["trash", `Trash (${trashedDeals.length})`, Trash2] as [string, string, any]] : []),
     ...(isAdmin && pendingDeleteCount > 0 ? [["delete-queue", `Delete Requests (${pendingDeleteCount})`, Bell] as [string, string, any]] : []),
     ...(isAdmin && pendingLenderChangeCount > 0 ? [["lender-changes", `Lender Changes (${pendingLenderChangeCount})`, Bell] as [string, string, any]] : []),
   ];
@@ -5324,7 +5345,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                               {showMyDeals && (
                                 filteredAdmin.length === 0
                                   ? <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400 mb-4">No deals found</div>
-                                  : <div className="space-y-4 mb-4">{filteredAdmin.map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} />)}</div>
+                                  : <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">{filteredAdmin.map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} onDelete={isAdmin ? deleteDeal : undefined} />)}</div>
                               )}
                             </div>
                           )}
@@ -5342,7 +5363,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                               {showAdvisorDeals && (
                                 filteredAdvisor.length === 0
                                   ? <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400 mb-4">No deals found</div>
-                                  : <div className="space-y-4 mb-4">{filteredAdvisor.map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} />)}</div>
+                                  : <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">{filteredAdvisor.map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} onDelete={isAdmin ? deleteDeal : undefined} />)}</div>
                               )}
                             </div>
                           )}
@@ -5363,7 +5384,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                 ? <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400 mb-4">
                                     {clientDeals.length === 0 ? "No client deals yet." : "No deals match your filters."}
                                   </div>
-                                : <div className="space-y-4 mb-4">{filteredClient.map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} />)}</div>
+                                : <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">{filteredClient.map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} onDelete={isAdmin ? deleteDeal : undefined} />)}</div>
                             )}
                           </div>
 
@@ -5371,7 +5392,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                           {!isAdmin && (
                             visibleDeals.length === 0
                               ? <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">No deals assigned to you yet.</div>
-                              : <div className="space-y-4">{filterDeals(visibleDeals).map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} />)}</div>
+                              : <div className="grid grid-cols-1 md:grid-cols-2 gap-5">{filterDeals(visibleDeals).map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} onDelete={isAdmin ? deleteDeal : undefined} />)}</div>
                           )}
                         </>
                       );
@@ -5674,6 +5695,28 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                 </div>
               )}
 
+              {/* Trash */}
+              {activeTab === "trash" && isAdmin && (
+                <div className="space-y-4">
+                  <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Deleted Deals</div>
+                  <p className="text-xs text-gray-500">Deals deleted in the last 7 days. Click Restore to bring them back.</p>
+                  {trashedDeals.filter((d: any) => new Date(d.trashedAt).getTime() > Date.now() - 7*24*60*60*1000).map((deal: any) => (
+                    <div key={deal.id} className="rounded-xl border border-gray-200 bg-white p-4 flex items-center justify-between gap-4">
+                      <div>
+                        <div className="font-bold text-[#0a1f44]">{deal.seekerName}</div>
+                        <div className="text-xs text-gray-400">{deal.dealNumber} • {deal.assets?.[0]?.assetType} • {deal.assets?.[0]?.loanAmount}</div>
+                        <div className="text-xs text-red-400 mt-0.5">Deleted {new Date(deal.trashedAt).toLocaleDateString()} — expires {new Date(new Date(deal.trashedAt).getTime() + 7*24*60*60*1000).toLocaleDateString()}</div>
+                      </div>
+                      <button onClick={() => restoreDeal(deal.id)} className="px-4 py-2 text-xs font-bold bg-green-600 text-white rounded-xl hover:bg-green-700 flex-shrink-0">
+                        Restore
+                      </button>
+                    </div>
+                  ))}
+                  {trashedDeals.filter((d: any) => new Date(d.trashedAt).getTime() > Date.now() - 7*24*60*60*1000).length === 0 && (
+                    <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">No deleted deals</div>
+                  )}
+                </div>
+              )}
               {/* Deal Memos */}
               {activeTab === "deal-memos" && isAdmin && (
                 <DealMemoTab

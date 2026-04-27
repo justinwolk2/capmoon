@@ -2,10 +2,10 @@
 import React from "react";
 import { Filter, Users, Landmark, FileSpreadsheet, FileText } from "lucide-react";
 
-export function DealCard({ deal, session, isAdmin, teamMembers, users, submittedDeals, setSubmittedDeals, lenderRecords, setPrefillDeal, setActiveTab }: {
+export function DealCard({ deal, session, isAdmin, teamMembers, users, submittedDeals, setSubmittedDeals, lenderRecords, setPrefillDeal, setActiveTab, onDelete }: {
   deal: any; session: any; isAdmin: boolean; teamMembers: any[]; users: any[];
   submittedDeals: any[]; setSubmittedDeals: (d: any[]) => void;
-  lenderRecords: any[]; setPrefillDeal: (d: any) => void; setActiveTab: (t: string) => void;
+  lenderRecords: any[]; setPrefillDeal: (d: any) => void; setActiveTab: (t: string) => void; onDelete?: (id: number) => void;
 }) {
   const [showInvite, setShowInvite] = React.useState(false);
   const [showLenderResponses, setShowLenderResponses] = React.useState(false);
@@ -255,11 +255,11 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
             </div>
             <div className="bg-[#f0f2f5] rounded-lg px-2.5 py-1.5">
               <div className="text-xs text-gray-400">Loan Amount</div>
-              <div className="text-xs font-bold text-[#0a1f44]">{asset?.loanAmount || "—"}</div>
+              <div className="text-xs font-bold text-[#0a1f44]">{asset?.loanAmount ? (asset.loanAmount.startsWith("$") ? asset.loanAmount : "$" + asset.loanAmount) : "—"}</div>
             </div>
             <div className="bg-[#f0f2f5] rounded-lg px-2.5 py-1.5">
               <div className="text-xs text-gray-400">NOI</div>
-              <div className="text-xs font-bold text-[#0a1f44]">{asset?.currentNetIncome || "—"}</div>
+              <div className="text-xs font-bold text-[#0a1f44]">{asset?.currentNetIncome ? (asset.currentNetIncome.startsWith("$") ? asset.currentNetIncome : "$" + asset.currentNetIncome) : "—"}</div>
             </div>
           </div>
           {asset?.dealType && <div className="text-xs text-gray-400 mb-2">Deal Type: <span className="font-semibold text-[#0a1f44]">{asset.dealType}</span></div>}
@@ -295,9 +295,17 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
           {deal.dealNumber && <span className="px-2 py-0.5 text-xs bg-[#c9a84c]/20 text-[#c9a84c] rounded-full font-bold border border-[#c9a84c]/30">{deal.dealNumber}</span>}
           {asset?.address?.city && <span className="text-white/50 text-sm">📍 {asset.address.city}{asset.address.state ? ", " + asset.address.state : ""}</span>}
         </div>
-        <button onClick={() => setShowMemo(!showMemo)} className="px-3 py-1.5 text-xs font-bold bg-[#c9a84c] text-[#0a1f44] rounded-lg hover:bg-[#c9a84c]/80">
-          📄 {showMemo ? "Hide Memo" : "Edit Deal Memo"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowMemo(!showMemo)} className="px-3 py-1.5 text-xs font-bold bg-[#c9a84c] text-[#0a1f44] rounded-lg hover:bg-[#c9a84c]/80">
+            📄 {showMemo ? "Hide Memo" : "Edit Deal Memo"}
+          </button>
+          {onDelete && (
+            <button onClick={() => { if(window.confirm("Move this deal to trash?")) { onDelete(deal.id); setExpanded(false); } }}
+              className="px-3 py-1.5 text-xs font-bold bg-red-500 text-white rounded-lg hover:bg-red-600">
+              🗑 Delete
+            </button>
+          )}
+        </div>
       </div>
       <div className="p-5">
         <div className="flex items-start justify-between mb-4">
