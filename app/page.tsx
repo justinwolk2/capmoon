@@ -5409,7 +5409,12 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                 : <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">{filteredClient.map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} onDelete={isAdmin ? deleteDeal : undefined} expandedDealId={expandedDealId} setExpandedDealId={setExpandedDealId} />)}</div>
                             )}
                           </div>
+                          )}
 
+                          {expandedDealId && (() => {
+                            const ed = submittedDeals.find((d: any) => d.id === expandedDealId);
+                            return ed ? <DealCard key={ed.id} deal={ed} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} onDelete={isAdmin ? deleteDeal : undefined} expandedDealId={expandedDealId} setExpandedDealId={setExpandedDealId} /> : null;
+                          })()}
                           {/* Non-admin: just show visible deals with search */}
                           {!isAdmin && (
                             visibleDeals.length === 0
