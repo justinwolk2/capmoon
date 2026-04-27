@@ -5270,6 +5270,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                       const clientDeals = visibleDeals.filter(d => {
                         return !adminDeals.includes(d) && !advisorDeals.includes(d);
                       });
+                      const deletedDeals = submittedDeals.filter((d: any) => d.deletedAt && new Date(d.deletedAt).getTime() > Date.now() - 7*24*60*60*1000);
 
                       // Unique advisors + clients for dropdowns
                       const advisorOptions = teamMembers.map(m => m.name);
