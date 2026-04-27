@@ -5238,7 +5238,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                 const currentTeamMemberId = session?.user.teamMemberId;
                 const isLenderRole = session?.user.role === "lender";
                 const visibleDeals = isAdmin
-                  ? submittedDeals
+                  ? submittedDeals.filter((d: any) => !d.deletedAt)
                   : isLenderRole
                   ? [] // lenders see deals via lender portal, not here
                   : submittedDeals.filter((d) =>
