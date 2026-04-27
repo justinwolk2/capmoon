@@ -695,5 +695,6 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
           Save & Go Back
         </button>
       </div>
+    </div>
   );
 }
