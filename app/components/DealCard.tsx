@@ -681,7 +681,7 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
       </div>
       {/* Save / Discard */}
       <div className="mt-6 pt-4 border-t border-gray-200 flex items-center justify-between">
-        <button onClick={() => { if(window.confirm("Discard changes and go back?")) setExpanded(false); }}
+        <button onClick={() => { const ok = window.confirm("Discard and go back?"); if(ok) setExpanded(false); }}
           className="px-5 py-2.5 text-sm font-semibold border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50 transition-colors">
           Discard &amp; Go Back
         </button>
