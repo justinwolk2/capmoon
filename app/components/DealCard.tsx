@@ -323,14 +323,14 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
               {deal.status === "term-sheet-accepted" && <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full font-bold border border-green-200">✓ Term Sheet Accepted</span>}
               {deal.status === "closed" && <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full font-bold border border-purple-200">Closed</span>}
             </div>
-          <div className="flex flex-wrap gap-2 mt-1">
-            {deal.assets[0]?.assetType && <span className="text-xs text-gray-500 font-medium">{deal.assets[0].assetType}</span>}
-            {deal.assets[0]?.loanAmount && <span className="text-xs text-[#0a1f44] font-bold">{deal.assets[0].loanAmount}</span>}
-            {deal.capitalType && <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100">{deal.capitalType}</span>}
-            {deal.assets[0]?.address?.city && <span className="text-xs text-gray-400">📍 {deal.assets[0].address.city}, {deal.assets[0].address.state}</span>}
+            <div className="flex flex-wrap gap-2 mt-1">
+              {deal.assets[0]?.assetType && <span className="text-xs text-gray-500 font-medium">{deal.assets[0].assetType}</span>}
+              {deal.assets[0]?.loanAmount && <span className="text-xs text-[#0a1f44] font-bold">{deal.assets[0].loanAmount}</span>}
+              {deal.capitalType && <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100">{deal.capitalType}</span>}
+              {deal.assets[0]?.address?.city && <span className="text-xs text-gray-400">📍 {deal.assets[0].address.city}, {deal.assets[0].address.state}</span>}
+            </div>
+            <div className="text-xs text-gray-400 mt-0.5">Submitted: {deal.submittedAt}</div>
           </div>
-          <div className="text-xs text-gray-400 mt-0.5">Submitted: {deal.submittedAt}</div>
-        </div>
         <select value={deal.status} onChange={(e) => updateDealStatus(e.target.value)}
           className={`px-3 py-1 rounded-full text-xs font-semibold border cursor-pointer ${deal.status==="pending"?"bg-amber-50 text-amber-600 border-amber-200":deal.status==="assigned"?"bg-blue-50 text-blue-600 border-blue-200":deal.status==="sent-to-lenders"?"bg-indigo-50 text-indigo-600 border-indigo-200":deal.status==="term-sheet-accepted"?"bg-green-50 text-green-600 border-green-200":"bg-purple-50 text-purple-600 border-purple-200"}`}>
           <option value="pending">Pending</option><option value="assigned">Assigned</option><option value="sent-to-lenders">Sent to Lenders</option><option value="term-sheet-accepted">Term Sheet Accepted</option><option value="closed">Closed</option>
