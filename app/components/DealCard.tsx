@@ -2,10 +2,10 @@
 import React from "react";
 import { Filter, Users, Landmark, FileSpreadsheet, FileText } from "lucide-react";
 
-export function DealCard({ deal, session, isAdmin, teamMembers, users, submittedDeals, setSubmittedDeals, lenderRecords, setPrefillDeal, setActiveTab, onDelete }: {
+export function DealCard({ deal, session, isAdmin, teamMembers, users, submittedDeals, setSubmittedDeals, lenderRecords, setPrefillDeal, setActiveTab, onDelete, expandedDealId, setExpandedDealId }: {
   deal: any; session: any; isAdmin: boolean; teamMembers: any[]; users: any[];
   submittedDeals: any[]; setSubmittedDeals: (d: any[]) => void;
-  lenderRecords: any[]; setPrefillDeal: (d: any) => void; setActiveTab: (t: string) => void; onDelete?: (id: number) => void;
+  lenderRecords: any[]; setPrefillDeal: (d: any) => void; setActiveTab: (t: string) => void; onDelete?: (id: number) => void; expandedDealId?: number | null; setExpandedDealId?: (id: number | null) => void;
 }) {
   const [showInvite, setShowInvite] = React.useState(false);
   const [showLenderResponses, setShowLenderResponses] = React.useState(false);
@@ -15,7 +15,12 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
   const [editingDeal, setEditingDeal] = React.useState(false);
   const [showAcceptTermSheet, setShowAcceptTermSheet] = React.useState(false);
   const [acceptingLender, setAcceptingLender] = React.useState("");
-  const [expanded, setExpanded] = React.useState(false);
+  const [localExpanded, setLocalExpanded] = React.useState(false);
+  const expanded = expandedDealId !== undefined ? expandedDealId === deal.id : localExpanded;
+  const setExpanded = (val: boolean) => {
+    if (setExpandedDealId) setExpandedDealId(val ? deal.id : null);
+    else setLocalExpanded(val);
+  };
   const [showMemo, setShowMemo] = React.useState(false);
   const [memoFields, setMemoFields] = React.useState<Record<string,string>>({
     dealTitle: (deal.seekerName || "") + " — " + (deal.assets?.[0]?.assetType || "") + (deal.assets?.[0]?.address?.city ? " — " + deal.assets?.[0]?.address?.city : ""),

@@ -4106,6 +4106,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const [showClientDeals, setShowClientDeals] = useState(true);
   const [prefillDeal, setPrefillDeal] = useState<SubmittedDeal | null>(null);
   const [viewingDealId, setViewingDealId] = useState<number | null>(null);
+  const [expandedDealId, setExpandedDealId] = useState<number | null>(null);
   const [trashedDeals, setTrashedDeals] = useState<any[]>([]);
   const [lenderRecords, setLenderRecords] = useState<LenderRecord[]>(seedLenders);
   const [lendersLoaded, setLendersLoaded] = useState(false);
@@ -4397,7 +4398,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     ["uploads", "Upload Center", Upload],
     ...(isAdmin ? [["user-management", "Admin Portal", Settings] as [string, string, any]] : []),
     ...(isAdmin ? [["deal-memos", "Deal Memos", FileText] as [string, string, any]] : []),
-    ...(isAdmin && trashedDeals.length > 0 ? [["trash", `Trash (${trashedDeals.length})`, Trash2] as [string, string, any]] : []),
+
     ...(isAdmin && pendingDeleteCount > 0 ? [["delete-queue", `Delete Requests (${pendingDeleteCount})`, Bell] as [string, string, any]] : []),
     ...(isAdmin && pendingLenderChangeCount > 0 ? [["lender-changes", `Lender Changes (${pendingLenderChangeCount})`, Bell] as [string, string, any]] : []),
   ];
@@ -5338,21 +5339,41 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                             </div>
                           </div>
 
+                          {/* Deleted Deals Section */}
+                          {isAdmin && trashedDeals.length > 0 && !expandedDealId && (
+                            <div className="mb-6 rounded-xl border border-red-100 bg-red-50/30 p-4">
+                              <div className="text-xs font-bold uppercase tracking-[0.15em] text-red-400 mb-3">🗑 Deleted Deals — Recoverable for 7 Days</div>
+                              <div className="space-y-2">
+                                {trashedDeals.filter((d: any) => new Date(d.trashedAt).getTime() > Date.now() - 7*24*60*60*1000).map((deal: any) => (
+                                  <div key={deal.id} className="rounded-xl bg-white border border-red-100 p-3 flex items-center justify-between gap-4">
+                                    <div>
+                                      <div className="text-sm font-bold text-[#0a1f44]">{deal.seekerName}</div>
+                                      <div className="text-xs text-gray-400">{deal.dealNumber} • {deal.assets?.[0]?.assetType} • {deal.assets?.[0]?.loanAmount}</div>
+                                      <div className="text-xs text-red-400 mt-0.5">Deleted {new Date(deal.trashedAt).toLocaleDateString()} — expires {new Date(new Date(deal.trashedAt).getTime() + 7*24*60*60*1000).toLocaleDateString()}</div>
+                                    </div>
+                                    <button onClick={() => restoreDeal(deal.id)} className="px-4 py-2 text-xs font-bold bg-green-600 text-white rounded-xl hover:bg-green-700 flex-shrink-0">
+                                      Restore
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                           {/* My Deals / Admin Section */}
-                          {isAdmin && (
+                          {isAdmin && !expandedDealId && (
                             <div className="mb-6">
                               <SectionHeader title="My Deals" count={filteredAdmin.length} color="#0a1f44" show={showMyDeals} onToggle={() => setShowMyDeals(p => !p)} />
                               {showMyDeals && (
                                 filteredAdmin.length === 0
                                   ? <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400 mb-4">No deals found</div>
-                                  : <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">{filteredAdmin.map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} onDelete={isAdmin ? deleteDeal : undefined} />)}</div>
+                                  : <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">{filteredAdmin.map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} onDelete={isAdmin ? deleteDeal : undefined} expandedDealId={expandedDealId} setExpandedDealId={setExpandedDealId} />)}</div>
                               )}
                             </div>
                           )}
 
                           {/* Advisor Deals Section */}
-                          {isAdmin && (
-                            <div className="mb-6">
+                          {isAdmin && !expandedDealId && (
+                          <div className="mb-6">
                               <SectionHeader title="Capital Advisor Deals" count={filteredAdvisor.length} color="#c9a84c" show={showAdvisorDeals} onToggle={() => setShowAdvisorDeals(p => !p)}>
                                 <select value={filterAdvisor} onChange={e => setFilterAdvisor(e.target.value)}
                                   className="px-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] text-gray-600">
@@ -5363,12 +5384,13 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                               {showAdvisorDeals && (
                                 filteredAdvisor.length === 0
                                   ? <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400 mb-4">No deals found</div>
-                                  : <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">{filteredAdvisor.map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} onDelete={isAdmin ? deleteDeal : undefined} />)}</div>
+                                  : <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">{filteredAdvisor.map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} onDelete={isAdmin ? deleteDeal : undefined} expandedDealId={expandedDealId} setExpandedDealId={setExpandedDealId} />)}</div>
                               )}
                             </div>
                           )}
 
                           {/* Client Deals Section */}
+                          {!expandedDealId && (
                           <div className="mb-6">
                             <SectionHeader title="Client / Customer Deals" count={filteredClient.length} color="#10b981" show={showClientDeals} onToggle={() => setShowClientDeals(p => !p)}>
                               {clientOptions.length > 0 && (
@@ -5384,7 +5406,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                 ? <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400 mb-4">
                                     {clientDeals.length === 0 ? "No client deals yet." : "No deals match your filters."}
                                   </div>
-                                : <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">{filteredClient.map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} onDelete={isAdmin ? deleteDeal : undefined} />)}</div>
+                                : <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">{filteredClient.map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} onDelete={isAdmin ? deleteDeal : undefined} expandedDealId={expandedDealId} setExpandedDealId={setExpandedDealId} />)}</div>
                             )}
                           </div>
 
@@ -5392,7 +5414,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                           {!isAdmin && (
                             visibleDeals.length === 0
                               ? <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">No deals assigned to you yet.</div>
-                              : <div className="grid grid-cols-1 md:grid-cols-2 gap-5">{filterDeals(visibleDeals).map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} onDelete={isAdmin ? deleteDeal : undefined} />)}</div>
+                              : <div className="grid grid-cols-1 md:grid-cols-2 gap-5">{filterDeals(visibleDeals).map(d => <DealCard key={d.id} deal={d} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} onDelete={isAdmin ? deleteDeal : undefined} expandedDealId={expandedDealId} setExpandedDealId={setExpandedDealId} />)}</div>
                           )}
                         </>
                       );
