@@ -17,7 +17,22 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
   const [acceptingLender, setAcceptingLender] = React.useState("");
   const [expanded, setExpanded] = React.useState(false);
   const [showMemo, setShowMemo] = React.useState(false);
-  const [memoFields, setMemoFields] = React.useState<Record<string,string>>({});
+  const [memoFields, setMemoFields] = React.useState<Record<string,string>>({
+    dealTitle: (deal.seekerName || "") + " — " + (deal.assets?.[0]?.assetType || "") + (deal.assets?.[0]?.address?.city ? " — " + deal.assets?.[0]?.address?.city : ""),
+    borrowerName: deal.seekerName || "",
+    propertyAddress: [deal.assets?.[0]?.address?.street, deal.assets?.[0]?.address?.city, deal.assets?.[0]?.address?.state].filter(Boolean).join(", "),
+    assetType: deal.assets?.[0]?.assetType || "",
+    capitalType: deal.capitalType || "",
+    loanAmount: deal.assets?.[0]?.loanAmount || "",
+    propertyValue: deal.assets?.[0]?.propertyValue || "",
+    ltv: deal.assets?.[0]?.manualLtv || "",
+    currentNetIncome: deal.assets?.[0]?.currentNetIncome || "",
+    dscr: deal.assets?.[0]?.dscr || "",
+    executiveSummary: (deal.seekerName || "") + " is seeking " + (deal.assets?.[0]?.loanAmount || "TBD") + " in " + (deal.capitalType || "") + " financing for a " + (deal.assets?.[0]?.assetType || "") + " located at " + [deal.assets?.[0]?.address?.city, deal.assets?.[0]?.address?.state].filter(Boolean).join(", ") + ".",
+    capitalStack: "Loan Amount: " + (deal.assets?.[0]?.loanAmount || "TBD") + "\nProperty Value: " + (deal.assets?.[0]?.propertyValue || "TBD") + "\nCapital Type: " + (deal.capitalType || "") + "\nRecourse: " + (deal.assets?.[0]?.recourseType || "TBD"),
+    sponsorProfile: "Borrower: " + (deal.seekerName || "") + "\nEmail: " + (deal.seekerEmail || ""),
+    notes: deal.notes || "",
+  });
   const [threadMessages, setThreadMessages] = React.useState<Record<string, any[]>>({});
   const [threadInput, setThreadInput] = React.useState<Record<string, string>>({});
   const [threadLoading, setThreadLoading] = React.useState<Record<string, boolean>>({});
@@ -193,43 +208,64 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
   const asset = deal.assets?.[0];
 
   if (!expanded) {
+    const assetIcon = asset?.assetType?.includes("Apartment") ? "🏢" : asset?.assetType?.includes("Office") ? "🏛" : asset?.assetType?.includes("Hotel") ? "🏨" : asset?.assetType?.includes("Retail") ? "🏪" : asset?.assetType?.includes("Industrial") ? "🏭" : asset?.assetType?.includes("Land") ? "🌿" : "🏗";
     return (
-      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => setExpanded(true)}>
-        {/* Property photo hero */}
-        {asset?.propertyPhoto ? (
-          <div className="w-full h-56 overflow-hidden">
-            <img src={asset.propertyPhoto} alt="Property" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-          </div>
-        ) : (
-          <div className="w-full h-44 bg-gradient-to-br from-[#0a1f44] to-[#1a3a6e] flex flex-col items-center justify-center gap-2">
-            <div className="text-6xl opacity-20">{asset?.assetType?.includes("Apartment") ? "🏢" : asset?.assetType?.includes("Office") ? "🏛" : asset?.assetType?.includes("Hotel") ? "🏨" : asset?.assetType?.includes("Retail") ? "🏪" : asset?.assetType?.includes("Industrial") ? "🏭" : "🏗"}</div>
-          </div>
-        )}
-        <div className="p-4">
-          {/* Status + deal number */}
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {deal.dealNumber && <span className="px-2 py-0.5 text-xs bg-[#c9a84c]/20 text-[#0a1f44] rounded-full font-bold border border-[#c9a84c]/30">{deal.dealNumber}</span>}
-              {deal.status === "pending" && <span className="px-2 py-0.5 text-xs bg-amber-50 text-amber-600 rounded-full font-bold border border-amber-200">Pending</span>}
-              {deal.status === "assigned" && <span className="px-2 py-0.5 text-xs bg-blue-50 text-blue-600 rounded-full font-bold border border-blue-200">Assigned</span>}
-              {deal.status === "sent-to-lenders" && <span className="px-2 py-0.5 text-xs bg-indigo-50 text-indigo-600 rounded-full font-bold border border-indigo-200">Out to Lenders</span>}
-              {deal.status === "term-sheet-accepted" && <span className="px-2 py-0.5 text-xs bg-green-50 text-green-700 rounded-full font-bold border border-green-200">✓ Term Sheet</span>}
-              {deal.status === "closed" && <span className="px-2 py-0.5 text-xs bg-purple-50 text-purple-700 rounded-full font-bold border border-purple-200">🏆 Closed</span>}
+      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-lg transition-all flex flex-col">
+        {/* Square photo or placeholder */}
+        <div className="w-full aspect-square overflow-hidden relative">
+          {asset?.propertyPhoto ? (
+            <img src={asset.propertyPhoto} alt="Property" className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-[#0a1f44] to-[#1a3a6e] flex flex-col items-center justify-center gap-3">
+              <div className="text-6xl opacity-25">{assetIcon}</div>
+              <div className="text-white/40 text-sm font-medium text-center px-4">{asset?.assetType || "Commercial Real Estate"}</div>
             </div>
-            <span className="text-xs text-gray-400">{deal.submittedAt?.split(",")[0]}</span>
+          )}
+          {/* Status badge overlaid on photo */}
+          <div className="absolute top-3 left-3 flex gap-1.5 flex-wrap">
+            {deal.dealNumber && <span className="px-2 py-0.5 text-xs bg-[#c9a84c] text-[#0a1f44] rounded-full font-bold shadow-sm">{deal.dealNumber}</span>}
+            {deal.status === "pending" && <span className="px-2 py-0.5 text-xs bg-amber-500 text-white rounded-full font-bold shadow-sm">Pending</span>}
+            {deal.status === "assigned" && <span className="px-2 py-0.5 text-xs bg-blue-500 text-white rounded-full font-bold shadow-sm">Assigned</span>}
+            {deal.status === "sent-to-lenders" && <span className="px-2 py-0.5 text-xs bg-indigo-500 text-white rounded-full font-bold shadow-sm">Out to Lenders</span>}
+            {deal.status === "term-sheet-accepted" && <span className="px-2 py-0.5 text-xs bg-green-500 text-white rounded-full font-bold shadow-sm">✓ Term Sheet</span>}
+            {deal.status === "closed" && <span className="px-2 py-0.5 text-xs bg-purple-500 text-white rounded-full font-bold shadow-sm">🏆 Closed</span>}
           </div>
-          {/* Borrower + asset info */}
-          <div className="font-display text-lg font-bold text-[#0a1f44] leading-tight mb-1">{deal.seekerName}</div>
-          <div className="flex flex-wrap gap-2 mb-3">
-            {asset?.assetType && <span className="text-xs text-gray-500">{asset.assetType}</span>}
-            {asset?.dealType && <span className="text-xs text-gray-400">• {asset.dealType}</span>}
-            {asset?.loanAmount && <span className="text-xs font-bold text-[#0a1f44]">• {asset.loanAmount}</span>}
-            {asset?.address?.city && <span className="text-xs text-gray-400">📍 {asset.address.city}{asset.address.state ? ", " + asset.address.state : ""}</span>}
-            {deal.capitalType && <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full border border-blue-100">{deal.capitalType}</span>}
+          <div className="absolute top-3 right-3">
+            <span className="text-xs text-white/70 bg-black/30 px-2 py-0.5 rounded-full">{deal.submittedAt?.split(",")[0]}</span>
           </div>
-          {/* Advisor avatars */}
+        </div>
+        {/* Card body */}
+        <div className="p-4 flex flex-col flex-1">
+          <div className="font-display text-xl font-bold text-[#0a1f44] leading-tight mb-1">{deal.seekerName}</div>
+          {/* Address */}
+          {(asset?.address?.street || asset?.address?.city) && (
+            <div className="text-xs text-gray-500 mb-2">
+              📍 {[asset.address.street, asset.address.city, asset.address.state].filter(Boolean).join(", ")}
+            </div>
+          )}
+          {/* Metric grid */}
+          <div className="grid grid-cols-2 gap-1.5 mb-3">
+            <div className="bg-[#f0f2f5] rounded-lg px-2.5 py-1.5">
+              <div className="text-xs text-gray-400">Property Type</div>
+              <div className="text-xs font-bold text-[#0a1f44] truncate">{asset?.assetType || "—"}</div>
+            </div>
+            <div className="bg-[#f0f2f5] rounded-lg px-2.5 py-1.5">
+              <div className="text-xs text-gray-400">Capital Type</div>
+              <div className="text-xs font-bold text-[#0a1f44] truncate">{deal.capitalType || "—"}</div>
+            </div>
+            <div className="bg-[#f0f2f5] rounded-lg px-2.5 py-1.5">
+              <div className="text-xs text-gray-400">Loan Amount</div>
+              <div className="text-xs font-bold text-[#0a1f44]">{asset?.loanAmount || "—"}</div>
+            </div>
+            <div className="bg-[#f0f2f5] rounded-lg px-2.5 py-1.5">
+              <div className="text-xs text-gray-400">NOI</div>
+              <div className="text-xs font-bold text-[#0a1f44]">{asset?.currentNetIncome || "—"}</div>
+            </div>
+          </div>
+          {asset?.dealType && <div className="text-xs text-gray-400 mb-2">Deal Type: <span className="font-semibold text-[#0a1f44]">{asset.dealType}</span></div>}
+          {/* Advisors */}
           {advisors.length > 0 && (
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-2 mb-3 pt-2 border-t border-gray-100">
               {advisors.map((a: any) => (
                 <div key={a.id} className="flex items-center gap-1.5">
                   <img src={a.photo || "/logo1.JPEG"} alt={a.name} className="h-6 w-6 rounded-full object-cover border border-[#c9a84c]/30" />
@@ -238,9 +274,8 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
               ))}
             </div>
           )}
-          {/* Open Deal button */}
-          <button onClick={e => { e.stopPropagation(); setExpanded(true); }}
-            className="w-full py-2 text-xs font-bold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 transition-colors">
+          <button onClick={() => setExpanded(true)}
+            className="mt-auto w-full py-2.5 text-sm font-bold bg-[#0a1f44] text-white rounded-xl hover:bg-[#c9a84c] hover:text-[#0a1f44] transition-colors">
             Open Deal →
           </button>
         </div>
@@ -511,6 +546,92 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
         </div>
       )}
 
+      {/* Deal Memo Editor */}
+      {showMemo && (
+        <div className="mt-4 border-t border-[#c9a84c]/20 pt-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-sm font-bold text-[#0a1f44] uppercase tracking-wide">📄 Deal Memo Editor</div>
+            <div className="flex gap-2">
+              <button onClick={async () => {
+                const res = await fetch("/api/generate-memo", { method: "POST", headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ deal, memoFields }) });
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a"); a.href = url;
+                a.download = (memoFields.dealTitle || "DealMemo").replace(/[^a-zA-Z0-9]/g, "_") + ".doc";
+                a.click(); URL.revokeObjectURL(url);
+              }} className="px-3 py-1.5 text-xs font-bold border border-[#0a1f44] text-[#0a1f44] rounded-xl hover:bg-[#0a1f44] hover:text-white transition-colors">
+                ⬇ Export Word
+              </button>
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 mb-4">
+            {[
+              ["Deal Title", "dealTitle"], ["Borrower Name", "borrowerName"],
+              ["Property Address", "propertyAddress"], ["Asset Type", "assetType"],
+              ["Capital Type", "capitalType"], ["Loan Amount", "loanAmount"],
+              ["Property Value / ARV", "propertyValue"], ["LTV", "ltv"],
+              ["NOI", "currentNetIncome"], ["DSCR", "dscr"],
+            ].map(([label, key]) => (
+              <div key={key}>
+                <label className="text-xs text-gray-500 mb-1 block font-bold uppercase">{label}</label>
+                <input value={memoFields[key] || ""} onChange={e => setMemoFields((p: any) => ({...p, [key]: e.target.value}))}
+                  className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-3">
+            {[
+              ["Executive Summary", "executiveSummary", 4],
+              ["Capital Stack", "capitalStack", 3],
+              ["Sponsor / Borrower Profile", "sponsorProfile", 3],
+              ["Market Overview", "marketOverview", 3],
+              ["Financial Summary", "financialSummary", 3],
+              ["Notes / Additional Info", "notes", 3],
+            ].map(([label, key, rows]) => (
+              <div key={key as string}>
+                <label className="text-xs text-gray-500 mb-1 block font-bold uppercase">{label}</label>
+                <textarea value={memoFields[key as string] || ""} onChange={e => setMemoFields((p: any) => ({...p, [key as string]: e.target.value}))}
+                  rows={rows as number}
+                  className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44] resize-none" />
+              </div>
+            ))}
+          </div>
+          {/* Photo upload */}
+          <div className="mt-4">
+            <label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Property Photos</label>
+            <label className="flex items-center gap-2 px-4 py-2 text-xs font-semibold border border-[#0a1f44]/20 text-[#0a1f44] rounded-xl hover:bg-[#0a1f44]/5 cursor-pointer w-fit">
+              + Upload Photos
+              <input type="file" accept="image/*" multiple className="hidden" onChange={async (e) => {
+                const files = Array.from(e.target.files || []);
+                for (const file of files) {
+                  const formData = new FormData();
+                  formData.append("file", file);
+                  formData.append("dealId", String(deal.id));
+                  formData.append("dealNumber", deal.dealNumber || "");
+                  formData.append("type", "Photo");
+                  formData.append("label", file.name);
+                  formData.append("uploadedBy", "Advisor");
+                  await fetch("/api/upload", { method: "POST", body: formData });
+                }
+                // Refresh docs
+                const d = await fetch("/api/upload?dealId=" + deal.id).then(r => r.json());
+                if (Array.isArray(d)) setDealDocs(d);
+              }} />
+            </label>
+            {dealDocs.filter((d: any) => d.type === "Photo" || d.label?.match(/.(jpg|jpeg|png|webp|gif)/i)).length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mt-3">
+                {dealDocs.filter((d: any) => d.type === "Photo" || d.label?.match(/.(jpg|jpeg|png|webp|gif)/i)).map((doc: any) => (
+                  <div key={doc.id} className="rounded-xl overflow-hidden border border-gray-200">
+                    <img src={doc.url} alt={doc.label} className="w-full h-24 object-cover" />
+                    <div className="p-1.5 text-xs text-gray-400 truncate">{doc.label}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
