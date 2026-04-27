@@ -46,7 +46,8 @@ export async function POST(req: NextRequest) {
     }
 
     const ext = file.name.split(".").pop() || "bin";
-    const filename = `deals/${dealId}/${Date.now()}-${docLabel.replace(/[^a-z0-9]/gi, "_")}.${ext}`;
+    const baseName = docLabel.replace(/\.[^.]+$/, "").replace(/[^a-z0-9]/gi, "_").slice(0, 40);
+    const filename = `deals/${dealId}/${Date.now()}-${baseName}.${ext}`;
     const blob = await put(filename, file, { access: "public" });
 
     const result = await sql`
