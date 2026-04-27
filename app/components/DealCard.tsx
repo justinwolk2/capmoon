@@ -613,14 +613,30 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
               const isMain = deal.assets?.[0]?.propertyPhoto === photoUrl;
               return (
                 <div key={doc.id} className={"rounded-xl overflow-hidden border-2 " + (isMain ? "border-[#c9a84c]" : "border-gray-200")}>
-                  <img src={photoUrl} alt={doc.document_name || doc.label} className="w-full h-24 object-cover" />
+                  <img src={photoUrl} alt={doc.document_name || doc.label} className="w-full h-32 object-cover" />
+                  <div className="flex">
                   <button onClick={() => {
                     const updatedDeal = { ...deal, assets: deal.assets.map((a: any, i: number) => i === 0 ? { ...a, propertyPhoto: isMain ? "" : photoUrl } : a) };
                     setSubmittedDeals(submittedDeals.map((d: any) => d.id === deal.id ? updatedDeal : d));
                     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [updatedDeal] }) });
-                  }} className={"w-full text-xs py-1 font-semibold transition-colors " + (isMain ? "bg-[#c9a84c] text-[#0a1f44]" : "bg-gray-100 text-gray-500 hover:bg-[#0a1f44] hover:text-white")}>
-                    {isMain ? "★ Main Photo" : "Set as Main"}
+                  }} className={"flex-1 text-xs py-1 font-semibold transition-colors " + (isMain ? "bg-[#c9a84c] text-[#0a1f44]" : "bg-gray-100 text-gray-500 hover:bg-[#0a1f44] hover:text-white")}>
+                    {isMain ? "★ Main" : "Set Main"}
                   </button>
+                  <button onClick={async () => {
+                    if (!window.confirm("Delete this photo?")) return;
+                    await fetch("/api/upload?id=" + doc.id, { method: "DELETE" });
+                    const updated = await fetch("/api/upload?dealId=" + deal.id).then(r => r.json());
+                    if (Array.isArray(updated)) setDealDocs(updated);
+                    if (isMain) {
+                      const photos = updated.filter((d: any) => d.document_type === "Photo");
+                      const ud = { ...deal, assets: deal.assets.map((a: any, i: number) => i === 0 ? { ...a, propertyPhoto: photos[0]?.document_url || "" } : a) };
+                      setSubmittedDeals(submittedDeals.map((d: any) => d.id === deal.id ? ud : d));
+                      fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [ud] }) });
+                    }
+                  }} className="px-3 text-xs py-1 font-semibold bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                    🗑
+                  </button>
+                  </div>
                 </div>
               );
             })}
