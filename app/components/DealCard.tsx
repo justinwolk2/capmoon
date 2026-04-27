@@ -314,8 +314,8 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
       </div>
       <div className="p-5">
         <div className="flex items-start justify-between mb-4">
-        <div>
-          <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Deal #{deal.id}</div>
+          <div>
+            <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Deal #{deal.id}</div>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="text-base font-bold text-[#0a1f44]">{deal.seekerName}</div>
             {deal.dealNumber && <span className="px-2 py-0.5 text-xs bg-[#c9a84c]/20 text-[#0a1f44] rounded-full font-bold border border-[#c9a84c]/30">{deal.dealNumber}</span>}
