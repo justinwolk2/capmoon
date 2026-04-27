@@ -683,7 +683,7 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
       <div className="mt-6 pt-4 border-t border-gray-200 flex items-center justify-between">
         <button onClick={() => { const ok = window.confirm("Discard and go back?"); if(ok) setExpanded(false); }}
           className="px-5 py-2.5 text-sm font-semibold border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50 transition-colors">
-          Discard &amp; Go Back
+          Discard & Go Back
         </button>
         <button onClick={async () => {
           const ud = { ...deal, memoFields, savedAt: new Date().toISOString() };
@@ -691,7 +691,7 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
           await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [ud] }) });
           setExpanded(false);
         }} className="px-6 py-2.5 text-sm font-bold bg-[#0a1f44] text-white rounded-xl hover:bg-[#c9a84c] hover:text-[#0a1f44] transition-colors">
-          Save &amp; Go Back
+          Save & Go Back
         </button>
       </div>
     </div>
