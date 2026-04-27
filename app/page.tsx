@@ -1155,9 +1155,10 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
             formData.append("file", file);
             formData.append("dealId", "0");
             formData.append("dealNumber", "draft");
-            formData.append("type", "Photo");
-            formData.append("label", file.name);
+            formData.append("docType", "Photo");
+            formData.append("docLabel", file.name);
             formData.append("uploadedBy", "Advisor");
+            formData.append("uploadedByRole", "advisor");
             const res = await fetch("/api/upload", { method: "POST", body: formData });
             const data = await res.json();
             if (data.url) upd("propertyPhoto" as any, data.url);

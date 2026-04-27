@@ -624,9 +624,10 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
                     formData.append("file", file);
                     formData.append("dealId", String(deal.id));
                     formData.append("dealNumber", deal.dealNumber || "");
-                    formData.append("type", "Photo");
-                    formData.append("label", file.name);
+                    formData.append("docType", "Photo");
+                    formData.append("docLabel", file.name);
                     formData.append("uploadedBy", "Advisor");
+                    formData.append("uploadedByRole", "advisor");
                     await fetch("/api/upload", { method: "POST", body: formData });
                   }
                   const updated = await fetch("/api/upload?dealId=" + deal.id).then(r => r.json());
