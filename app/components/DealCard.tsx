@@ -559,6 +559,59 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
         </div>
       )}
 
+      {/* Property Photos - always visible in expanded deal */}
+      <div className="mt-4 pt-4 border-t border-gray-100">
+        <div className="text-xs font-bold uppercase tracking-wide text-[#0a1f44] mb-3">📷 Property Photos</div>
+        {dealDocs.filter((d: any) => d.type === "Photo" || d.document_type === "Photo").length < 7 && (
+          <label className="flex items-center gap-2 px-4 py-2 text-xs font-semibold border-2 border-dashed border-gray-200 text-gray-500 rounded-xl hover:border-[#0a1f44] hover:text-[#0a1f44] cursor-pointer w-fit mb-3 transition-colors">
+            📷 Upload Photos ({dealDocs.filter((d: any) => d.type === "Photo" || d.document_type === "Photo").length}/7)
+            <input type="file" accept="image/*" multiple className="hidden" onChange={async (e) => {
+              const photoDocs = dealDocs.filter((d: any) => d.type === "Photo" || d.document_type === "Photo");
+              const files = Array.from(e.target.files || []).slice(0, 7 - photoDocs.length);
+              for (const file of files) {
+                const fd = new FormData();
+                fd.append("file", file);
+                fd.append("dealId", String(deal.id));
+                fd.append("dealNumber", deal.dealNumber || "");
+                fd.append("docType", "Photo");
+                fd.append("docLabel", file.name);
+                fd.append("uploadedBy", "Advisor");
+                fd.append("uploadedByRole", "advisor");
+                await fetch("/api/upload", { method: "POST", body: fd });
+              }
+              const updated = await fetch("/api/upload?dealId=" + deal.id).then(r => r.json());
+              if (Array.isArray(updated)) setDealDocs(updated);
+              // Auto-set first photo as main
+              const photos = (Array.isArray(updated) ? updated : []).filter((d:any) => d.document_type === "Photo");
+              if (!deal.assets?.[0]?.propertyPhoto && photos.length > 0) {
+                const updatedDeal = { ...deal, assets: deal.assets.map((a: any, i: number) => i === 0 ? { ...a, propertyPhoto: photos[0].document_url } : a) };
+                setSubmittedDeals(submittedDeals.map((d: any) => d.id === deal.id ? updatedDeal : d));
+                fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [updatedDeal] }) });
+              }
+            }} />
+          </label>
+        )}
+        {dealDocs.filter((d: any) => d.type === "Photo" || d.document_type === "Photo").length > 0 && (
+          <div className="grid grid-cols-3 gap-2">
+            {dealDocs.filter((d: any) => d.type === "Photo" || d.document_type === "Photo").map((doc: any) => {
+              const photoUrl = doc.document_url || doc.url;
+              const isMain = deal.assets?.[0]?.propertyPhoto === photoUrl;
+              return (
+                <div key={doc.id} className={"rounded-xl overflow-hidden border-2 " + (isMain ? "border-[#c9a84c]" : "border-gray-200")}>
+                  <img src={photoUrl} alt={doc.document_name || doc.label} className="w-full h-24 object-cover" />
+                  <button onClick={() => {
+                    const updatedDeal = { ...deal, assets: deal.assets.map((a: any, i: number) => i === 0 ? { ...a, propertyPhoto: isMain ? "" : photoUrl } : a) };
+                    setSubmittedDeals(submittedDeals.map((d: any) => d.id === deal.id ? updatedDeal : d));
+                    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [updatedDeal] }) });
+                  }} className={"w-full text-xs py-1 font-semibold transition-colors " + (isMain ? "bg-[#c9a84c] text-[#0a1f44]" : "bg-gray-100 text-gray-500 hover:bg-[#0a1f44] hover:text-white")}>
+                    {isMain ? "★ Main Photo" : "Set as Main"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
       {/* Deal Memo Editor */}
       {showMemo && (
         <div className="mt-4 border-t border-[#c9a84c]/20 pt-4">
