@@ -331,6 +331,7 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
             </div>
             <div className="text-xs text-gray-400 mt-0.5">Submitted: {deal.submittedAt}</div>
           </div>
+        </div>
         <select value={deal.status} onChange={(e) => updateDealStatus(e.target.value)}
           className={`px-3 py-1 rounded-full text-xs font-semibold border cursor-pointer ${deal.status==="pending"?"bg-amber-50 text-amber-600 border-amber-200":deal.status==="assigned"?"bg-blue-50 text-blue-600 border-blue-200":deal.status==="sent-to-lenders"?"bg-indigo-50 text-indigo-600 border-indigo-200":deal.status==="term-sheet-accepted"?"bg-green-50 text-green-600 border-green-200":"bg-purple-50 text-purple-600 border-purple-200"}`}>
           <option value="pending">Pending</option><option value="assigned">Assigned</option><option value="sent-to-lenders">Sent to Lenders</option><option value="term-sheet-accepted">Term Sheet Accepted</option><option value="closed">Closed</option>
