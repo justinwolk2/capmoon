@@ -1139,9 +1139,30 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
     <div className="grid gap-4 md:grid-cols-2">
       <AddressFields address={asset.address || blankAddress()} onChange={(a) => upd("address", a)} inputClass={inputClass} />
       <div className="md:col-span-2">
-        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Property Photo URL <span className="text-gray-400 font-normal normal-case">(optional — paste image URL or upload in Upload Center)</span></label>
-        <Input value={(asset as any).propertyPhoto || ""} onChange={(e) => upd("propertyPhoto" as any, e.target.value)} placeholder="https://... or leave blank" className={inputClass} />
-        {(asset as any).propertyPhoto && <img src={(asset as any).propertyPhoto} alt="Property" className="mt-2 h-32 w-full object-cover rounded-xl border border-gray-200" />}
+        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Property Photo <span className="text-gray-400 font-normal normal-case">(optional)</span></label>
+        {(asset as any).propertyPhoto && (
+          <div className="relative mb-2">
+            <img src={(asset as any).propertyPhoto} alt="Property" className="h-40 w-full object-cover rounded-xl border border-gray-200" />
+            <button type="button" onClick={() => upd("propertyPhoto" as any, "")} className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-lg">✕ Remove</button>
+          </div>
+        )}
+        <label className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-2 border-dashed border-gray-300 text-gray-500 rounded-xl hover:border-[#0a1f44] hover:text-[#0a1f44] cursor-pointer transition-colors w-fit">
+          📷 Upload Property Photo
+          <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("dealId", "0");
+            formData.append("dealNumber", "draft");
+            formData.append("type", "Photo");
+            formData.append("label", file.name);
+            formData.append("uploadedBy", "Advisor");
+            const res = await fetch("/api/upload", { method: "POST", body: formData });
+            const data = await res.json();
+            if (data.url) upd("propertyPhoto" as any, data.url);
+          }} />
+        </label>
       </div>
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Ownership Status</label><Select value={asset.ownershipStatus} onValueChange={(v) => upd("ownershipStatus", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
       <div>
@@ -4107,7 +4128,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const [prefillDeal, setPrefillDeal] = useState<SubmittedDeal | null>(null);
   const [viewingDealId, setViewingDealId] = useState<number | null>(null);
   const [expandedDealId, setExpandedDealId] = useState<number | null>(null);
-  const [trashedDeals, setTrashedDeals] = useState<any[]>([]);
+
   const [lenderRecords, setLenderRecords] = useState<LenderRecord[]>(seedLenders);
   const [lendersLoaded, setLendersLoaded] = useState(false);
 
@@ -4278,19 +4299,23 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   function deleteDeal(dealId: number) {
     const deal = submittedDeals.find((d: any) => d.id === dealId);
     if (!deal) return;
-    const trashed = { ...deal, trashedAt: new Date().toISOString() };
-    setTrashedDeals((prev: any[]) => [trashed, ...prev]);
-    setSubmittedDeals(submittedDeals.filter((d: any) => d.id !== dealId) as any);
+    const trashed = { ...deal, deletedAt: new Date().toISOString() };
+    // Keep in submittedDeals but marked as deleted - filter out from views
+    const updated = submittedDeals.map((d: any) => d.id === dealId ? trashed : d);
+    setSubmittedDeals(updated as any);
     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "deals", data: submittedDeals.filter((d: any) => d.id !== dealId) }) }).catch(console.error);
+      body: JSON.stringify({ type: "deals", data: [trashed] }) }).catch(console.error);
   }
 
   function restoreDeal(dealId: number) {
-    const deal = trashedDeals.find((d: any) => d.id === dealId);
-    if (!deal) return;
-    const { trashedAt, ...restored } = deal;
-    setSubmittedDeals([restored, ...submittedDeals] as any);
-    setTrashedDeals((prev: any[]) => prev.filter((d: any) => d.id !== dealId));
+    const updated = submittedDeals.map((d: any) => d.id === dealId ? { ...d, deletedAt: undefined } : d);
+    setSubmittedDeals(updated as any);
+    const restored = submittedDeals.find((d: any) => d.id === dealId);
+    if (restored) {
+      const { deletedAt, ...clean } = restored as any;
+      fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "deals", data: [clean] }) }).catch(console.error);
+    }
   }
 
   function handleSaveLender(form: NewLenderForm) {
@@ -5340,16 +5365,16 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                           </div>
 
                           {/* Deleted Deals Section */}
-                          {isAdmin && trashedDeals.length > 0 && !expandedDealId && (
+                          {isAdmin && deletedDeals.length > 0 && !expandedDealId && (
                             <div className="mb-6 rounded-xl border border-red-100 bg-red-50/30 p-4">
                               <div className="text-xs font-bold uppercase tracking-[0.15em] text-red-400 mb-3">🗑 Deleted Deals — Recoverable for 7 Days</div>
                               <div className="space-y-2">
-                                {trashedDeals.filter((d: any) => new Date(d.trashedAt).getTime() > Date.now() - 7*24*60*60*1000).map((deal: any) => (
+                                {deletedDeals.map((deal: any) => (
                                   <div key={deal.id} className="rounded-xl bg-white border border-red-100 p-3 flex items-center justify-between gap-4">
                                     <div>
                                       <div className="text-sm font-bold text-[#0a1f44]">{deal.seekerName}</div>
                                       <div className="text-xs text-gray-400">{deal.dealNumber} • {deal.assets?.[0]?.assetType} • {deal.assets?.[0]?.loanAmount}</div>
-                                      <div className="text-xs text-red-400 mt-0.5">Deleted {new Date(deal.trashedAt).toLocaleDateString()} — expires {new Date(new Date(deal.trashedAt).getTime() + 7*24*60*60*1000).toLocaleDateString()}</div>
+                                      <div className="text-xs text-red-400 mt-0.5">Deleted {new Date(deal.deletedAt).toLocaleDateString()} — expires {new Date(new Date(deal.deletedAt).getTime() + 7*24*60*60*1000).toLocaleDateString()}</div>
                                     </div>
                                     <button onClick={() => restoreDeal(deal.id)} className="px-4 py-2 text-xs font-bold bg-green-600 text-white rounded-xl hover:bg-green-700 flex-shrink-0">
                                       Restore
@@ -5727,7 +5752,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                 <div className="space-y-4">
                   <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Deleted Deals</div>
                   <p className="text-xs text-gray-500">Deals deleted in the last 7 days. Click Restore to bring them back.</p>
-                  {trashedDeals.filter((d: any) => new Date(d.trashedAt).getTime() > Date.now() - 7*24*60*60*1000).map((deal: any) => (
+                  {deletedDeals.map((deal: any) => (
                     <div key={deal.id} className="rounded-xl border border-gray-200 bg-white p-4 flex items-center justify-between gap-4">
                       <div>
                         <div className="font-bold text-[#0a1f44]">{deal.seekerName}</div>
@@ -5739,7 +5764,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                       </button>
                     </div>
                   ))}
-                  {trashedDeals.filter((d: any) => new Date(d.trashedAt).getTime() > Date.now() - 7*24*60*60*1000).length === 0 && (
+                  {deletedDeals.length === 0 && (
                     <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">No deleted deals</div>
                   )}
                 </div>
