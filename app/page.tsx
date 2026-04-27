@@ -5748,28 +5748,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                 </div>
               )}
 
-              {/* Trash */}
-              {activeTab === "trash" && isAdmin && (
-                <div className="space-y-4">
-                  <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Deleted Deals</div>
-                  <p className="text-xs text-gray-500">Deals deleted in the last 7 days. Click Restore to bring them back.</p>
-                  {deletedDeals.map((deal: any) => (
-                    <div key={deal.id} className="rounded-xl border border-gray-200 bg-white p-4 flex items-center justify-between gap-4">
-                      <div>
-                        <div className="font-bold text-[#0a1f44]">{deal.seekerName}</div>
-                        <div className="text-xs text-gray-400">{deal.dealNumber} • {deal.assets?.[0]?.assetType} • {deal.assets?.[0]?.loanAmount}</div>
-                        <div className="text-xs text-red-400 mt-0.5">Deleted {new Date(deal.trashedAt).toLocaleDateString()} — expires {new Date(new Date(deal.trashedAt).getTime() + 7*24*60*60*1000).toLocaleDateString()}</div>
-                      </div>
-                      <button onClick={() => restoreDeal(deal.id)} className="px-4 py-2 text-xs font-bold bg-green-600 text-white rounded-xl hover:bg-green-700 flex-shrink-0">
-                        Restore
-                      </button>
-                    </div>
-                  ))}
-                  {deletedDeals.length === 0 && (
-                    <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">No deleted deals</div>
-                  )}
-                </div>
-              )}
+
               {/* Deal Memos */}
               {activeTab === "deal-memos" && isAdmin && (
                 <DealMemoTab
