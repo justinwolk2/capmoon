@@ -568,9 +568,23 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
             <input type="file" accept="image/*" multiple className="hidden" onChange={async (e) => {
               const photoDocs = dealDocs.filter((d: any) => d.type === "Photo" || d.document_type === "Photo");
               const files = Array.from(e.target.files || []).slice(0, 7 - photoDocs.length);
+              const compressImg = (f: File): Promise<Blob> => new Promise(resolve => {
+                const img = new Image(); const u = URL.createObjectURL(f);
+                img.onload = () => {
+                  let w = img.width; let h = img.height;
+                  if (w > 1200) { h = h*1200/w; w = 1200; }
+                  if (h > 1200) { w = w*1200/h; h = 1200; }
+                  const cv = document.createElement("canvas"); cv.width=w; cv.height=h;
+                  cv.getContext("2d")!.drawImage(img,0,0,w,h);
+                  cv.toBlob(b => resolve(b!), "image/jpeg", 0.82);
+                  URL.revokeObjectURL(u);
+                }; img.src = u;
+              });
               for (const file of files) {
+                const compressed = await compressImg(file);
+                const cf = new File([compressed], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
                 const fd = new FormData();
-                fd.append("file", file);
+                fd.append("file", cf);
                 fd.append("dealId", String(deal.id));
                 fd.append("dealNumber", deal.dealNumber || "");
                 fd.append("docType", "Photo");
@@ -663,62 +677,22 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
               </div>
             ))}
           </div>
-          {/* Photo upload */}
-          <div className="mt-4">
-            <label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Property Photos</label>
-            {dealDocs.filter((d: any) => d.type === "Photo" || d.label?.match(/.(jpg|jpeg|png|webp|gif)/i)).length < 7 && (
-              <label className="flex items-center gap-2 px-4 py-2 text-xs font-semibold border border-[#0a1f44]/20 text-[#0a1f44] rounded-xl hover:bg-[#0a1f44]/5 cursor-pointer w-fit">
-                📷 Upload Photos ({dealDocs.filter((d: any) => d.type === "Photo" || d.label?.match(/.(jpg|jpeg|png|webp|gif)/i)).length}/7)
-                <input type="file" accept="image/*" multiple className="hidden" onChange={async (e) => {
-                  const photoDocs = dealDocs.filter((d: any) => d.type === "Photo" || d.label?.match(/.(jpg|jpeg|png|webp|gif)/i));
-                  const files = Array.from(e.target.files || []).slice(0, 7 - photoDocs.length);
-                  for (const file of files) {
-                    const formData = new FormData();
-                    formData.append("file", file);
-                    formData.append("dealId", String(deal.id));
-                    formData.append("dealNumber", deal.dealNumber || "");
-                    formData.append("docType", "Photo");
-                    formData.append("docLabel", file.name);
-                    formData.append("uploadedBy", "Advisor");
-                    formData.append("uploadedByRole", "advisor");
-                    await fetch("/api/upload", { method: "POST", body: formData });
-                  }
-                  const updated = await fetch("/api/upload?dealId=" + deal.id).then(r => r.json());
-                  if (Array.isArray(updated)) setDealDocs(updated);
-                  // Set first photo as main if none set
-                  if (!deal.assets?.[0]?.propertyPhoto && files.length > 0) {
-                    const res = await fetch("/api/upload?dealId=" + deal.id).then(r => r.json());
-                    if (Array.isArray(res) && res[0]?.url) {
-                      const updatedDeal = { ...deal, assets: deal.assets.map((a: any, i: number) => i === 0 ? { ...a, propertyPhoto: res.filter((d:any) => d.type==="Photo")[0]?.url } : a) };
-                      setSubmittedDeals(submittedDeals.map((d: any) => d.id === deal.id ? updatedDeal : d));
-                      fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [updatedDeal] }) });
-                    }
-                  }
-                }} />
-              </label>
-            )}
-            {dealDocs.filter((d: any) => d.type === "Photo" || d.label?.match(/.(jpg|jpeg|png|webp|gif)/i)).length > 0 && (
-              <div className="grid grid-cols-3 gap-2 mt-3">
-                {dealDocs.filter((d: any) => d.type === "Photo" || d.label?.match(/.(jpg|jpeg|png|webp|gif)/i)).map((doc: any) => {
-                  const isMain = deal.assets?.[0]?.propertyPhoto === doc.url;
-                  return (
-                    <div key={doc.id} className={`rounded-xl overflow-hidden border-2 ${isMain ? "border-[#c9a84c]" : "border-gray-200"}`}>
-                      <img src={doc.url} alt={doc.label} className="w-full h-24 object-cover" />
-                      <button onClick={() => {
-                        const updatedDeal = { ...deal, assets: deal.assets.map((a: any, i: number) => i === 0 ? { ...a, propertyPhoto: isMain ? "" : doc.url } : a) };
-                        setSubmittedDeals(submittedDeals.map((d: any) => d.id === deal.id ? updatedDeal : d));
-                        fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [updatedDeal] }) });
-                      }} className={`w-full text-xs py-1 font-semibold ${isMain ? "bg-[#c9a84c] text-[#0a1f44]" : "bg-gray-100 text-gray-500 hover:bg-[#0a1f44] hover:text-white"} transition-colors`}>
-                        {isMain ? "★ Main Photo" : "Set as Main"}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </div>
-      )}
+      </div>
+      {/* Save / Discard */}
+      <div className="mt-6 pt-4 border-t border-gray-200 flex items-center justify-between">
+        <button onClick={() => { if(window.confirm("Discard changes and go back?")) setExpanded(false); }}
+          className="px-5 py-2.5 text-sm font-semibold border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50 transition-colors">
+          Discard &amp; Go Back
+        </button>
+        <button onClick={async () => {
+          const ud = { ...deal, memoFields, savedAt: new Date().toISOString() };
+          setSubmittedDeals(submittedDeals.map((d: any) => d.id === deal.id ? ud : d));
+          await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "deals", data: [ud] }) });
+          setExpanded(false);
+        }} className="px-6 py-2.5 text-sm font-bold bg-[#0a1f44] text-white rounded-xl hover:bg-[#c9a84c] hover:text-[#0a1f44] transition-colors">
+          Save &amp; Go Back
+        </button>
       </div>
     </div>
   );
