@@ -678,7 +678,7 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
             ))}
           </div>
         </div>
-      </div>
+      )}
       {/* Save / Discard */}
       <div className="mt-6 pt-4 border-t border-gray-200 flex items-center justify-between">
         <button onClick={() => { const ok = window.confirm("Discard and go back?"); if(ok) setExpanded(false); }}
