@@ -7,6 +7,7 @@ import { BarChart3, Building2, FileSpreadsheet, FileText, Filter, Gauge, Landmar
 import { motion } from "framer-motion";
 import { DealCard } from "./components/DealCard";
 import { DealMatcherExpedited } from "./components/DealMatcherExpedited";
+import { computeAllRatios } from "./lib/deal-calcs"; // CAPMOON_LIVE_RATIOS_PATCH
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1130,6 +1131,30 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
   }
   metricBoxes.push([m.isSubCap ? "Subordinated LTV - Last Dollar" : "Subordinated Last $ LTV", m.isSubCap ? formatPercent(m.autoLtv) : "N/A"]);
   metricBoxes.push(["Total Capital", formatCurrencyInput(String(m.totalCap || 0))]);
+  // CAPMOON_LIVE_RATIOS_PATCH — additive: compute new ratios via lib/deal-calcs
+  const _cmrInputs = {
+    loanAmount: parseCurrency(asset.loanAmount) || parseCurrency(asset.seniorLoanAmount) || null,
+    propertyValue: parseCurrency(asset.propertyValue) || null,
+    acquisitionPrice: parseCurrency(asset.purchasePrice) || null,
+    totalProjectCost:
+      (parseCurrency(asset.landCost) || 0) +
+        (parseCurrency(asset.softCosts) || 0) +
+        (parseCurrency(asset.hardCosts) || 0) +
+        (parseCurrency(asset.carryingCosts) || 0) || null,
+    noi: parseCurrency(asset.currentNetIncome) || null,
+    stabilizedNoi: parseCurrency(asset.stabilizedNoi) || null,
+    arv: parseCurrency(asset.arvValue) || null,
+    interestRate: asset.currentRate ? parseFloat(asset.currentRate) / 100 : null,
+    amortizationYears: 30,
+    isInterestOnly: false,
+  };
+  const _cmr = computeAllRatios(_cmrInputs);
+  if (_cmr.dscr !== null) metricBoxes.push(["DSCR", _cmr.dscr.toFixed(2) + "x"]);
+  if (_cmr.debtYieldPct !== null) metricBoxes.push(["Debt Yield", _cmr.debtYieldPct.toFixed(2) + "%"]);
+  if (_cmr.yieldOnCost !== null) metricBoxes.push(["Yield on Cost", (_cmr.yieldOnCost * 100).toFixed(2) + "%"]);
+  if (_cmr.stabilizedDscr !== null) metricBoxes.push(["Stab DSCR", _cmr.stabilizedDscr.toFixed(2) + "x"]);
+  if (_cmr.profitMargin !== null) metricBoxes.push(["Profit Margin", (_cmr.profitMargin * 100).toFixed(1) + "%"]);
+  // END CAPMOON_LIVE_RATIOS_PATCH
   const arvVal = parseCurrency(asset.propertyValue);
   const loanVal = parseCurrency(asset.loanAmount) || parseCurrency(asset.seniorLoanAmount);
   const equityAvailable = arvVal > 0 && loanVal > 0 ? formatCurrencyInput(String(arvVal - loanVal)) : "—";
