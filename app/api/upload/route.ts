@@ -35,6 +35,24 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get("file") as File;
     const dealId = formData.get("dealId") as string;
+    const scope = formData.get("scope") as string || "";
+
+    // CAPMOON_TEAM_PHOTO_BACKEND_PATCH — team-member scope short-circuit
+    if (scope === "team-member") {
+      if (!file) {
+        return NextResponse.json({ error: "Missing file" }, { status: 400 });
+      }
+      const ext = file.name.split(".").pop() || "bin";
+      const safeName = file.name
+        .replace(/\.[^.]+$/, "")
+        .replace(/[^a-z0-9]/gi, "_")
+        .slice(0, 40);
+      const filename = `team/${Date.now()}-${safeName}.${ext}`;
+      const blob = await put(filename, file, { access: "public" });
+      return NextResponse.json({ success: true, url: blob.url });
+    }
+    // END CAPMOON_TEAM_PHOTO_BACKEND_PATCH
+
     const dealNumber = formData.get("dealNumber") as string || "";
     const uploadedBy = formData.get("uploadedBy") as string || "Admin";
     const uploadedByRole = formData.get("uploadedByRole") as string || "admin";
