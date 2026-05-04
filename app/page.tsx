@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { BarChart3, Building2, FileSpreadsheet, FileText, Filter, Gauge, Landmark, Plus, Search, ShieldCheck, Upload, Users, Trash2, ChevronRight, ChevronLeft, CheckCircle, Edit2, Sparkles, Loader2, Lock, LogOut, Settings, Eye, EyeOff, Bell, Zap, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { DealCard } from "./components/DealCard";
+import Pipeline, { PIPELINE_STAGES, type PipelineDeal, type StageId } from "./components/Pipeline"; // CAPMOON_PIPELINE_PATCH
 import { DealMatcherExpedited } from "./components/DealMatcherExpedited";
 import { computeAllRatios } from "./lib/deal-calcs"; // CAPMOON_LIVE_RATIOS_PATCH
 
@@ -5796,6 +5797,105 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 }
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
+
+// CAPMOON_PIPELINE_PATCH — start
+function PipelineView({
+  submittedDeals,
+  setSubmittedDeals,
+  session,
+  setActiveSection,
+  setSelectedDealId,
+}: {
+  submittedDeals: any[];
+  setSubmittedDeals: (deals: any[]) => void;
+  session: any;
+  setActiveSection: (s: string) => void;
+  setSelectedDealId: (id: any) => void;
+}) {
+  const currentUserEmail = session?.user?.email ?? "";
+  const role = (session?.user?.role ?? "advisor") as
+    | "admin" | "advisor" | "staff" | "intern" | "lender" | "capital-seeker";
+  const canSeeAllDeals = !!session?.user?.canSeeAllDeals;
+
+  // Map submitted deals → PipelineDeal shape
+  const pipelineDeals: PipelineDeal[] = (submittedDeals || []).map((d: any) => {
+    const data = d.data || d;
+    const firstAsset = data.assets?.[0] || {};
+    const addr = firstAsset.address || {};
+    const dealNumber = data.dealNumber || data.tempNumber || (`#${d.id}`);
+    const isTemp = !!data.tempNumber && !data.dealNumber;
+    const status: StageId =
+      (PIPELINE_STAGES.find((s) => s.id === data.status)?.id) ?? "pending";
+    return {
+      id: d.id,
+      dealNumber: String(dealNumber),
+      isTemp,
+      borrowerName: data.borrowerName || data.advisorName || "Untitled",
+      loanAmount: parseFloat(String(firstAsset.loanAmount || "0").replace(/[^0-9.]/g, "")) || null,
+      assetType: firstAsset.assetType || data.capitalType || "—",
+      city: addr.city,
+      state: addr.state,
+      status,
+      assignedAdvisor: data.assignedAdvisor || data.advisorName,
+      assignedAdvisorAvatar: data.assignedAdvisorAvatar,
+      pipedriveId: data.pipedriveId ?? null,
+      stageEnteredAt: data.stageEnteredAt ?? data.submittedAt ?? d.created_at,
+      ownerEmail: data.ownerEmail || data.advisorEmail,
+      collaborators: data.collaborators || [],
+    };
+  });
+
+  function handleStageChange(dealId: any, newStage: StageId) {
+    const next = (submittedDeals || []).map((d: any) => {
+      if (d.id !== dealId) return d;
+      return {
+        ...d,
+        data: {
+          ...(d.data || {}),
+          status: newStage,
+          stageEnteredAt: new Date().toISOString(),
+        },
+      };
+    });
+    setSubmittedDeals(next);
+  }
+
+  async function handlePipedriveSync(
+    _dealId: any,
+    pipedriveId: number,
+    newStage: StageId,
+  ) {
+    const stageMeta = PIPELINE_STAGES.find((s) => s.id === newStage);
+    if (!stageMeta) throw new Error("Unknown stage");
+    const res = await fetch("/api/pipedrive", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "update-stage",
+        deal: { pipedriveId, stageId: stageMeta.pdStageId, status: newStage },
+      }),
+    });
+    if (!res.ok) throw new Error(`Pipedrive update failed: ${res.status}`);
+  }
+
+  function handleOpenDeal(dealId: any) {
+    setSelectedDealId(dealId);
+    setActiveSection("submitted-deals");
+  }
+
+  return (
+    <Pipeline
+      deals={pipelineDeals}
+      currentUserEmail={currentUserEmail}
+      currentUserRole={role}
+      canSeeAllDeals={canSeeAllDeals}
+      onDealStageChange={handleStageChange}
+      onOpenDeal={handleOpenDeal}
+      onPipedriveSync={handlePipedriveSync}
+    />
+  );
+}
+// CAPMOON_PIPELINE_PATCH — end
 
 export default function Home() {
   const [session, setSession] = useState<AuthSession>(null);
