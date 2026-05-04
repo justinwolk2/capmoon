@@ -2058,6 +2058,151 @@ function AddLenderPage({ onSave, onCancel, existingLenders, inputClass, selectTr
 
 // ─── Deal Team Tab ────────────────────────────────────────────────────────────
 
+// CAPMOON_TEAM_PHOTO_PATCH — TeamPhotoUploader component
+function TeamPhotoUploader({
+  value,
+  onChange,
+  inputClass,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+  inputClass: string;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showUrlField, setShowUrlField] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function uploadFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      setError("File must be an image");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image must be under 5MB");
+      return;
+    }
+    setError(null);
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("scope", "team-member");
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+      const data = await res.json();
+      const url = data.url || data.location || data.fileUrl;
+      if (!url) throw new Error("Upload returned no URL");
+      onChange(url);
+    } catch (err: any) {
+      console.error("Team photo upload error:", err);
+      setError(err?.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) uploadFile(file);
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) uploadFile(file);
+  }
+
+  return (
+    <div className="space-y-2">
+      {value ? (
+        <div className="flex items-center gap-3">
+          <img
+            src={value}
+            alt="Team member"
+            className="h-16 w-16 rounded-xl object-cover border-2 border-[#c9a84c]/30"
+          />
+          <div className="flex flex-col gap-1">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-xs text-[#0a1f44] hover:underline font-semibold"
+            >
+              Replace photo
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="text-xs text-red-600 hover:underline"
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          onDrop={handleDrop}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onClick={() => fileInputRef.current?.click()}
+          className={`flex flex-col items-center justify-center gap-1 px-4 py-6 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
+            dragOver
+              ? "border-[#c9a84c] bg-[#c9a84c]/10"
+              : "border-gray-300 bg-gray-50 hover:border-[#0a1f44]/40 hover:bg-gray-100"
+          }`}
+        >
+          {uploading ? (
+            <>
+              <div className="text-xs text-gray-500">Uploading...</div>
+            </>
+          ) : (
+            <>
+              <div className="text-2xl">📷</div>
+              <div className="text-xs font-semibold text-[#0a1f44]">
+                Click to upload or drag & drop
+              </div>
+              <div className="text-[10px] text-gray-400">PNG, JPG up to 5MB</div>
+            </>
+          )}
+        </div>
+      )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
+      {error && <div className="text-xs text-red-600">{error}</div>}
+
+      {/* Fallback URL field — collapsed by default */}
+      <button
+        type="button"
+        onClick={() => setShowUrlField((v) => !v)}
+        className="text-[10px] text-gray-400 hover:text-gray-600 underline"
+      >
+        {showUrlField ? "Hide URL field" : "Or paste a URL instead"}
+      </button>
+      {showUrlField && (
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="https://example.com/photo.jpg"
+          className={inputClass}
+        />
+      )}
+    </div>
+  );
+}
+// CAPMOON_TEAM_PHOTO_PATCH — end TeamPhotoUploader
+
 function DealTeamTab({ teamMembers, setTeamMembers, currentUserId, isAdmin, inputClass, selectTriggerClass, cardClass }: { teamMembers: TeamMember[]; setTeamMembers: (m: TeamMember[]) => void; currentUserId: number; isAdmin: boolean; inputClass: string; selectTriggerClass: string; cardClass: string }) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [newMember, setNewMember] = useState<Partial<TeamMember>>({ name: "", email: "", phone: "", photo: "", geographicMarket: "", specialtyAreas: [], title: "" });
@@ -2127,7 +2272,16 @@ function DealTeamTab({ teamMembers, setTeamMembers, currentUserId, isAdmin, inpu
             <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Title</label><Input value={newMember.title || ""} onChange={(e) => setNewMember((p) => ({ ...p, title: e.target.value }))} placeholder="Vice President of Capital Advisory" className={inputClass} /></div>
             <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Phone</label><Input value={newMember.phone || ""} onChange={(e) => setNewMember((p) => ({ ...p, phone: e.target.value }))} placeholder="305-000-0000" className={inputClass} /></div>
             <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Geographic Market</label><Input value={newMember.geographicMarket || ""} onChange={(e) => setNewMember((p) => ({ ...p, geographicMarket: e.target.value }))} placeholder="Southeast, Florida" className={inputClass} /></div>
-            <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Photo URL</label><Input value={newMember.photo || ""} onChange={(e) => setNewMember((p) => ({ ...p, photo: e.target.value }))} placeholder="/photo.jpg" className={inputClass} /></div>
+                        {/* CAPMOON_TEAM_PHOTO_PATCH — start */}
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Photo</label>
+              <TeamPhotoUploader
+                value={newMember.photo || ""}
+                onChange={(url) => setNewMember((p) => ({ ...p, photo: url }))}
+                inputClass={inputClass}
+              />
+            </div>
+            {/* CAPMOON_TEAM_PHOTO_PATCH — end */}
             <div className="md:col-span-2">
               <CheckboxGroup label="Specialty Areas (Capital Types)" options={capitalTypes} selected={newMember.specialtyAreas || []} onChange={(v) => setNewMember((p) => ({ ...p, specialtyAreas: v }))} />
             </div>
