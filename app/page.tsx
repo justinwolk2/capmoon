@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState, useRef } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -139,6 +139,13 @@ const initialUsers: AppUser[] = [
   { id: 2, username: "lpalumbo@capmoon.com", password: "Louis2024!", role: "advisor", name: "Louis Palumbo", blockedLenderIds: [], teamMemberId: 1 },
   { id: 3, username: "shussain@capmoon.com", password: "Shuvo2024!", role: "advisor", name: "Shuvo Hussain", blockedLenderIds: [], teamMemberId: 2 },
   { id: 4, username: "testlender@example.com", password: "Lender2024!", role: "lender", name: "Test Lender", blockedLenderIds: [], linkedLenderId: 1 },
+  // CAPMOON_INTERN_ACCESS_PATCH — 6 intern users (lender-db-only access)
+  { id: 5, username: "advisoryteam1@capmoon.com", password: "Groundhog78#", role: "intern", name: "Advisory Team 1", blockedLenderIds: [] },
+  { id: 6, username: "advisoryteam2@capmoon.com", password: "Groundhog78#", role: "intern", name: "Advisory Team 2", blockedLenderIds: [] },
+  { id: 7, username: "advisoryteam3@capmoon.com", password: "Groundhog78#", role: "intern", name: "Advisory Team 3", blockedLenderIds: [] },
+  { id: 8, username: "advisoryteam4@capmoon.com", password: "Groundhog78#", role: "intern", name: "Advisory Team 4", blockedLenderIds: [] },
+  { id: 9, username: "advisoryteam5@capmoon.com", password: "Groundhog78#", role: "intern", name: "Advisory Team 5", blockedLenderIds: [] },
+  { id: 10, username: "advisoryteam6@capmoon.com", password: "Groundhog78#", role: "intern", name: "Advisory Team 6", blockedLenderIds: [] },
 ];
 
 const seedLenders: LenderRecord[] = [
@@ -4293,6 +4300,13 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const isIntern = session?.user.role === "intern";
   const isLender = session?.user.role === "lender";
   const [activeTab, setActiveTab] = useState("overview");
+
+  // CAPMOON_INTERN_ACCESS_PATCH — runtime guard: redirect interns away from non-allowed tabs
+  useEffect(() => {
+    if (isIntern && activeTab && !["overview", "lenders", "add-lender"].includes(activeTab)) {
+      setActiveTab("overview");
+    }
+  }, [isIntern, activeTab]);
   React.useEffect(() => { (window as any).__setActiveTab = setActiveTab; }, [setActiveTab]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userSearch, setUserSearch] = useState("");
@@ -4607,7 +4621,11 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
     ...(isAdmin && pendingDeleteCount > 0 ? [["delete-queue", `Delete Requests (${pendingDeleteCount})`, Bell] as [string, string, any]] : []),
     ...(isAdmin && pendingLenderChangeCount > 0 ? [["lender-changes", `Lender Changes (${pendingLenderChangeCount})`, Bell] as [string, string, any]] : []),
-  ];
+  ].filter((item) => {
+    // CAPMOON_INTERN_ACCESS_PATCH — interns only see lender database tabs
+    if (!isIntern) return true;
+    return ["overview", "lenders", "add-lender"].includes(item[0] as string);
+  }) as [string, string, any, string?][];
 
   // ── SectionHeader component (extracted for React hooks compliance) ──
                       function SectionHeader({ title, count, color, show, onToggle, children }: { title: string; count: number; color: string; show: boolean; onToggle: () => void; children?: React.ReactNode }) {
