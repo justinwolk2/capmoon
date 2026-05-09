@@ -3,7 +3,7 @@ import React, { useMemo, useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart3, Building2, FileSpreadsheet, FileText, Filter, Gauge, Landmark, Plus, Search, ShieldCheck, Upload, Users, Trash2, ChevronRight, ChevronLeft, CheckCircle, Edit2, Sparkles, Loader2, Lock, LogOut, Settings, Eye, EyeOff, Bell, Zap, ArrowLeft } from "lucide-react";
+import { BarChart3, Building2, FileSpreadsheet, FileText, Filter, Gauge, Landmark, Plus, Search, ShieldCheck, Upload, Users, Trash2, ChevronRight, ChevronLeft, CheckCircle, Edit2, Sparkles, Loader2, Lock, LogOut, Settings, Eye, EyeOff, Bell, Zap, ArrowLeft, Workflow } from "lucide-react"; // CAPMOON_PIPELINE_SIDEBAR_PATCH
 import { motion } from "framer-motion";
 import { DealCard } from "./components/DealCard";
 import Pipeline, { PIPELINE_STAGES, type PipelineDeal, type StageId } from "./components/Pipeline"; // CAPMOON_PIPELINE_PATCH
@@ -4615,6 +4615,9 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     ["matcher", "Deal Matcher", Filter],
     ["deal-team", "Deal Team", Users],
     ["submitted-deals", "Submitted Deals", FileSpreadsheet],
+    // CAPMOON_PIPELINE_SIDEBAR_PATCH — start
+    ["pipeline", "DealFlow via Pipedrive\u00ae", Workflow],
+    // CAPMOON_PIPELINE_SIDEBAR_PATCH — end
     ["uploads", "Upload Center", Upload],
     ...(isAdmin ? [["user-management", "Admin Portal", Settings] as [string, string, any]] : []),
     ...(isAdmin ? [["deal-memos", "Deal Memos", FileText] as [string, string, any]] : []),
@@ -4624,7 +4627,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   ].filter((item) => {
     // CAPMOON_INTERN_ACCESS_PATCH — interns only see lender database tabs
     if (!isIntern) return true;
-    return ["overview", "lenders", "add-lender"].includes(item[0] as string);
+    return ["overview", "lenders", "add-lender", "pipeline"].includes(item[0] as string); // CAPMOON_PIPELINE_SIDEBAR_PATCH
   }) as [string, string, any, string?][];
 
   // ── SectionHeader component (extracted for React hooks compliance) ──
@@ -5433,6 +5436,17 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
               )}
 
               {/* Submitted Deals */}
+              {/* CAPMOON_PIPELINE_SIDEBAR_PATCH — start */}
+              {activeTab === "pipeline" && (
+                <PipelineView
+                  submittedDeals={submittedDeals}
+                  setSubmittedDeals={setSubmittedDeals as any}
+                  session={session}
+                  setActiveSection={setActiveTab}
+                  setSelectedDealId={setExpandedDealId as any}
+                />
+              )}
+              {/* CAPMOON_PIPELINE_SIDEBAR_PATCH — end */}
               {activeTab === "submitted-deals" && (() => {
                 const currentTeamMemberId = session?.user.teamMemberId;
                 const isLenderRole = session?.user.role === "lender";
