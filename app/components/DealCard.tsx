@@ -55,6 +55,39 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
   const [requestSending, setRequestSending] = React.useState(false);
   const [requestSent, setRequestSent] = React.useState(false);
   const [inviteUserId, setInviteUserId] = React.useState("");
+  // CAPMOON_TITLE_UNIFICATION_PATCH — inline title editor state
+  const [editingDealTitle, setEditingDealTitle] = React.useState(false);
+  const [dealTitleDraft, setDealTitleDraft] = React.useState("");
+  // Helper: auto-default title when no custom dealTitle is set
+  const autoDefaultDealTitle = (() => {
+    const num = deal.dealNumber || ("#" + deal.id);
+    const city = deal.assets?.[0]?.address?.city;
+    if (city) return num + " — " + city;
+    if (deal.seekerName && deal.seekerName !== "Untitled") return num + " — " + deal.seekerName;
+    return String(num);
+  })();
+  const effectiveDealTitle = (deal.dealTitle && deal.dealTitle.trim()) || autoDefaultDealTitle;
+  // Save edited title back into submittedDeals + DB
+  function commitDealTitle() {
+    const trimmed = dealTitleDraft.trim();
+    const toSave = trimmed === "" || trimmed === autoDefaultDealTitle ? "" : trimmed;
+    if (toSave !== (deal.dealTitle || "")) {
+      const next = (submittedDeals || []).map((d: any) => {
+        if (d.id !== deal.id) return d;
+        return { ...d, dealTitle: toSave, data: { ...(d.data || {}), dealTitle: toSave } };
+      });
+      setSubmittedDeals(next);
+      const saved = next.find((d: any) => d.id === deal.id);
+      if (saved) {
+        fetch("/api/data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "deals", data: [saved] }),
+        }).catch((e) => console.error("Save dealTitle failed:", e));
+      }
+    }
+    setEditingDealTitle(false);
+  }
   const [editDealFields, setEditDealFields] = React.useState({
     seekerName: deal.seekerName || "", seekerEmail: deal.seekerEmail || "",
     seekerPhone: deal.seekerPhone || "", notes: deal.notes || "",
@@ -241,7 +274,35 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
         </div>
         {/* Card body */}
         <div className="p-4 flex flex-col flex-1">
-          <div className="font-display text-xl font-bold text-[#0a1f44] leading-tight mb-1">{deal.seekerName}</div>
+          {/* CAPMOON_TITLE_UNIFICATION_PATCH — collapsed title with editable file#+title */}
+          <div className="mb-1">
+            <div className="text-xs font-mono font-bold text-[#c9a84c] tracking-wider mb-0.5">{deal.dealNumber || ("#" + deal.id)}</div>
+            {editingDealTitle ? (
+              <input
+                autoFocus
+                value={dealTitleDraft}
+                onChange={(e) => setDealTitleDraft(e.target.value)}
+                onBlur={commitDealTitle}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); commitDealTitle(); }
+                  else if (e.key === "Escape") { setDealTitleDraft(effectiveDealTitle); setEditingDealTitle(false); }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full font-display text-xl font-bold text-[#0a1f44] leading-tight bg-transparent border border-[#c9a84c] rounded px-1 outline-none"
+              />
+            ) : (
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={(e) => { e.stopPropagation(); setDealTitleDraft(effectiveDealTitle); setEditingDealTitle(true); }}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDealTitleDraft(effectiveDealTitle); setEditingDealTitle(true); } }}
+                title="Click to edit title"
+                className="font-display text-xl font-bold text-[#0a1f44] leading-tight cursor-text hover:bg-gray-50 rounded px-1 -mx-1 transition-colors"
+              >
+                {effectiveDealTitle}
+              </div>
+            )}
+          </div>
           {/* Address */}
           {(asset?.address?.street || asset?.address?.city) && (
             <div className="text-xs text-gray-500 mb-2">
@@ -296,7 +357,32 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
         <div className="flex items-center gap-3 flex-wrap">
           <button onClick={() => { if (onBack) { onBack(); } else { setExpanded(false); } }} className="text-white/70 hover:text-white text-sm font-semibold transition-colors">← Back</button>{/* CAPMOON_SMART_BACK_PATCH */}
           <span className="text-white/30">|</span>
-          <span className="font-display text-lg font-bold">{deal.seekerName}</span>
+          {/* CAPMOON_TITLE_UNIFICATION_PATCH — expanded view header title */}
+          {editingDealTitle ? (
+            <input
+              autoFocus
+              value={dealTitleDraft}
+              onChange={(e) => setDealTitleDraft(e.target.value)}
+              onBlur={commitDealTitle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); commitDealTitle(); }
+                else if (e.key === "Escape") { setDealTitleDraft(effectiveDealTitle); setEditingDealTitle(false); }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="font-display text-lg font-bold bg-white/10 border border-[#c9a84c] rounded px-2 outline-none text-white min-w-[200px]"
+            />
+          ) : (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); setDealTitleDraft(effectiveDealTitle); setEditingDealTitle(true); }}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDealTitleDraft(effectiveDealTitle); setEditingDealTitle(true); } }}
+              title="Click to edit title"
+              className="font-display text-lg font-bold cursor-text hover:bg-white/10 rounded px-1 transition-colors"
+            >
+              {effectiveDealTitle}
+            </span>
+          )}
           {deal.dealNumber && <span className="px-2 py-0.5 text-xs bg-[#c9a84c]/20 text-[#c9a84c] rounded-full font-bold border border-[#c9a84c]/30">{deal.dealNumber}</span>}
           {asset?.address?.city && <span className="text-white/50 text-sm">📍 {asset.address.city}{asset.address.state ? ", " + asset.address.state : ""}</span>}
         </div>
@@ -317,7 +403,7 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
           <div>
             <div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Deal #{deal.id}</div>
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="text-base font-bold text-[#0a1f44]">{deal.seekerName}</div>
+              <div className="text-xs text-gray-500">{/* CAPMOON_TITLE_UNIFICATION_PATCH */}Borrower: <span className="font-semibold text-[#0a1f44]">{deal.seekerName}</span></div>
               {deal.dealNumber && <span className="px-2 py-0.5 text-xs bg-[#c9a84c]/20 text-[#0a1f44] rounded-full font-bold border border-[#c9a84c]/30">{deal.dealNumber}</span>}
               {deal.status === "sent-to-lenders" && <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full font-bold border border-blue-200">Out to Lenders</span>}
               {deal.status === "term-sheet-accepted" && <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full font-bold border border-green-200">✓ Term Sheet Accepted</span>}
