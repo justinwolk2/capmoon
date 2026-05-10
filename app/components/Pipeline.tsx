@@ -1,24 +1,35 @@
+// CAPMOON_KANBAN_OVERHAUL — Pipeline.tsx full replacement
 "use client";
 
 /**
- * CapMoon — Pipeline Kanban Board
- * --------------------------------
- * 5-column kanban matching Pipedrive stages. Drag-and-drop AND click-to-move.
- * Two-way Pipedrive sync for admin/advisor users.
+ * CapMoon — Pipeline Kanban Board (DealFlow via Pipedrive)
+ * --------------------------------------------------------
+ * Brand colors:
+ *   - Columns 1/3/5: navy #0a1f44 (Proposed, Out to Market, Closing)
+ *   - Columns 2/4: slate-500 #64748b (In Discussions, Term Sheet)
+ *   - Cards on navy: light grey #e2e8f0
+ *   - Cards on grey: navy #0a1f44
+ *   - Gold accent: #c9a84c (deal#, $, advisor avatar ring)
  *
- * Access rules:
+ * Card content:
+ *   - Property photo (44×44, top-left) where available
+ *   - Editable title (click to edit, save on blur/Enter)
+ *   - Address subtitle
+ *   - Advisor footer: photo + name + loan amount
+ *
+ * Access rules (unchanged from prior version):
  *   - Admin or canSeeAllDeals=true → see every deal
- *   - Otherwise → see only deals assigned to the current user
+ *   - Otherwise → only deals owned by / shared with current user
  *
  * Pipedrive sync:
  *   - On stage change → POST /api/pipedrive { action: "update-stage", deal }
- *   - Only fires if currentUser.role is "admin" or "advisor"
- *   - Failures log to console but don't block the UI update
+ *   - Only fires for admin/advisor with a pipedriveId
  *
  * Stage aging:
- *   - Cards turn yellow at 7 days in stage
- *   - Orange at 14 days
- *   - Red at 30+ days
+ *   - Yellow border at 7+ days · orange at 14+ · red at 30+
+ *
+ * Filter bar:
+ *   - "All advisors" dropdown (Justin / Louis / Shuvo / Unassigned)
  */
 
 import { useState, useMemo } from "react";
@@ -41,35 +52,62 @@ import {
 // =============================================================================
 
 export const PIPELINE_STAGES = [
-  { id: "pending",             label: "Proposed Deal",                pdStageId: 6,  color: "#f59e0b", bg: "bg-amber-500/10",   text: "text-amber-300",   border: "border-amber-500/30" },
-  { id: "assigned",            label: "In Discussions",               pdStageId: 7,  color: "#3b82f6", bg: "bg-blue-500/10",    text: "text-blue-300",    border: "border-blue-500/30" },
-  { id: "sent-to-lenders",     label: "Out to Market",                pdStageId: 8,  color: "#8b5cf6", bg: "bg-violet-500/10",  text: "text-violet-300",  border: "border-violet-500/30" },
-  { id: "term-sheet-accepted", label: "Term Sheet Accepted",          pdStageId: 9,  color: "#10b981", bg: "bg-emerald-500/10", text: "text-emerald-300", border: "border-emerald-500/30" },
-  { id: "closed",              label: "Closing",                      pdStageId: 10, color: "#6366f1", bg: "bg-indigo-500/10",  text: "text-indigo-300",  border: "border-indigo-500/30" },
+  { id: "pending",             label: "Proposed Deal",       pdStageId: 6,  variant: "navy" as const },
+  { id: "assigned",            label: "In Discussions",      pdStageId: 7,  variant: "grey" as const },
+  { id: "sent-to-lenders",     label: "Out to Market",       pdStageId: 8,  variant: "navy" as const },
+  { id: "term-sheet-accepted", label: "Term Sheet",          pdStageId: 9,  variant: "grey" as const },
+  { id: "closed",              label: "Closing",             pdStageId: 10, variant: "navy" as const },
 ] as const;
 
 export type StageId = typeof PIPELINE_STAGES[number]["id"];
+
+// Brand color palette (single source of truth)
+const COLORS = {
+  navy: "#0a1f44",
+  grey: "#64748b",
+  cardLight: "#e2e8f0",
+  cardLightBorder: "#94a3b8",
+  cardLightPhotoBg: "#cbd5e1",
+  cardLightTextDark: "#0a1f44",
+  cardLightTextSubtle: "#475569",
+  cardLightAdvisorName: "#1e293b",
+  cardDarkBorder: "rgba(201,168,76,0.3)",
+  cardDarkPhotoBg: "#1e3a5f",
+  gold: "#c9a84c",
+  goldBright: "#fbbf24",
+  agingYellow: "#f59e0b",
+  agingOrange: "#f97316",
+  agingRed: "#ef4444",
+};
 
 // =============================================================================
 // Types
 // =============================================================================
 
 export interface PipelineDeal {
-  id: string | number;             // dealId in DB
-  dealNumber: string;              // 991177 OR TEMP-001
-  isTemp?: boolean;                // shows TEMP badge
+  id: string | number;
+  dealNumber: string;
+  isTemp?: boolean;
+  // NEW: editable title (falls back to auto-generated default)
+  dealTitle?: string;
+  // Borrower / seeker name (renamed from borrowerName for clarity)
   borrowerName: string;
   loanAmount: number | null;
   assetType: string;
   city?: string;
   state?: string;
+  street?: string;
   status: StageId;
+  // NEW: property photo URL
+  propertyPhoto?: string;
+  // Advisor info
   assignedAdvisor?: string;
   assignedAdvisorAvatar?: string;
+  assignedAdvisorId?: number | string | null;
   pipedriveId?: number | null;
-  stageEnteredAt?: string;         // ISO timestamp — for aging visual cue
-  ownerEmail?: string;             // for access filter
-  collaborators?: string[];        // emails who have access
+  stageEnteredAt?: string;
+  ownerEmail?: string;
+  collaborators?: string[];
 }
 
 export interface PipelineProps {
@@ -79,9 +117,12 @@ export interface PipelineProps {
   canSeeAllDeals?: boolean;
   onDealStageChange: (dealId: string | number, newStage: StageId) => void;
   onOpenDeal: (dealId: string | number) => void;
-  /** Optional: called for admin/advisor users to fire Pipedrive sync.
-   *  If omitted, sync is skipped (e.g. for staff/interns). */
+  /** Optional: called for admin/advisor users to fire Pipedrive sync. */
   onPipedriveSync?: (dealId: string | number, pipedriveId: number, newStage: StageId) => Promise<void>;
+  /** Optional: called when a card title is edited inline. */
+  onTitleChange?: (dealId: string | number, newTitle: string) => void;
+  /** Optional: list of advisors for the filter dropdown */
+  availableAdvisors?: Array<{ id: number | string; name: string }>;
 }
 
 // =============================================================================
@@ -93,14 +134,6 @@ function daysInStage(deal: PipelineDeal): number | null {
   const entered = new Date(deal.stageEnteredAt).getTime();
   if (isNaN(entered)) return null;
   return Math.floor((Date.now() - entered) / (1000 * 60 * 60 * 24));
-}
-
-function ageColor(days: number | null): string {
-  if (days === null) return "border-slate-700/40";
-  if (days >= 30) return "border-rose-500/60 ring-1 ring-rose-500/30";
-  if (days >= 14) return "border-orange-500/60 ring-1 ring-orange-500/20";
-  if (days >= 7) return "border-amber-500/60 ring-1 ring-amber-500/20";
-  return "border-slate-700/40";
 }
 
 function fmtMoney(n: number | null): string {
@@ -117,6 +150,8 @@ function filterByAccess(
   canSeeAll: boolean,
 ): PipelineDeal[] {
   if (role === "lender" || role === "capital-seeker") return [];
+  // Interns and staff with canSeeAll, admin, or advisors with canSeeAll all see everything.
+  // Otherwise, see only deals owned/shared.
   if (role === "admin" || canSeeAll) return deals;
   return deals.filter(
     (d) =>
@@ -125,18 +160,42 @@ function filterByAccess(
   );
 }
 
+function autoDefaultTitle(deal: PipelineDeal): string {
+  // Per spec: "Deal# — City"
+  const num = deal.dealNumber || `#${deal.id}`;
+  if (deal.city) return `${num} — ${deal.city}`;
+  if (deal.borrowerName && deal.borrowerName !== "Untitled") return `${num} — ${deal.borrowerName}`;
+  return num;
+}
+
+function effectiveTitle(deal: PipelineDeal): string {
+  return (deal.dealTitle && deal.dealTitle.trim()) || autoDefaultTitle(deal);
+}
+
+function advisorInitials(name: string | undefined): string {
+  if (!name) return "—";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "—";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 // =============================================================================
-// Card (draggable)
+// Card (draggable) — supports two variants: "light" (on navy col) or "dark" (on grey col)
 // =============================================================================
 
 function DealCard({
   deal,
+  variant,
   onOpen,
   onMoveTo,
+  onTitleChange,
 }: {
   deal: PipelineDeal;
+  variant: "light" | "dark";
   onOpen: (id: string | number) => void;
   onMoveTo: (id: string | number, stage: StageId) => void;
+  onTitleChange?: (id: string | number, newTitle: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(deal.id),
@@ -144,89 +203,347 @@ function DealCard({
   });
 
   const [showMoveMenu, setShowMoveMenu] = useState(false);
-  const days = daysInStage(deal);
-  const ageBorderClass = ageColor(days);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(effectiveTitle(deal));
 
-  const style = transform
-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-    : undefined;
+  const days = daysInStage(deal);
+  const showDays = days !== null && days >= 7;
+
+  // Aging border outline (applied as inset shadow so it works on both variants)
+  let agingShadow = "";
+  if (days !== null) {
+    if (days >= 30) agingShadow = `0 0 0 1.5px ${COLORS.agingRed}`;
+    else if (days >= 14) agingShadow = `0 0 0 1.5px ${COLORS.agingOrange}`;
+    else if (days >= 7) agingShadow = `0 0 0 1.5px ${COLORS.agingYellow}`;
+  }
+
+  const isLight = variant === "light";
+  const cardStyle: React.CSSProperties = {
+    background: isLight ? COLORS.cardLight : COLORS.navy,
+    border: `1px solid ${isLight ? COLORS.cardLightBorder : COLORS.cardDarkBorder}`,
+    boxShadow: agingShadow || (isLight ? "0 1px 1px rgba(0,0,0,0.08)" : "0 1px 2px rgba(0,0,0,0.25)"),
+    ...(transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : {}),
+    opacity: isDragging ? 0.4 : 1,
+  };
+
+  const titleColor = isLight ? COLORS.cardLightTextDark : "#ffffff";
+  const addrColor = isLight ? COLORS.cardLightTextSubtle : "rgba(255,255,255,0.65)";
+  const numColor = isLight ? COLORS.cardLightTextDark : COLORS.gold;
+  const photoBg = isLight ? COLORS.cardLightPhotoBg : COLORS.cardDarkPhotoBg;
+  const photoFg = isLight ? "#94a3b8" : "rgba(255,255,255,0.3)";
+  const advisorNameColor = isLight ? COLORS.cardLightAdvisorName : "rgba(255,255,255,0.85)";
+  const loanAmtColor = isLight ? COLORS.cardLightTextDark : COLORS.gold;
+  const footBorder = isLight ? "rgba(10,31,68,0.15)" : "rgba(255,255,255,0.12)";
+
+  function commitTitle() {
+    const trimmed = titleDraft.trim();
+    const auto = autoDefaultTitle(deal);
+    // If user cleared it or matches auto-default, save empty string (means "use default")
+    const toSave = trimmed === "" || trimmed === auto ? "" : trimmed;
+    if (toSave !== (deal.dealTitle ?? "") && onTitleChange) {
+      onTitleChange(deal.id, toSave);
+    }
+    setEditingTitle(false);
+  }
 
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className={`bg-slate-800/60 backdrop-blur-sm rounded-lg border-2 p-3 mb-2 cursor-grab active:cursor-grabbing transition-shadow ${ageBorderClass} ${isDragging ? "opacity-40 shadow-xl" : "hover:shadow-md"}`}
-      {...attributes}
+      style={{
+        ...cardStyle,
+        borderRadius: 7,
+        padding: 8,
+        marginBottom: 8,
+        cursor: editingTitle ? "default" : "grab",
+      }}
+      {...(editingTitle ? {} : attributes)}
     >
-      {/* Drag handle covers the whole card except interactive elements */}
-      <div {...listeners} className="select-none">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span
-              className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
-                deal.isTemp
-                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                  : "bg-slate-700/60 text-slate-200"
-              }`}
-            >
-              {deal.dealNumber}
-            </span>
-            {days !== null && days >= 7 && (
-              <span className="text-[10px] uppercase tracking-wider text-slate-400">
-                {days}d
+      {/* Drag handle wraps everything except interactive controls */}
+      <div {...(editingTitle ? {} : listeners)} className="select-none">
+        {/* Top row: photo + meta */}
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 6 }}>
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 5,
+              flexShrink: 0,
+              background: photoBg,
+              color: photoFg,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 14,
+              overflow: "hidden",
+              backgroundImage: deal.propertyPhoto ? `url(${deal.propertyPhoto})` : undefined,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+          >
+            {!deal.propertyPhoto && "📷"}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div>
+              <span
+                style={{
+                  fontFamily: "'SF Mono', Monaco, monospace",
+                  fontSize: 10,
+                  letterSpacing: "0.04em",
+                  color: numColor,
+                  fontWeight: 700,
+                }}
+              >
+                {deal.dealNumber}
               </span>
+              {deal.isTemp && (
+                <span
+                  style={{
+                    fontSize: 9,
+                    marginLeft: 5,
+                    padding: "1px 4px",
+                    borderRadius: 3,
+                    background: "rgba(245,158,11,0.2)",
+                    color: COLORS.agingYellow,
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  TEMP
+                </span>
+              )}
+              {showDays && (
+                <span
+                  style={{
+                    fontSize: 9,
+                    marginLeft: 5,
+                    color: isLight ? "#b45309" : COLORS.goldBright,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    fontWeight: 600,
+                  }}
+                >
+                  {days}d
+                </span>
+              )}
+            </div>
+
+            {/* Editable title */}
+            {editingTitle ? (
+              <input
+                autoFocus
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={commitTitle}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    commitTitle();
+                  } else if (e.key === "Escape") {
+                    setTitleDraft(effectiveTitle(deal));
+                    setEditingTitle(false);
+                  }
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: "100%",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: titleColor,
+                  background: isLight ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.1)",
+                  border: `1px solid ${COLORS.gold}`,
+                  borderRadius: 3,
+                  padding: "1px 4px",
+                  marginTop: 1,
+                  outline: "none",
+                }}
+              />
+            ) : (
+              <div
+                role="button"
+                tabIndex={0}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onTitleChange) {
+                    setTitleDraft(effectiveTitle(deal));
+                    setEditingTitle(true);
+                  }
+                }}
+                title={onTitleChange ? "Click to edit title" : undefined}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: titleColor,
+                  marginTop: 1,
+                  padding: "1px 4px",
+                  marginLeft: -4,
+                  borderRadius: 3,
+                  cursor: onTitleChange ? "text" : "default",
+                  lineHeight: 1.3,
+                  wordBreak: "break-word",
+                }}
+                className="capmoon-card-title"
+              >
+                {effectiveTitle(deal)}
+              </div>
+            )}
+
+            {/* Address */}
+            {(deal.street || deal.city) && (
+              <div style={{ fontSize: 10, marginTop: 1, lineHeight: 1.3, color: addrColor }}>
+                {deal.street && <span>{deal.street}</span>}
+                {deal.street && deal.city && <span>, </span>}
+                {deal.city && (
+                  <span>
+                    {deal.city}
+                    {deal.state ? `, ${deal.state}` : ""}
+                  </span>
+                )}
+              </div>
             )}
           </div>
-          {deal.assignedAdvisorAvatar ? (
-            <img
-              src={deal.assignedAdvisorAvatar}
-              alt={deal.assignedAdvisor ?? ""}
-              className="w-5 h-5 rounded-full"
-              title={deal.assignedAdvisor}
-            />
-          ) : deal.assignedAdvisor ? (
+        </div>
+
+        {/* Footer: advisor + loan amount */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            paddingTop: 6,
+            marginTop: 5,
+            borderTop: `1px solid ${footBorder}`,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0, flex: 1 }}>
+            {deal.assignedAdvisorAvatar ? (
+              <img
+                src={deal.assignedAdvisorAvatar}
+                alt={deal.assignedAdvisor ?? ""}
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: "50%",
+                  flexShrink: 0,
+                  objectFit: "cover",
+                  border: `1.5px solid ${COLORS.gold}`,
+                }}
+                title={deal.assignedAdvisor}
+              />
+            ) : (
+              <span
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: "50%",
+                  background: `linear-gradient(135deg, ${COLORS.gold}, #8b6f1f)`,
+                  color: COLORS.navy,
+                  fontSize: 8,
+                  fontWeight: 700,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  border: `1.5px solid ${COLORS.gold}`,
+                }}
+                title={deal.assignedAdvisor}
+              >
+                {advisorInitials(deal.assignedAdvisor)}
+              </span>
+            )}
             <span
-              className="w-5 h-5 rounded-full bg-slate-600 text-[10px] flex items-center justify-center text-slate-200"
-              title={deal.assignedAdvisor}
+              style={{
+                fontSize: 10,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                color: advisorNameColor,
+              }}
             >
-              {deal.assignedAdvisor.charAt(0)}
+              {deal.assignedAdvisor ?? "Unassigned"}
             </span>
-          ) : null}
-        </div>
-        <div className="text-sm font-semibold text-slate-100 truncate mb-1">
-          {deal.borrowerName}
-        </div>
-        <div className="text-xs text-slate-400 mb-2 truncate">
-          {deal.assetType}
-          {deal.city && ` · ${deal.city}${deal.state ? `, ${deal.state}` : ""}`}
-        </div>
-        <div className="text-sm font-mono font-bold text-amber-300">
-          {fmtMoney(deal.loanAmount)}
+          </div>
+          <span
+            style={{
+              fontSize: 11,
+              color: loanAmtColor,
+              fontWeight: 700,
+            }}
+          >
+            {fmtMoney(deal.loanAmount)}
+          </span>
         </div>
       </div>
 
       {/* Action row: Open + Move to */}
-      <div className="flex items-center gap-1 mt-3 pt-2 border-t border-slate-700/40">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          marginTop: 6,
+          paddingTop: 6,
+          borderTop: `1px solid ${footBorder}`,
+        }}
+      >
         <button
           type="button"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => onOpen(deal.id)}
-          className="flex-1 text-[11px] uppercase tracking-wider text-slate-300 hover:text-white py-1 rounded hover:bg-slate-700/40"
+          style={{
+            flex: 1,
+            fontSize: 10,
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            color: isLight ? COLORS.cardLightTextSubtle : "rgba(255,255,255,0.7)",
+            padding: "3px 0",
+            borderRadius: 4,
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+          }}
+          className="capmoon-card-btn"
         >
           Open
         </button>
-        <div className="relative">
+        <div style={{ position: "relative" }}>
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => setShowMoveMenu((v) => !v)}
-            className="text-[11px] uppercase tracking-wider text-slate-400 hover:text-white py-1 px-2 rounded hover:bg-slate-700/40"
+            style={{
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              color: isLight ? COLORS.cardLightTextSubtle : "rgba(255,255,255,0.6)",
+              padding: "3px 8px",
+              borderRadius: 4,
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+            }}
+            className="capmoon-card-btn"
           >
             Move ▾
           </button>
           {showMoveMenu && (
             <div
-              className="absolute right-0 top-full mt-1 z-30 w-48 bg-slate-900 border border-slate-700 rounded-lg shadow-xl py-1"
+              style={{
+                position: "absolute",
+                right: 0,
+                top: "100%",
+                marginTop: 4,
+                zIndex: 30,
+                minWidth: 180,
+                background: COLORS.navy,
+                border: `1px solid ${COLORS.gold}`,
+                borderRadius: 8,
+                boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
+                padding: "4px 0",
+              }}
               onPointerDown={(e) => e.stopPropagation()}
             >
               {PIPELINE_STAGES.filter((s) => s.id !== deal.status).map((s) => (
@@ -237,7 +554,17 @@ function DealCard({
                     setShowMoveMenu(false);
                     onMoveTo(deal.id, s.id);
                   }}
-                  className="w-full text-left px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-700/60"
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "6px 12px",
+                    fontSize: 11,
+                    color: "white",
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                  className="capmoon-move-opt"
                 >
                   {s.label}
                 </button>
@@ -259,41 +586,96 @@ function StageColumn({
   deals,
   onOpen,
   onMoveTo,
+  onTitleChange,
 }: {
   stage: typeof PIPELINE_STAGES[number];
   deals: PipelineDeal[];
   onOpen: (id: string | number) => void;
   onMoveTo: (id: string | number, stage: StageId) => void;
+  onTitleChange?: (id: string | number, newTitle: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
   const totalValue = deals.reduce((sum, d) => sum + (d.loanAmount ?? 0), 0);
 
+  const colBg = stage.variant === "navy" ? COLORS.navy : COLORS.grey;
+  const cardVariant: "light" | "dark" = stage.variant === "navy" ? "light" : "dark";
+
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col min-w-[260px] w-[280px] flex-shrink-0 rounded-xl border ${stage.border} ${stage.bg} ${isOver ? "ring-2 ring-amber-400/60" : ""} transition-all`}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        minWidth: 240,
+        width: 260,
+        flexShrink: 0,
+        borderRadius: 10,
+        background: colBg,
+        border: isOver ? `2px solid ${COLORS.gold}` : "2px solid transparent",
+        padding: 10,
+        transition: "border 0.15s",
+      }}
     >
-      <div className="px-3 py-2 border-b border-slate-700/40">
-        <div className="flex items-center justify-between mb-1">
-          <span className={`text-xs font-bold uppercase tracking-wider ${stage.text}`}>
-            {stage.label}
-          </span>
-          <span className="text-[10px] text-slate-400 bg-slate-900/60 rounded-full px-2 py-0.5">
-            {deals.length}
-          </span>
+      {/* Header */}
+      <div
+        style={{
+          padding: "4px 8px 9px",
+          marginBottom: 8,
+          borderBottom: "1px solid rgba(255,255,255,0.18)",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: "white",
+            display: "block",
+            marginBottom: 2,
+          }}
+        >
+          {stage.label}
         </div>
-        <div className="text-[11px] text-slate-400 font-mono">
-          {fmtMoney(totalValue)}
+        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.75)" }}>
+          {deals.length}
+          {" · "}
+          <b style={{ color: COLORS.gold, fontWeight: 600 }}>{fmtMoney(totalValue)}</b>
         </div>
       </div>
-      <div className="flex-1 p-2 overflow-y-auto min-h-[200px] max-h-[calc(100vh-280px)]">
+
+      {/* Cards */}
+      <div
+        style={{
+          flex: 1,
+          padding: 2,
+          overflowY: "auto",
+          minHeight: 200,
+          maxHeight: "calc(100vh - 280px)",
+        }}
+      >
         {deals.length === 0 ? (
-          <div className="text-xs text-slate-500 italic text-center py-6">
-            No deals
+          <div
+            style={{
+              fontSize: 11,
+              color: "rgba(255,255,255,0.4)",
+              fontStyle: "italic",
+              textAlign: "center",
+              padding: "24px 0",
+            }}
+          >
+            Drop here
           </div>
         ) : (
           deals.map((d) => (
-            <DealCard key={d.id} deal={d} onOpen={onOpen} onMoveTo={onMoveTo} />
+            <DealCard
+              key={d.id}
+              deal={d}
+              variant={cardVariant}
+              onOpen={onOpen}
+              onMoveTo={onMoveTo}
+              onTitleChange={onTitleChange}
+            />
           ))
         )}
       </div>
@@ -313,9 +695,12 @@ export default function Pipeline({
   onDealStageChange,
   onOpenDeal,
   onPipedriveSync,
+  onTitleChange,
+  availableAdvisors,
 }: PipelineProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "error">("idle");
+  const [advisorFilter, setAdvisorFilter] = useState<string>("all");
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -323,11 +708,24 @@ export default function Pipeline({
     }),
   );
 
-  // Filter by access rules
-  const visibleDeals = useMemo(
+  // Step 1: visibility filter (role + ownership)
+  const visibleByAccess = useMemo(
     () => filterByAccess(deals, currentUserEmail, currentUserRole, canSeeAllDeals),
     [deals, currentUserEmail, currentUserRole, canSeeAllDeals],
   );
+
+  // Step 2: advisor filter (user-controlled)
+  const visibleDeals = useMemo(() => {
+    if (advisorFilter === "all") return visibleByAccess;
+    if (advisorFilter === "unassigned") {
+      return visibleByAccess.filter(
+        (d) => !d.assignedAdvisorId && !d.assignedAdvisor,
+      );
+    }
+    return visibleByAccess.filter(
+      (d) => String(d.assignedAdvisorId) === advisorFilter || d.assignedAdvisor === advisorFilter,
+    );
+  }, [visibleByAccess, advisorFilter]);
 
   // Group by stage
   const byStage = useMemo(() => {
@@ -340,7 +738,7 @@ export default function Pipeline({
     };
     for (const d of visibleDeals) {
       if (map[d.status]) map[d.status].push(d);
-      else map.pending.push(d); // unknown → bucket into pending
+      else map.pending.push(d);
     }
     return map;
   }, [visibleDeals]);
@@ -354,10 +752,8 @@ export default function Pipeline({
     if (!deal) return;
     if (deal.status === newStage) return;
 
-    // Optimistic UI update
     onDealStageChange(dealId, newStage);
 
-    // Pipedrive sync — admin/advisor only
     const shouldSync =
       (currentUserRole === "admin" || currentUserRole === "advisor") &&
       onPipedriveSync &&
@@ -394,40 +790,84 @@ export default function Pipeline({
   // Empty / no-access state
   if (currentUserRole === "lender" || currentUserRole === "capital-seeker") {
     return (
-      <div className="p-8 text-center text-slate-400">
+      <div style={{ padding: 32, textAlign: "center", color: "#94a3b8" }}>
         Pipeline view is not available for your role.
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* Header strip */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h2 className="text-lg font-bold text-slate-100">Pipeline</h2>
-          <p className="text-xs text-slate-400">
-            {visibleDeals.length} deal{visibleDeals.length === 1 ? "" : "s"} ·{" "}
-            {currentUserRole === "admin" || canSeeAllDeals
-              ? "All deals"
-              : "Your deals"}
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: COLORS.navy, margin: 0 }}>DealFlow</h2>
+          <p style={{ fontSize: 11, color: "#64748b", margin: "2px 0 0 0" }}>
+            {visibleDeals.length} deal{visibleDeals.length === 1 ? "" : "s"}
+            {advisorFilter !== "all" && (
+              <span> · filtered</span>
+            )}
+            {(currentUserRole === "admin" || canSeeAllDeals) ? " · all" : " · yours"}
           </p>
         </div>
-        {syncStatus !== "idle" && (
-          <span
-            className={`text-xs px-3 py-1 rounded-full border ${
-              syncStatus === "syncing"
-                ? "bg-amber-500/10 text-amber-300 border-amber-500/40"
-                : syncStatus === "synced"
-                  ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/40"
-                  : "bg-rose-500/10 text-rose-300 border-rose-500/40"
-            }`}
+
+        {/* Filter bar */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <label style={{ fontSize: 11, color: "#374151", fontWeight: 600 }}>Advisor:</label>
+          <select
+            value={advisorFilter}
+            onChange={(e) => setAdvisorFilter(e.target.value)}
+            style={{
+              fontSize: 11,
+              padding: "4px 8px",
+              border: "1px solid #d1d5db",
+              borderRadius: 6,
+              background: "white",
+              color: "#111827",
+              cursor: "pointer",
+            }}
           >
-            {syncStatus === "syncing" && "Syncing to Pipedrive…"}
-            {syncStatus === "synced" && "✓ Synced to Pipedrive"}
-            {syncStatus === "error" && "⚠ Pipedrive sync failed"}
-          </span>
-        )}
+            <option value="all">All advisors</option>
+            {availableAdvisors?.map((a) => (
+              <option key={a.id} value={String(a.id)}>
+                {a.name}
+              </option>
+            ))}
+            <option value="unassigned">— Unassigned</option>
+          </select>
+
+          {syncStatus !== "idle" && (
+            <span
+              style={{
+                fontSize: 11,
+                padding: "4px 12px",
+                borderRadius: 999,
+                border:
+                  syncStatus === "syncing"
+                    ? "1px solid rgba(245,158,11,0.4)"
+                    : syncStatus === "synced"
+                      ? "1px solid rgba(16,185,129,0.4)"
+                      : "1px solid rgba(244,63,94,0.4)",
+                background:
+                  syncStatus === "syncing"
+                    ? "rgba(245,158,11,0.1)"
+                    : syncStatus === "synced"
+                      ? "rgba(16,185,129,0.1)"
+                      : "rgba(244,63,94,0.1)",
+                color:
+                  syncStatus === "syncing"
+                    ? "#b45309"
+                    : syncStatus === "synced"
+                      ? "#047857"
+                      : "#be123c",
+              }}
+            >
+              {syncStatus === "syncing" && "Syncing to Pipedrive…"}
+              {syncStatus === "synced" && "✓ Synced to Pipedrive"}
+              {syncStatus === "error" && "⚠ Pipedrive sync failed"}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Kanban */}
@@ -436,7 +876,15 @@ export default function Pipeline({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-3 overflow-x-auto pb-4">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(5, minmax(240px, 1fr))",
+            gap: 10,
+            overflowX: "auto",
+            paddingBottom: 12,
+          }}
+        >
           {PIPELINE_STAGES.map((stage) => (
             <StageColumn
               key={stage.id}
@@ -444,20 +892,31 @@ export default function Pipeline({
               deals={byStage[stage.id] ?? []}
               onOpen={onOpenDeal}
               onMoveTo={handleStageChange}
+              onTitleChange={onTitleChange}
             />
           ))}
         </div>
 
         <DragOverlay>
           {activeDeal && (
-            <div className="bg-slate-800 rounded-lg border-2 border-amber-400/60 p-3 shadow-2xl rotate-2 w-[260px]">
-              <div className="text-xs font-mono font-bold text-amber-300 mb-1">
+            <div
+              style={{
+                background: COLORS.navy,
+                border: `2px solid ${COLORS.gold}`,
+                borderRadius: 7,
+                padding: 8,
+                boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
+                transform: "rotate(1.5deg)",
+                width: 240,
+              }}
+            >
+              <div style={{ fontSize: 10, fontFamily: "'SF Mono', Monaco, monospace", color: COLORS.gold, fontWeight: 700, marginBottom: 2 }}>
                 {activeDeal.dealNumber}
               </div>
-              <div className="text-sm font-semibold text-slate-100 truncate">
-                {activeDeal.borrowerName}
+              <div style={{ fontSize: 12, fontWeight: 600, color: "white", marginBottom: 4 }}>
+                {effectiveTitle(activeDeal)}
               </div>
-              <div className="text-sm font-mono font-bold text-amber-300 mt-1">
+              <div style={{ fontSize: 11, color: COLORS.gold, fontWeight: 700 }}>
                 {fmtMoney(activeDeal.loanAmount)}
               </div>
             </div>
@@ -465,10 +924,11 @@ export default function Pipeline({
         </DragOverlay>
       </DndContext>
 
-      {/* Stage aging legend */}
-      <div className="text-[10px] text-slate-500 mt-2 italic">
+      {/* Aging legend */}
+      <div style={{ fontSize: 10, color: "#94a3b8", fontStyle: "italic", marginTop: 4 }}>
         Card border colors: yellow at 7d in stage · orange at 14d · red at 30d+
       </div>
     </div>
   );
 }
+

@@ -4616,8 +4616,9 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     ["deal-team", "Deal Team", Users],
     ["submitted-deals", "Submitted Deals", FileSpreadsheet],
     // CAPMOON_PIPELINE_SIDEBAR_PATCH — start
-    ["pipeline", "DealFlow via Pipedrive\u00ae", Workflow],
+    ["pipeline", "DealFlow via Pipedrive\u00ae", Workflow, "sub"],
     // CAPMOON_PIPELINE_SIDEBAR_PATCH — end
+    // CAPMOON_KANBAN_OVERHAUL — sub-item style flag (4th tuple element="sub")
     ["uploads", "Upload Center", Upload],
     ...(isAdmin ? [["user-management", "Admin Portal", Settings] as [string, string, any]] : []),
     ...(isAdmin ? [["deal-memos", "Deal Memos", FileText] as [string, string, any]] : []),
@@ -5444,6 +5445,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                   session={session}
                   setActiveSection={setActiveTab}
                   setSelectedDealId={setExpandedDealId as any}
+                  teamMembers={teamMembers}
+                  users={users}
                 />
               )}
               {/* CAPMOON_PIPELINE_SIDEBAR_PATCH — end */}
@@ -5991,19 +5994,24 @@ function PipelineView({
   session,
   setActiveSection,
   setSelectedDealId,
+  teamMembers,
+  users,
 }: {
   submittedDeals: any[];
   setSubmittedDeals: (deals: any[]) => void;
   session: any;
   setActiveSection: (s: string) => void;
   setSelectedDealId: (id: any) => void;
+  teamMembers: any[]; // CAPMOON_KANBAN_OVERHAUL
+  users: any[]; // CAPMOON_KANBAN_OVERHAUL
 }) {
   const currentUserEmail = session?.user?.email ?? "";
   const role = (session?.user?.role ?? "advisor") as
     | "admin" | "advisor" | "staff" | "intern" | "lender" | "capital-seeker";
   const canSeeAllDeals = !!session?.user?.canSeeAllDeals;
 
-  // Map submitted deals → PipelineDeal shape
+  // CAPMOON_KANBAN_OVERHAUL — start (PipelineView mapping)
+  // Map submitted deals → PipelineDeal shape with team-member lookup for advisor
   const pipelineDeals: PipelineDeal[] = (submittedDeals || []).map((d: any) => {
     const data = d.data || d;
     const firstAsset = data.assets?.[0] || {};
@@ -6012,24 +6020,58 @@ function PipelineView({
     const isTemp = !!data.tempNumber && !data.dealNumber;
     const status: StageId =
       (PIPELINE_STAGES.find((s) => s.id === data.status)?.id) ?? "pending";
+
+    // Resolve advisor: prefer string fields, else look up in teamMembers by assignedAdvisorIds[0]
+    let advisorName: string | undefined = data.assignedAdvisor || data.advisorName;
+    let advisorPhoto: string | undefined = data.assignedAdvisorAvatar;
+    let advisorId: number | string | null = null;
+
+    const idArr = Array.isArray(data.assignedAdvisorIds) ? data.assignedAdvisorIds : [];
+    if (idArr.length > 0) {
+      advisorId = idArr[0];
+      const tm = (teamMembers || []).find((t: any) => t && t.id === advisorId);
+      if (tm) {
+        if (!advisorName) advisorName = tm.name;
+        if (!advisorPhoto && tm.photo) advisorPhoto = tm.photo;
+      }
+    }
+
+    // Hardcoded fallback: deals owned by Justin (no team-member entry)
+    const ownerEmail = data.ownerEmail || data.advisorEmail || "";
+    if (!advisorName) {
+      if (ownerEmail === "justin.wolk@capmoon.com") {
+        advisorName = "Justin Wolk";
+        advisorPhoto = advisorPhoto || "/justin.jpeg";
+      }
+    }
+    // Always-on Justin photo override if name resolves to Justin
+    if (advisorName === "Justin Wolk" && !advisorPhoto) {
+      advisorPhoto = "/justin.jpeg";
+    }
+
     return {
       id: d.id,
       dealNumber: String(dealNumber),
       isTemp,
-      borrowerName: data.borrowerName || data.advisorName || "Untitled",
+      dealTitle: data.dealTitle || undefined,
+      borrowerName: data.seekerName || data.borrowerName || data.advisorName || "Untitled",
       loanAmount: parseFloat(String(firstAsset.loanAmount || "0").replace(/[^0-9.]/g, "")) || null,
       assetType: firstAsset.assetType || data.capitalType || "—",
+      street: addr.street,
       city: addr.city,
       state: addr.state,
       status,
-      assignedAdvisor: data.assignedAdvisor || data.advisorName,
-      assignedAdvisorAvatar: data.assignedAdvisorAvatar,
+      propertyPhoto: firstAsset.propertyPhoto || data.propertyPhoto,
+      assignedAdvisor: advisorName,
+      assignedAdvisorAvatar: advisorPhoto,
+      assignedAdvisorId: advisorId,
       pipedriveId: data.pipedriveId ?? null,
       stageEnteredAt: data.stageEnteredAt ?? data.submittedAt ?? d.created_at,
-      ownerEmail: data.ownerEmail || data.advisorEmail,
+      ownerEmail,
       collaborators: data.collaborators || [],
     };
   });
+  // CAPMOON_KANBAN_OVERHAUL — end (PipelineView mapping)
 
   function handleStageChange(dealId: any, newStage: StageId) {
     const next = (submittedDeals || []).map((d: any) => {
@@ -6064,6 +6106,44 @@ function PipelineView({
     if (!res.ok) throw new Error(`Pipedrive update failed: ${res.status}`);
   }
 
+  // CAPMOON_KANBAN_OVERHAUL — title editor: persist dealTitle on the deal
+  function handleTitleChange(dealId: any, newTitle: string) {
+    const next = (submittedDeals || []).map((d: any) => {
+      if (d.id !== dealId) return d;
+      return {
+        ...d,
+        data: {
+          ...(d.data || {}),
+          dealTitle: newTitle,
+        },
+      };
+    });
+    setSubmittedDeals(next);
+    // Persist to DB (async, non-blocking)
+    const saved = next.find((d: any) => d.id === dealId);
+    if (saved) {
+      fetch("/api/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "deals", data: [saved] }),
+      }).catch((e) => console.error("Save dealTitle failed:", e));
+    }
+  }
+
+  // CAPMOON_KANBAN_OVERHAUL — build advisor list for filter
+  const availableAdvisors = (() => {
+    const list: Array<{ id: number | string; name: string }> = [];
+    // Always include Justin (admin) since he's not in teamMembers table
+    list.push({ id: "justin.wolk@capmoon.com", name: "Justin Wolk" });
+    // Include all team members
+    (teamMembers || []).forEach((tm: any) => {
+      if (tm && tm.id != null && tm.name) {
+        list.push({ id: tm.id, name: tm.name });
+      }
+    });
+    return list;
+  })();
+
   function handleOpenDeal(dealId: any) {
     setSelectedDealId(dealId);
     setActiveSection("submitted-deals");
@@ -6078,6 +6158,8 @@ function PipelineView({
       onDealStageChange={handleStageChange}
       onOpenDeal={handleOpenDeal}
       onPipedriveSync={handlePipedriveSync}
+      onTitleChange={handleTitleChange}
+      availableAdvisors={availableAdvisors}
     />
   );
 }
