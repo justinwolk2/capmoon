@@ -359,7 +359,7 @@ function DealCard({
                 }}
               />
             ) : (
-              {/* CAPMOON_TITLE_CLICK_FIX — capture-phase pointer events to beat dnd-kit */}
+              // CAPMOON_TITLE_CLICK_FIX — capture-phase pointer events to beat dnd-kit
               <div
                 role="button"
                 tabIndex={0}
