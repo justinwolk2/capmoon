@@ -359,15 +359,30 @@ function DealCard({
                 }}
               />
             ) : (
+              {/* CAPMOON_TITLE_CLICK_FIX — capture-phase pointer events to beat dnd-kit */}
               <div
                 role="button"
                 tabIndex={0}
-                onPointerDown={(e) => {
+                onPointerDownCapture={(e) => {
+                  // Capture phase fires before dnd-kit's pointer sensor —
+                  // stops drag from initiating when user clicks the title.
+                  e.stopPropagation();
+                }}
+                onMouseDownCapture={(e) => {
+                  // Belt-and-suspenders for browsers/devices that emit mouse over pointer
                   e.stopPropagation();
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (onTitleChange) {
+                    setTitleDraft(effectiveTitle(deal));
+                    setEditingTitle(true);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  // Allow keyboard activation since role=button + tabindex=0
+                  if ((e.key === "Enter" || e.key === " ") && onTitleChange) {
+                    e.preventDefault();
                     setTitleDraft(effectiveTitle(deal));
                     setEditingTitle(true);
                   }
