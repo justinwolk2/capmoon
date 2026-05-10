@@ -337,23 +337,7 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
           <option value="pending">Pending</option><option value="assigned">Assigned</option><option value="sent-to-lenders">Sent to Lenders</option><option value="term-sheet-accepted">Term Sheet Accepted</option><option value="closed">Closed</option>
         </select>
       </div>
-      {/* Stage action buttons */}
-      {(isAdmin || session?.user.role === "advisor" || session?.user.role === "staff" || session?.user.role === "intern") && (
-        <div className="flex flex-wrap gap-2 mb-3">
-          {(deal.status === "sent-to-lenders" || deal.status === "assigned") && (
-            <button onClick={() => setShowAcceptTermSheet(!showAcceptTermSheet)}
-              className="px-3 py-1.5 text-xs font-bold bg-green-600 text-white rounded-xl hover:bg-green-700">
-              ✓ Accept Term Sheet
-            </button>
-          )}
-          {deal.status === "term-sheet-accepted" && (
-            <button onClick={() => { if(window.confirm("Mark this deal as CLOSED?")) updateDealStatus("closed"); }}
-              className="px-3 py-1.5 text-xs font-bold bg-purple-600 text-white rounded-xl hover:bg-purple-700">
-              🏆 Mark as Closed
-            </button>
-          )}
-        </div>
-      )}
+      {/* CAPMOON_TERM_SHEET_PLACEMENT_PATCH — stage action buttons relocated below to span metric grid right side */}
       {showAcceptTermSheet && (
         <div className="mb-3 p-4 rounded-xl border border-green-200 bg-green-50 space-y-3">
           <div className="text-sm font-bold text-green-800">Which lender accepted the term sheet?</div>
@@ -377,11 +361,31 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
           ✓ Term sheet accepted from <strong>{deal.acceptedLenderName}</strong>
         </div>
       )}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-        {[["Capital Type",deal.capitalType],["Loan Amount",deal.assets[0]?.loanAmount||"—"],["Asset Type",deal.assets[0]?.assetType||"—"],["Property Value",deal.assets[0]?.propertyValue||"—"],["DSCR",deal.assets[0]?.dscr||"—"],["Assets",`${deal.assets.length} asset${deal.assets.length>1?"s":""}`]].map(([label,val])=>(
-          <div key={String(label)} className="rounded-lg bg-white border border-gray-200 p-3"><div className="text-xs text-gray-400 mb-1">{label}</div><div className="text-sm font-bold text-[#0a1f44]">{val}</div></div>
-        ))}
+      {/* CAPMOON_TERM_SHEET_PLACEMENT_PATCH — start: metric grid + right-side stage-action button slot */}
+      <div className="flex flex-col md:flex-row gap-3 mb-3 items-stretch">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 flex-1">
+          {[["Capital Type",deal.capitalType],["Loan Amount",deal.assets[0]?.loanAmount||"—"],["Asset Type",deal.assets[0]?.assetType||"—"],["Property Value",deal.assets[0]?.propertyValue||"—"],["DSCR",deal.assets[0]?.dscr||"—"],["Assets",`${deal.assets.length} asset${deal.assets.length>1?"s":""}`]].map(([label,val])=>(
+            <div key={String(label)} className="rounded-lg bg-white border border-gray-200 p-3"><div className="text-xs text-gray-400 mb-1">{label}</div><div className="text-sm font-bold text-[#0a1f44]">{val}</div></div>
+          ))}
+        </div>
+        {(isAdmin || session?.user.role === "advisor" || session?.user.role === "staff" || session?.user.role === "intern") && (deal.status === "sent-to-lenders" || deal.status === "assigned" || deal.status === "term-sheet-accepted") && (
+          <div className="md:w-44 flex flex-col">
+            {(deal.status === "sent-to-lenders" || deal.status === "assigned") && (
+              <button onClick={() => setShowAcceptTermSheet(!showAcceptTermSheet)}
+                className="flex-1 min-h-[80px] px-4 py-3 text-sm font-bold bg-green-600 text-white rounded-xl hover:bg-green-700 shadow-sm flex items-center justify-center text-center leading-tight">
+                ✓ Accept<br/>Term Sheet
+              </button>
+            )}
+            {deal.status === "term-sheet-accepted" && (
+              <button onClick={() => { if(window.confirm("Mark this deal as CLOSED?")) updateDealStatus("closed"); }}
+                className="flex-1 min-h-[80px] px-4 py-3 text-sm font-bold bg-purple-600 text-white rounded-xl hover:bg-purple-700 shadow-sm flex items-center justify-center text-center leading-tight">
+                🏆 Mark as<br/>Closed
+              </button>
+            )}
+          </div>
+        )}
       </div>
+      {/* CAPMOON_TERM_SHEET_PLACEMENT_PATCH — end */}
       {deal.assets.map((asset: any, idx: number) => asset.address?.city ? (
         <div key={idx} className="text-xs text-gray-500 mt-1">Asset {idx+1}: {asset.address.street?`${asset.address.street}, `:""}{asset.address.city}, {asset.address.state} {asset.address.zip}</div>
       ) : null)}
