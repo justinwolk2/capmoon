@@ -4709,7 +4709,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     // CAPMOON_PIPELINE_SIDEBAR_PATCH — end
     // CAPMOON_KANBAN_OVERHAUL — sub-item style flag (4th tuple element="sub")
     ["uploads", "Upload Center", Upload],
-    ...(isAdmin ? [["user-management", "Admin Portal", Settings] as [string, string, any]] : []),
+    ...(isAdmin ? [["user-management", `Admin Portal${(pendingDeleteCount + pendingLenderChangeCount) > 0 ? ` (${pendingDeleteCount + pendingLenderChangeCount})` : ""}`, Settings] as [string, string, any]] : []), // CAPMOON_ADMIN_APPROVALS_POLISH — amber count badge
     ...(isAdmin ? [["deal-memos", "Deal Memos", FileText] as [string, string, any]] : []),
 
     ...(isAdmin && pendingDeleteCount > 0 ? [["delete-queue", `Delete Requests (${pendingDeleteCount})`, Bell] as [string, string, any]] : []),
@@ -5838,14 +5838,22 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                               <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold">Pending Approvals</div>
                               <div className="text-xs text-gray-500 mt-0.5">{totalPending} awaiting review · past requests auto-delete after 7 days</div>
                             </div>
-                            {totalPending > 0 && (
+                            {/* CAPMOON_ADMIN_APPROVALS_POLISH — pill toggles green/amber */}
+                            {totalPending > 0 ? (
                               <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">{totalPending} pending</span>
+                            ) : (
+                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">✓ All clear</span>
                             )}
                           </div>
 
                           {/* Current pending list */}
+                          {/* CAPMOON_ADMIN_APPROVALS_POLISH — green all-caught-up empty state */}
                           {totalPending === 0 ? (
-                            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-xs text-gray-400">No pending approvals.</div>
+                            <div className="rounded-xl border border-dashed border-emerald-200 p-6 text-center" style={{ background: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)" }}>
+                              <div className="text-2xl mb-1">✓</div>
+                              <div className="text-sm font-bold text-emerald-700">All caught up</div>
+                              <div className="text-xs text-emerald-600/80 mt-0.5">Nothing waiting on you right now.</div>
+                            </div>
                           ) : (
                             <div className="space-y-2">
                               {pendingLcr.map((req) => (
