@@ -4445,6 +4445,94 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const pendingDeleteCount = deleteRequests.filter((r) => r.status === "pending").length;
   const pendingLenderChangeCount = lenderChangeRequests.filter((r) => r.status === "pending").length;
 
+  // CAPMOON_ADMIN_APPROVALS_MINITAB — start: extracted handlers + lazy cleanup
+  // Helper: parse "M/D/YYYY, h:mm:ss AM" or ISO date strings into ms-since-epoch
+  function parseRequestedAt(s: any): number {
+    if (!s) return 0;
+    const t = new Date(String(s)).getTime();
+    return isNaN(t) ? 0 : t;
+  }
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+  // Lazy cleanup: on mount (admin only), remove non-pending items > 7 days old
+  // from BOTH queues, then persist the cleaned arrays back to the DB.
+  React.useEffect(() => {
+    if (!isAdmin) return;
+    const now = Date.now();
+    let didChange = false;
+
+    const cleanedLcr = lenderChangeRequests.filter((r) => {
+      if (r.status === "pending") return true;
+      const t = parseRequestedAt((r as any).requestedAt);
+      if (t === 0) return true; // keep if we can't parse
+      return (now - t) <= SEVEN_DAYS_MS;
+    });
+    if (cleanedLcr.length !== lenderChangeRequests.length) {
+      didChange = true;
+      setLenderChangeRequests(cleanedLcr);
+      fetch("/api/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "lender-changes", data: cleanedLcr }),
+      }).catch(e => console.error("LCR cleanup save failed:", e));
+    }
+
+    const cleanedDr = deleteRequests.filter((r) => {
+      if (r.status === "pending") return true;
+      const t = parseRequestedAt((r as any).requestedAt);
+      if (t === 0) return true;
+      return (now - t) <= SEVEN_DAYS_MS;
+    });
+    if (cleanedDr.length !== deleteRequests.length) {
+      didChange = true;
+      setDeleteRequests(cleanedDr);
+      fetch("/api/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "delete-requests", data: cleanedDr }),
+      }).catch(e => console.error("DR cleanup save failed:", e));
+    }
+    // We intentionally only run this on mount — re-running on every state
+    // change would create an infinite loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reusable approve handler for lender change requests
+  function handleLenderChangeApprove(reqId: number) {
+    const req = lenderChangeRequests.find((r) => r.id === reqId);
+    if (!req) return;
+    if (req.changeType === "add") {
+      setLenderRecords((prev) => { const next = [...prev, req.proposedData]; saveLendersToDb(next); return next; });
+    } else {
+      setLenderRecords((prev) => { const next = prev.map((l) => l.id === req.lenderId ? req.proposedData : l); saveLendersToDb(next); return next; });
+    }
+    const updated = lenderChangeRequests.map((r) => r.id === reqId ? { ...r, status: "approved" as const } : r);
+    setLenderChangeRequests(updated);
+    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: updated }) }).catch(e => console.error(e));
+  }
+
+  // Reusable deny handler for lender change requests
+  function handleLenderChangeDeny(reqId: number) {
+    const req = lenderChangeRequests.find((r) => r.id === reqId);
+    if (!req) return;
+    if (req.changeType === "edit" && req.lenderId) {
+      fetch("/api/data?type=lenders").then(r => r.json()).then(dbL => {
+        if (Array.isArray(dbL) && dbL.length > 0) {
+          setLenderRecords([...seedLenders, ...dbL]);
+        } else {
+          setLenderRecords(seedLenders);
+        }
+      });
+    }
+    const updated = lenderChangeRequests.map((r) => r.id === reqId ? { ...r, status: "denied" as const } : r);
+    setLenderChangeRequests(updated);
+    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: updated }) }).catch(e => console.error(e));
+  }
+
+  // Mini-tab: collapsible state for "Past Requests"
+  const [showPastApprovals, setShowPastApprovals] = React.useState(false);
+  // CAPMOON_ADMIN_APPROVALS_MINITAB — end
+
   function handleDeleteLender(id: number) {
     const lender = lenderRecords.find((l) => l.id === id);
     if (!lender) return;
@@ -5732,6 +5820,111 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                       <button onClick={addUser} className="mt-4 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Add User</button>
                     </div>
 
+                    {/* CAPMOON_ADMIN_APPROVALS_MINITAB — start: Pending Approvals card */}
+                    {(() => {
+                      const now = Date.now();
+                      // Build unified pending list
+                      const pendingLcr = lenderChangeRequests.filter((r) => r.status === "pending");
+                      const pendingDr = deleteRequests.filter((r) => r.status === "pending");
+                      // Build past list (<=7 days, non-pending)
+                      const pastLcr = lenderChangeRequests.filter((r) => r.status !== "pending" && (now - parseRequestedAt((r as any).requestedAt)) <= SEVEN_DAYS_MS);
+                      const pastDr = deleteRequests.filter((r) => r.status !== "pending" && (now - parseRequestedAt((r as any).requestedAt)) <= SEVEN_DAYS_MS);
+                      const totalPending = pendingLcr.length + pendingDr.length;
+                      const totalPast = pastLcr.length + pastDr.length;
+                      return (
+                        <div className="rounded-xl border border-[#0a1f44]/10 bg-white p-5 mb-6">
+                          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                            <div>
+                              <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold">Pending Approvals</div>
+                              <div className="text-xs text-gray-500 mt-0.5">{totalPending} awaiting review · past requests auto-delete after 7 days</div>
+                            </div>
+                            {totalPending > 0 && (
+                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">{totalPending} pending</span>
+                            )}
+                          </div>
+
+                          {/* Current pending list */}
+                          {totalPending === 0 ? (
+                            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-xs text-gray-400">No pending approvals.</div>
+                          ) : (
+                            <div className="space-y-2">
+                              {pendingLcr.map((req) => (
+                                <div key={"lcr-" + req.id} className="rounded-lg border border-gray-200 bg-gray-50 p-3 flex items-center justify-between gap-3 flex-wrap">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={"px-2 py-0.5 rounded-full text-[10px] font-bold border " + (req.changeType === "add" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-blue-50 text-blue-600 border-blue-200")}>
+                                      {req.changeType === "add" ? "New Lender" : "Edit Lender"}
+                                    </span>
+                                    <span className="text-sm font-semibold text-[#0a1f44]">{req.lenderName}</span>
+                                    <span className="text-xs text-gray-500">by {req.requestedBy} · {req.requestedAt}</span>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button onClick={() => handleLenderChangeApprove(req.id)} className="px-3 py-1.5 text-xs font-semibold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600">Approve</button>
+                                    <button onClick={() => handleLenderChangeDeny(req.id)} className="px-3 py-1.5 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-white">Deny</button>
+                                  </div>
+                                </div>
+                              ))}
+                              {pendingDr.map((req) => (
+                                <div key={"dr-" + req.id} className="rounded-lg border border-red-200 bg-red-50/50 p-3 flex items-center justify-between gap-3 flex-wrap">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-red-50 text-red-600 border-red-200">Delete Lender</span>
+                                    <span className="text-sm font-semibold text-[#0a1f44]">{req.lenderName}</span>
+                                    <span className="text-xs text-gray-500">by {req.requestedBy} · {req.requestedAt}</span>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button onClick={() => handleDeleteRequestAction(req.id, "approved")} className="px-3 py-1.5 text-xs font-semibold bg-red-500 text-white rounded-lg hover:bg-red-600">Approve & Delete</button>
+                                    <button onClick={() => handleDeleteRequestAction(req.id, "denied")} className="px-3 py-1.5 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-white">Deny</button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Past Requests collapsible */}
+                          {totalPast > 0 && (
+                            <div className="mt-4 pt-4 border-t border-gray-100">
+                              <button
+                                type="button"
+                                onClick={() => setShowPastApprovals((v) => !v)}
+                                className="flex items-center gap-2 text-xs font-semibold text-gray-500 hover:text-[#0a1f44] transition-colors"
+                              >
+                                <span>{showPastApprovals ? "▼" : "▶"}</span>
+                                <span>Past requests ({totalPast}) · last 7 days</span>
+                              </button>
+                              {showPastApprovals && (
+                                <div className="space-y-2 mt-3">
+                                  {pastLcr.map((req) => (
+                                    <div key={"past-lcr-" + req.id} className="rounded-lg border border-gray-200 bg-white p-3 flex items-center justify-between gap-3 flex-wrap opacity-75">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-gray-100 text-gray-500 border-gray-200">{req.changeType === "add" ? "New Lender" : "Edit Lender"}</span>
+                                        <span className="text-sm text-[#0a1f44]">{req.lenderName}</span>
+                                        <span className="text-xs text-gray-400">by {req.requestedBy} · {req.requestedAt}</span>
+                                      </div>
+                                      <span className={"px-2 py-0.5 rounded-full text-[10px] font-semibold " + (req.status === "approved" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-gray-100 text-gray-500 border border-gray-200")}>
+                                        {req.status === "approved" ? "✓ Approved" : "✕ Denied"}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  {pastDr.map((req) => (
+                                    <div key={"past-dr-" + req.id} className="rounded-lg border border-gray-200 bg-white p-3 flex items-center justify-between gap-3 flex-wrap opacity-75">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-gray-100 text-gray-500 border-gray-200">Delete Lender</span>
+                                        <span className="text-sm text-[#0a1f44]">{req.lenderName}</span>
+                                        <span className="text-xs text-gray-400">by {req.requestedBy} · {req.requestedAt}</span>
+                                      </div>
+                                      <span className={"px-2 py-0.5 rounded-full text-[10px] font-semibold " + (req.status === "approved" ? "bg-red-50 text-red-500 border border-red-200" : "bg-gray-100 text-gray-500 border border-gray-200")}>
+                                        {req.status === "approved" ? "Approved & Deleted" : "✕ Denied"}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    {/* CAPMOON_ADMIN_APPROVALS_MINITAB — end */}
+
                     {/* Search */}
                     <div className="mb-4 relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
@@ -5891,37 +6084,15 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                             </div>
                             {req.status === "pending" ? (
                               <div className="flex gap-2">
+                                {/* CAPMOON_ADMIN_APPROVALS_MINITAB — uses extracted handler */}
                                 <button
-                                  onClick={() => {
-                                    // Apply the change
-                                    if (req.changeType === "add") {
-                                      setLenderRecords((prev) => { const next = [...prev, req.proposedData]; saveLendersToDb(next); return next; });
-                                    } else {
-                                      setLenderRecords((prev) => { const next = prev.map((l) => l.id === req.lenderId ? req.proposedData : l); saveLendersToDb(next); return next; });
-                                    }
-                                    const updated = lenderChangeRequests.map((r) => r.id === req.id ? { ...r, status: "approved" as const } : r);
-                                    setLenderChangeRequests(updated);
-                                    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: updated }) }).catch(e => console.error(e));
-                                  }}
+                                  onClick={() => handleLenderChangeApprove(req.id)}
                                   className="px-4 py-2 text-xs font-semibold bg-emerald-500 text-white rounded-xl hover:bg-emerald-600"
                                 >
                                   Approve
                                 </button>
                                 <button
-                                  onClick={() => {
-                                    if (req.changeType === "edit" && req.lenderId) {
-                                      fetch("/api/data?type=lenders").then(r => r.json()).then(dbL => {
-                                        if (Array.isArray(dbL) && dbL.length > 0) {
-                                          setLenderRecords([...seedLenders, ...dbL]);
-                                        } else {
-                                          setLenderRecords(seedLenders);
-                                        }
-                                      });
-                                    }
-                                    const updated = lenderChangeRequests.map((r) => r.id === req.id ? { ...r, status: "denied" as const } : r);
-                                    setLenderChangeRequests(updated);
-                                    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: updated }) }).catch(e => console.error(e));
-                                  }}
+                                  onClick={() => handleLenderChangeDeny(req.id)}
                                   className="px-4 py-2 text-xs border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"
                                 >
                                   Deny
