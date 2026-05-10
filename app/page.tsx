@@ -30,6 +30,14 @@ type AssetData = {
   hardCosts: string; carryingCosts: string; borrowerEquity: string;
   ltvMode: string; currentNetIncome: string; manualLtv: string; dy: string; currentRate: string; arvValue: string; stabilizedNoi: string; constructionBudget: string;
   purchaseYear?: string; fullyEntitled?: "yes" | "no"; currentPropertyValue?: string; additionalEquity?: string; arvNetIncome?: string; valueAddCurrentNoi?: string;
+  // CAPMOON_PREMIER_APARTMENT_FLOW_PATCH_2026_05_10 — apartment-conditional fields
+  ownershipInterest?: "Leasehold" | "Leased Fee";
+  isTIC?: "Yes" | "No";
+  ticEntireEncumbered?: "Yes" | "No";
+  ticPercentage?: string;
+  timeToCompletion?: string;
+  // CAPMOON_PREMIER_PHOTOS_4_PATCH_2026_05_10 — extra photos beyond propertyPhoto
+  propertyPhotos?: string[];
   selectedStates: string[]; recourseType: string;
   numUnits: string; numBuildings: string; numAcres: string; retailUnits: RetailUnit[];
   address: AssetAddress;
@@ -125,6 +133,15 @@ type HybridProperty = {
   selectedStates: string[];
   recourseType: string;
   notes: string;
+  // CAPMOON_PREMIER_APARTMENT_FLOW_PATCH_2026_05_10 — apartment-conditional fields
+  ownershipInterest?: "Leasehold" | "Leased Fee";
+  isTIC?: "Yes" | "No";
+  ticEntireEncumbered?: "Yes" | "No";
+  ticPercentage?: string;
+  constructionBudget?: string;
+  stabilizedNoi?: string;
+  timeToCompletion?: string;
+  apartmentDealType?: string;
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -868,10 +885,13 @@ const seedLenders: LenderRecord[] = [
   { id: 717, source: "Spreadsheet", spreadsheetRow: "R718", program: "CROSS RIVER BANK", lender: "CROSS RIVER BANK", type: "Senior", minLoan: "", maxLoan: "", maxLtv: "", minDscr: "N/A", states: ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"], assets: ["Apartments", "NOTE PURCHASE"], status: "Active", email: "", phone: "", recourse: "CASE BY CASE", contactPerson: "", loanTerms: "", typeOfLoans: [], sponsorStates: [], notes: "" }
 ];
 
-const assetTypes = ["Equipment, Autos, or Other Non Real Estate Products", "Apartments", "Condos", "Senior Housing", "Student Housing", "Gaming", "Assisted Living", "Education Related", "SFR Portfolio", "Mobile Home Park", "Co-living", "Office", "Medical Office", "Manufacturing", "Mixed Use", "Lt Industrial", "Cannabis", "Retail - Multi Tenant", "Retail - Single Tenant", "Hotel/Hospitality", "Land", "Self-storage", "Religious", "Hospital/Health Care", "Distressed Debt", "Other"];
+// CAPMOON_PREMIER_ASSET_EXPANSION_PATCH_2026_05_10 — alphabetized, +8 new types, 2 renames
+const assetTypes = ["Adult Entertainment", "Apartments", "Assisted Living", "Cannabis", "Car Washes", "Co-living", "Condo Inventory", "Condos", "Distressed Debt", "Education Related", "Equipment, Autos, or Other Non Real Estate Products", "Gaming / Casinos", "Hospital/Health Care", "Hotel/Hospitality", "IOS (Industrial Outdoor Storage)", "Land", "Light Industrial", "Manufacturing", "Medical Office", "Mixed Use", "Mobile Home Park", "Office", "Religious", "Retail - Multi Tenant", "Retail - Single Tenant", "Self-storage", "Senior Housing", "SFR Portfolio", "STR/Airbnb", "Student Housing", "Urgent Care", "Warehouse / Heavy Industrial", "Other"];
 const capitalTypes = ["Senior", "Mezzanine", "Preferred Equity", "JV Equity", "Line of Credit", "Note on Note", "Loan Sales", "C&I", "Stretch Senior/Hybrid"];
-const dealTypes = ["Construction", "Value add", "New Development", "Bridge", "Takeout", "Investment", "Permanent Loan"];
-const ownershipStatuses = ["Acquisition", "Refinance", "Permanent Loan"];
+// CAPMOON_PREMIER_ASSET_EXPANSION_PATCH_2026_05_10 — Takeout renamed
+const dealTypes = ["Construction", "Value add", "New Development", "Bridge", "Takeout/Rate and Term Refi", "Investment", "Permanent Loan"];
+// CAPMOON_PREMIER_ASSET_EXPANSION_PATCH_2026_05_10 — Permanent Loan removed
+const ownershipStatuses = ["Acquisition", "Refinance"];
 const refinanceTypes = ["Cash Out to Borrower", "Cash Out-Value Add", "Rate and Term"];
 const recourseOptions = ["FULL", "NON RECOURSE", "CASE BY CASE"];
 const marketOptions = ["US", "INTERNATIONAL"];
@@ -882,9 +902,82 @@ const typeOfLoanOptions = ["Acquisition", "Construction", "Value add", "New Deve
 const programTypeOptions = ["Refinance", "Acquisition", "Construction", "Land", "Fannie/Freddie", "HUD", "Small Balance", "Interest-only", "Cannabis"];
 const typeOfLenderOptions = ["Bridge", "Conventional", "Local Bank", "CMBS", "Fannie/Freddie", "Small Balance", "Family Office", "Private Lender", "Hard Money", "C&I", "JV", "Non-conventional", "Regional Bank", "Balance Sheet", "Investment Bank"];
 
-const lenderPropertyTypeOptions = ["Apartments", "Condos", "Senior Housing", "Student Housing", "Casino/Gaming", "Assisted Living", "Education Related", "SFR Portfolio", "Mobile Home Park", "Co-living", "Office", "Medical Office", "Manufacturing", "Mixed-use", "Light Industrial", "Cannabis", "Retail-Multi Tenant", "Retail Single Tenant", "Hotel/Hospitality-Flag Required", "Hotel/Hospitality-Private or No Flag", "NOTE PURCHASE", "Loan Sales", "Land", "Self-storage", "Religious", "Hospital/Health Care"];
+// CAPMOON_PREMIER_ASSET_EXPANSION_PATCH_2026_05_10 — alphabetized, synced new types
+const lenderPropertyTypeOptions = ["Adult Entertainment", "Apartments", "Assisted Living", "Cannabis", "Car Washes", "Casino/Gaming", "Co-living", "Condo Inventory", "Condos", "Education Related", "Hospital/Health Care", "Hotel/Hospitality-Flag Required", "Hotel/Hospitality-Private or No Flag", "IOS (Industrial Outdoor Storage)", "Land", "Light Industrial", "Loan Sales", "Manufacturing", "Medical Office", "Mixed-use", "Mobile Home Park", "NOTE PURCHASE", "Office", "Religious", "Retail-Multi Tenant", "Retail Single Tenant", "Self-storage", "Senior Housing", "SFR Portfolio", "STR/Airbnb", "Student Housing", "Urgent Care", "Warehouse / Heavy Industrial"];
 
 const loanTermOptions = ["Less than 1 year", "1 year", "2 year", "3 year", "5 year", "7 year", "10 year", "15 year", "20 year", "30 year", "35 year", "40 year+"];
+
+// CAPMOON_PREMIER_ASSET_EXPANSION_PATCH_2026_05_10 — display aliases for renamed legacy values
+const ASSET_TYPE_ALIASES: Record<string, string> = {
+  "Lt Industrial": "Light Industrial",
+  "Gaming": "Gaming / Casinos",
+};
+function displayAssetType(v: string): string {
+  return ASSET_TYPE_ALIASES[v] || v;
+}
+
+// CAPMOON_PREMIER_PHOTOS_4_PATCH_2026_05_10 — combined photo accessor (max 4)
+function getAssetPhotos(a: any): string[] {
+  const arr: string[] = [];
+  if (a?.propertyPhoto) arr.push(a.propertyPhoto);
+  if (Array.isArray(a?.propertyPhotos)) {
+    for (const u of a.propertyPhotos) {
+      if (u && typeof u === "string") arr.push(u);
+    }
+  }
+  return arr.slice(0, 4);
+}
+
+// CAPMOON_PREMIER_APARTMENT_FLOW_PATCH_2026_05_10 — apartment deal type catalog
+// Only "refi-va-light" is active; remaining 11 are disabled with "Coming Soon" tag.
+const APARTMENT_DEAL_TYPES_REFINANCE = [
+  { code: "refi-va-light",       label: "Value-Add (Light / No Construction)",  active: true  },
+  { code: "refi-va-heavy",       label: "Value-Add (Heavy Construction)",       active: false },
+  { code: "refi-new-dev",        label: "New Construction / Development",       active: false },
+  { code: "refi-short-term",     label: "Short Term Refinance",                 active: false },
+  { code: "refi-long-term",      label: "Long Term / Permanent Refinance",      active: false },
+  { code: "refi-other",          label: "Other (Leave Options Open)",           active: false },
+];
+const APARTMENT_DEAL_TYPES_ACQUISITION = [
+  { code: "acq-va",              label: "Value-Add",                            active: false },
+  { code: "acq-va-heavy",        label: "Value-Add (Heavy Construction)",       active: false },
+  { code: "acq-new-dev",         label: "New Construction / Development",       active: false },
+  { code: "acq-short-term",      label: "Short Term / Fast Close Acquisition",  active: false },
+  { code: "acq-long-term",       label: "Long Term Acquisition",                active: false },
+  { code: "acq-other",           label: "Other (Leave Options Open)",           active: false },
+];
+
+// CAPMOON_PREMIER_ASSET_EXPANSION_PATCH_2026_05_10 — searchable Asset Type select wrapper
+function AssetTypeSelect({ value, onChange, inputClass, selectTriggerClass }: { value: string; onChange: (v: string) => void; inputClass: string; selectTriggerClass: string }) {
+  const [query, setQuery] = useState("");
+  const filtered = query.trim()
+    ? assetTypes.filter((t) => t.toLowerCase().includes(query.trim().toLowerCase()))
+    : assetTypes;
+  return (
+    <div className="space-y-1.5">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search asset types…"
+        className={inputClass + " text-xs"}
+      />
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className={selectTriggerClass}><SelectValue>{value ? displayAssetType(value) : "Choose…"}</SelectValue></SelectTrigger>
+        <SelectContent>
+          {filtered.length === 0 && (
+            <div className="px-3 py-2 text-xs text-gray-400">No matches</div>
+          )}
+          {filtered.map((i) => (
+            <SelectItem key={i} value={i}>{i}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1172,7 +1265,8 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
     <div className="grid gap-4 md:grid-cols-2">
       <AddressFields address={asset.address || blankAddress()} onChange={(a) => upd("address", a)} inputClass={inputClass} />
       <div className="md:col-span-2">
-        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Property Photo <span className="text-gray-400 font-normal normal-case">(optional)</span></label>
+        {/* CAPMOON_PREMIER_PHOTOS_4_PATCH_2026_05_10 — up to 4 photos */}
+        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Property Photos <span className="text-gray-400 font-normal normal-case">(optional, up to 4)</span></label>
         {(asset as any).propertyPhoto && (
           <div className="relative mb-2">
             <img src={(asset as any).propertyPhoto} alt="Property" className="h-40 w-full object-cover rounded-xl border border-gray-200" />
@@ -1213,7 +1307,8 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
         <Select value={asset.dealType} onValueChange={(v) => upd("dealType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{dealTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
       </div>
       {asset.ownershipStatus === "Refinance" && (<div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Refinance Type</label><Select value={asset.refinanceType} onValueChange={(v) => upd("refinanceType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{refinanceTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>)}
-      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Asset Type</label><Select value={asset.assetType} onValueChange={(v) => upd("assetType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{assetTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+      {/* CAPMOON_PREMIER_ASSET_EXPANSION_PATCH_2026_05_10 — searchable asset select */}
+      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Asset Type</label><AssetTypeSelect value={asset.assetType} onChange={(v) => upd("assetType", v)} inputClass={inputClass} selectTriggerClass={selectTriggerClass} /></div>
       {showUnits && (<><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Units</label><Input value={asset.numUnits} onChange={(e) => upd("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Buildings</label><Input value={asset.numBuildings} onChange={(e) => upd("numBuildings", e.target.value)} placeholder="e.g. 4" className={inputClass} /></div></>)}
       {showAcres && (<div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Acres</label><Input value={asset.numAcres} onChange={(e) => upd("numAcres", e.target.value)} placeholder="e.g. 12.5" className={inputClass} /></div>)}
       {showRetail && (
@@ -2359,6 +2454,9 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
       numUnits: "", numBuildings: "", numAcres: "",
       currentNetIncome: "", valueAddCurrentNoi: "", dy: "", capRate: "", arvValue: "",
       selectedStates: [], recourseType: "CASE BY CASE", notes: "",
+      // CAPMOON_PREMIER_APARTMENT_FLOW_PATCH_2026_05_10 — apartment-conditional defaults
+      ownershipInterest: undefined, isTIC: undefined, ticEntireEncumbered: undefined, ticPercentage: "",
+      constructionBudget: "", stabilizedNoi: "", timeToCompletion: "", apartmentDealType: "",
     };
   }
   function updHybrid(field: keyof HybridProperty, value: string) {
@@ -2692,10 +2790,172 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                 {/* Type of property */}
                 <div>
                   <label className="text-xs text-gray-500 mb-2 block font-bold uppercase">Type of Property</label>
-                  <Select value={prop.assetType} onValueChange={(v) => updHybrid("assetType", v)}>
-                    <SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger>
-                    <SelectContent>{assetTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent>
-                  </Select>
+                  {/* CAPMOON_PREMIER_ASSET_EXPANSION_PATCH_2026_05_10 — searchable asset select (hybrid) */}
+                  <AssetTypeSelect
+                    value={prop.assetType}
+                    onChange={(v) => updHybrid("assetType", v)}
+                    inputClass={inputClass}
+                    selectTriggerClass={selectTriggerClass}
+                  />
+
+                  {/* CAPMOON_PREMIER_APARTMENT_FLOW_PATCH_2026_05_10 — apartment-conditional block */}
+                  {prop.assetType === "Apartments" && (
+                    <div className="mt-4 space-y-4 rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/5 p-4">
+                      <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Apartment Specifics</div>
+
+                      {/* Ownership Interest */}
+                      <div>
+                        <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Ownership Interest</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {(["Leasehold", "Leased Fee"] as const).map((opt) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => updHybrid("ownershipInterest", opt)}
+                              className={`p-3 rounded-xl border-2 text-center font-bold text-sm transition-all ${prop.ownershipInterest === opt ? "border-[#0a1f44] bg-[#0a1f44]/5 text-[#0a1f44]" : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30"}`}
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Tenancy in Common */}
+                      <div>
+                        <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Is any part of this asset a Tenancy in Common?</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {(["Yes", "No"] as const).map((opt) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => updHybrid("isTIC", opt)}
+                              className={`p-3 rounded-xl border-2 text-center font-bold text-sm transition-all ${prop.isTIC === opt ? (opt === "Yes" ? "border-amber-500 bg-amber-50 text-amber-700" : "border-emerald-500 bg-emerald-50 text-emerald-700") : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30"}`}
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* TIC follow-up: entire property encumbered? */}
+                      {prop.isTIC === "Yes" && (
+                        <div>
+                          <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Is the entire property being encumbered by the finance product?</label>
+                          <div className="grid grid-cols-2 gap-3">
+                            {(["Yes", "No"] as const).map((opt) => (
+                              <button
+                                key={opt}
+                                type="button"
+                                onClick={() => updHybrid("ticEntireEncumbered", opt)}
+                                className={`p-3 rounded-xl border-2 text-center font-bold text-sm transition-all ${prop.ticEntireEncumbered === opt ? "border-[#0a1f44] bg-[#0a1f44]/5 text-[#0a1f44]" : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30"}`}
+                              >
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* TIC % ownership entry */}
+                      {prop.isTIC === "Yes" && prop.ticEntireEncumbered === "No" && (
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Percentage Ownership by Borrower</label>
+                          <Input
+                            value={prop.ticPercentage || ""}
+                            onChange={(e) => updHybrid("ticPercentage", e.target.value)}
+                            placeholder="e.g. 50"
+                            className={inputClass}
+                          />
+                          <div className="text-xs text-gray-400 mt-1">Enter percentage, e.g. 50 for 50%</div>
+                        </div>
+                      )}
+
+                      {/* Apartment Deal Type — 12 options, only refi-va-light active */}
+                      <div>
+                        <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Apartment Deal Type</label>
+                        <div className="text-xs text-gray-400 mb-2">
+                          {prop.ownershipStatus === "Refinance" ? "Refinance options:" : prop.ownershipStatus === "Acquisition" ? "Acquisition options:" : "Pick Ownership Status above first."}
+                        </div>
+                        <div className="grid gap-2">
+                          {(prop.ownershipStatus === "Refinance" ? APARTMENT_DEAL_TYPES_REFINANCE : prop.ownershipStatus === "Acquisition" ? APARTMENT_DEAL_TYPES_ACQUISITION : []).map((opt) => {
+                            const selected = prop.apartmentDealType === opt.code;
+                            return (
+                              <button
+                                key={opt.code}
+                                type="button"
+                                disabled={!opt.active}
+                                onClick={() => opt.active && updHybrid("apartmentDealType", opt.code)}
+                                className={`flex items-center justify-between p-3 rounded-xl border-2 text-left transition-all ${
+                                  !opt.active
+                                    ? "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
+                                    : selected
+                                      ? "border-[#0a1f44] bg-[#0a1f44]/5 text-[#0a1f44]"
+                                      : "border-gray-200 text-gray-700 hover:border-[#0a1f44]/30"
+                                }`}
+                              >
+                                <span className="text-sm font-medium">{opt.label}</span>
+                                {!opt.active && (
+                                  <span className="text-xs font-bold uppercase tracking-wide text-[#c9a84c] bg-[#c9a84c]/10 px-2 py-0.5 rounded">Coming Soon</span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Path 6-a-1: Refinance + Value-Add light — full form */}
+                      {prop.ownershipStatus === "Refinance" && prop.apartmentDealType === "refi-va-light" && (() => {
+                        const curVal     = parseCurrency(prop.currentValue || "");
+                        const curLoan    = parseCurrency(prop.currentLoan || "");
+                        const curNOI     = parseCurrency(prop.valueAddCurrentNoi || "");
+                        const newARV     = parseCurrency(prop.arvValue || "");
+                        const newNOI     = parseCurrency(prop.stabilizedNoi || "");
+                        const newLoan    = parseCurrency(prop.seniorLoan || "");
+                        const currentLTV    = curVal > 0 && curLoan > 0 ? (curLoan / curVal) * 100 : 0;
+                        const currentDY     = curLoan > 0 && curNOI > 0 ? (curNOI / curLoan) * 100 : 0;
+                        const currentEquity = Math.max(0, curVal - curLoan);
+                        const currentCap    = curVal > 0 && curNOI > 0 ? (curNOI / curVal) * 100 : 0;
+                        const newCap        = newARV > 0 && newNOI > 0 ? (newNOI / newARV) * 100 : 0;
+                        const arltv         = newARV > 0 && newLoan > 0 ? (newLoan / newARV) * 100 : 0;
+                        return (
+                          <div className="mt-2 space-y-4 rounded-xl border border-[#c9a84c]/40 bg-white p-4">
+                            <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Value-Add Refinance — Apartment Details</div>
+
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Current Units</label><Input value={prop.numUnits} onChange={(e) => updHybrid("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div>
+                              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Current Buildings</label><Input value={prop.numBuildings} onChange={(e) => updHybrid("numBuildings", e.target.value)} placeholder="e.g. 4" className={inputClass} /></div>
+                              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Property Value (As-Is)</label><Input value={prop.currentValue} onChange={(e) => updHybrid("currentValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                              <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current NOI (Annual)</label><Input value={prop.valueAddCurrentNoi || ""} onChange={(e) => updHybrid("valueAddCurrentNoi", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                              <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Loan on Property</label><Input value={prop.currentLoan || ""} onChange={(e) => updHybrid("currentLoan", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                            </div>
+
+                            <div className="border-t border-[#c9a84c]/20 pt-4 space-y-3">
+                              <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Stabilization Plan</div>
+                              <div className="grid gap-3 md:grid-cols-2">
+                                <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Value-Add Total Budget</label><Input value={prop.constructionBudget || ""} onChange={(e) => updHybrid("constructionBudget", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                                <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Estimated ARV</label><Input value={prop.arvValue || ""} onChange={(e) => updHybrid("arvValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                                <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Estimated New NOI</label><Input value={prop.stabilizedNoi || ""} onChange={(e) => updHybrid("stabilizedNoi", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                                <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Time to Completion</label><Input value={prop.timeToCompletion || ""} onChange={(e) => updHybrid("timeToCompletion", e.target.value)} placeholder="e.g. 18 months" className={inputClass} /></div>
+                                <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">New Requested Loan Amount</label><Input value={prop.seniorLoan || ""} onChange={(e) => updHybrid("seniorLoan", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                              </div>
+                            </div>
+
+                            {/* Gold metric tile row — 6 auto-calc boxes */}
+                            {(curVal > 0 || curLoan > 0 || curNOI > 0 || newARV > 0 || newNOI > 0 || newLoan > 0) && (
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 pt-4 border-t border-[#c9a84c]/20">
+                                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current LTV</div><div className="text-sm font-bold text-[#0a1f44]">{currentLTV > 0 ? currentLTV.toFixed(1) + "%" : "—"}</div></div>
+                                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current DY</div><div className="text-sm font-bold text-[#0a1f44]">{currentDY > 0 ? currentDY.toFixed(1) + "%" : "—"}</div></div>
+                                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current Equity</div><div className="text-sm font-bold text-[#0a1f44]">{currentEquity > 0 ? "$" + (currentEquity / 1000000).toFixed(2) + "M" : "—"}</div></div>
+                                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current Cap Rate</div><div className="text-sm font-bold text-[#0a1f44]">{currentCap > 0 ? currentCap.toFixed(2) + "%" : "—"}</div></div>
+                                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New Cap Rate</div><div className="text-sm font-bold text-[#0a1f44]">{newCap > 0 ? newCap.toFixed(2) + "%" : "—"}</div></div>
+                                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">ARLTV</div><div className="text-sm font-bold text-[#0a1f44]">{arltv > 0 ? arltv.toFixed(1) + "%" : "—"}</div></div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
 
                 {/* Deal Type */}
