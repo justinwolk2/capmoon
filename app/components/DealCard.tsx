@@ -2,10 +2,10 @@
 import React from "react";
 import { Filter, Users, Landmark, FileSpreadsheet, FileText } from "lucide-react";
 
-export function DealCard({ deal, session, isAdmin, teamMembers, users, submittedDeals, setSubmittedDeals, lenderRecords, setPrefillDeal, setActiveTab, onDelete, expandedDealId, setExpandedDealId }: {
+export function DealCard({ deal, session, isAdmin, teamMembers, users, submittedDeals, setSubmittedDeals, lenderRecords, setPrefillDeal, setActiveTab, onDelete, expandedDealId, setExpandedDealId, onBack }: { // CAPMOON_SMART_BACK_PATCH
   deal: any; session: any; isAdmin: boolean; teamMembers: any[]; users: any[];
   submittedDeals: any[]; setSubmittedDeals: (d: any[]) => void;
-  lenderRecords: any[]; setPrefillDeal: (d: any) => void; setActiveTab: (t: string) => void; onDelete?: (id: number) => void; expandedDealId?: number | null; setExpandedDealId?: (id: number | null) => void;
+  lenderRecords: any[]; setPrefillDeal: (d: any) => void; setActiveTab: (t: string) => void; onDelete?: (id: number) => void; expandedDealId?: number | null; setExpandedDealId?: (id: number | null) => void; onBack?: () => void; // CAPMOON_SMART_BACK_PATCH
 }) {
   const [showInvite, setShowInvite] = React.useState(false);
   const [showLenderResponses, setShowLenderResponses] = React.useState(false);
@@ -294,7 +294,7 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
       {asset?.propertyPhoto && <div className="w-full h-64 overflow-hidden"><img src={asset.propertyPhoto} alt="Property" className="w-full h-full object-cover" /></div>}
       <div className="flex items-center justify-between px-5 py-4 bg-[#0a1f44] text-white flex-wrap gap-2">
         <div className="flex items-center gap-3 flex-wrap">
-          <button onClick={() => setExpanded(false)} className="text-white/70 hover:text-white text-sm font-semibold transition-colors">← Back</button>
+          <button onClick={() => { if (onBack) { onBack(); } else { setExpanded(false); } }} className="text-white/70 hover:text-white text-sm font-semibold transition-colors">← Back</button>{/* CAPMOON_SMART_BACK_PATCH */}
           <span className="text-white/30">|</span>
           <span className="font-display text-lg font-bold">{deal.seekerName}</span>
           {deal.dealNumber && <span className="px-2 py-0.5 text-xs bg-[#c9a84c]/20 text-[#c9a84c] rounded-full font-bold border border-[#c9a84c]/30">{deal.dealNumber}</span>}

@@ -4323,6 +4323,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const [prefillDeal, setPrefillDeal] = useState<SubmittedDeal | null>(null);
   const [viewingDealId, setViewingDealId] = useState<number | null>(null);
   const [expandedDealId, setExpandedDealId] = useState<number | null>(null);
+  const [dealOpenedFromTab, setDealOpenedFromTab] = useState<string | null>(null); // CAPMOON_SMART_BACK_PATCH
 
   const [lenderRecords, setLenderRecords] = useState<LenderRecord[]>(seedLenders);
   const [lendersLoaded, setLendersLoaded] = useState(false);
@@ -5447,6 +5448,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                   setSelectedDealId={setExpandedDealId as any}
                   teamMembers={teamMembers}
                   users={users}
+                  setDealOpenedFromTab={setDealOpenedFromTab}
                 />
               )}
               {/* CAPMOON_PIPELINE_SIDEBAR_PATCH — end */}
@@ -5655,7 +5657,14 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
                           {expandedDealId && (() => {
                             const ed = submittedDeals.find((d: any) => d.id === expandedDealId);
-                            return ed ? <DealCard key={ed.id} deal={ed} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} onDelete={isAdmin ? deleteDeal : undefined} expandedDealId={expandedDealId} setExpandedDealId={setExpandedDealId} /> : null;
+                            // CAPMOON_SMART_BACK_PATCH — Back returns to origin tab when set
+                            const smartBack = dealOpenedFromTab ? () => {
+                              const t = dealOpenedFromTab;
+                              setExpandedDealId(null);
+                              setDealOpenedFromTab(null);
+                              setActiveTab(t);
+                            } : undefined;
+                            return ed ? <DealCard key={ed.id} deal={ed} session={session} isAdmin={isAdmin} teamMembers={teamMembers} users={users} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals as (d: any[]) => void} lenderRecords={lenderRecords} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} onDelete={isAdmin ? deleteDeal : undefined} expandedDealId={expandedDealId} setExpandedDealId={setExpandedDealId} onBack={smartBack} /> : null;
                           })()}
                           {/* Non-admin: just show visible deals with search */}
                           {!isAdmin && (
@@ -5996,6 +6005,7 @@ function PipelineView({
   setSelectedDealId,
   teamMembers,
   users,
+  setDealOpenedFromTab,
 }: {
   submittedDeals: any[];
   setSubmittedDeals: (deals: any[]) => void;
@@ -6004,6 +6014,7 @@ function PipelineView({
   setSelectedDealId: (id: any) => void;
   teamMembers: any[]; // CAPMOON_KANBAN_OVERHAUL
   users: any[]; // CAPMOON_KANBAN_OVERHAUL
+  setDealOpenedFromTab: (tab: string | null) => void; // CAPMOON_SMART_BACK_PATCH
 }) {
   const currentUserEmail = session?.user?.email ?? "";
   const role = (session?.user?.role ?? "advisor") as
@@ -6144,8 +6155,10 @@ function PipelineView({
     return list;
   })();
 
+  // CAPMOON_SMART_BACK_PATCH — remember origin tab so Back can return there
   function handleOpenDeal(dealId: any) {
     setSelectedDealId(dealId);
+    setDealOpenedFromTab("pipeline");
     setActiveSection("submitted-deals");
   }
 
