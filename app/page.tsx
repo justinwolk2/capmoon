@@ -39,6 +39,9 @@ type AssetData = {
   apartmentDealType?: string;
   // CAPMOON_PREMIER_V3_GATING_PATCH_2026_05_10 — skip-photos flag for progressive disclosure
   propertySkipPhotos?: boolean;
+  // CAPMOON_PREMIER_V4_APARTMENT_BESPOKE_2026_05_11 — prior renovation history
+  priorRenovation?: "Yes" | "No";
+  priorRenovationYear?: string;
   // CAPMOON_PREMIER_PHOTOS_4_PATCH_2026_05_10 — extra photos beyond propertyPhoto
   propertyPhotos?: string[];
   selectedStates: string[]; recourseType: string;
@@ -891,8 +894,8 @@ const seedLenders: LenderRecord[] = [
 // CAPMOON_PREMIER_ASSET_EXPANSION_PATCH_2026_05_10 — alphabetized, +8 new types, 2 renames
 const assetTypes = ["Adult Entertainment", "Apartments", "Assisted Living", "Cannabis", "Car Washes", "Co-living", "Condo Inventory", "Condos", "Distressed Debt", "Education Related", "Equipment, Autos, or Other Non Real Estate Products", "Gaming / Casinos", "Hospital/Health Care", "Hotel/Hospitality", "IOS (Industrial Outdoor Storage)", "Land", "Light Industrial", "Manufacturing", "Medical Office", "Mixed Use", "Mobile Home Park", "Office", "Religious", "Retail - Multi Tenant", "Retail - Single Tenant", "Self-storage", "Senior Housing", "SFR Portfolio", "STR/Airbnb", "Student Housing", "Urgent Care", "Warehouse / Heavy Industrial", "Other"];
 const capitalTypes = ["Senior", "Mezzanine", "Preferred Equity", "JV Equity", "Line of Credit", "Note on Note", "Loan Sales", "C&I", "Stretch Senior/Hybrid"];
-// CAPMOON_PREMIER_ASSET_EXPANSION_PATCH_2026_05_10 — Takeout renamed
-const dealTypes = ["Construction", "Value add", "New Development", "Bridge", "Takeout/Rate and Term Refi", "Investment", "Permanent Loan"];
+// CAPMOON_PREMIER_V4_DEAL_TYPE_SPLIT_2026_05_11 — Takeout split into two
+const dealTypes = ["Construction", "Value add", "New Development", "Bridge", "Takeout - Rate and Term", "Takeout - Cash Out", "Investment", "Permanent Loan"];
 // CAPMOON_PREMIER_ASSET_EXPANSION_PATCH_2026_05_10 — Permanent Loan removed
 const ownershipStatuses = ["Acquisition", "Refinance"];
 const refinanceTypes = ["Cash Out to Borrower", "Cash Out-Value Add", "Rate and Term"];
@@ -918,6 +921,26 @@ const ASSET_TYPE_ALIASES: Record<string, string> = {
 function displayAssetType(v: string): string {
   return ASSET_TYPE_ALIASES[v] || v;
 }
+
+// CAPMOON_PREMIER_V4_DEAL_TYPE_SPLIT_2026_05_11 — display aliases for legacy deal-type strings
+const DEAL_TYPE_ALIASES: Record<string, string> = {
+  "Takeout": "Takeout - Rate and Term",
+  "Takeout/Rate and Term Refi": "Takeout - Rate and Term",
+};
+function displayDealType(v: string): string {
+  return DEAL_TYPE_ALIASES[v] || v;
+}
+
+// CAPMOON_PREMIER_V4_APARTMENT_BESPOKE_2026_05_11 — apartment refinance pulldown (7 options)
+const APARTMENT_REFI_DEAL_TYPES = [
+  { code: "refi-va-light",          label: "Value-Add (Light)",                                    active: true  },
+  { code: "refi-va-new-construct",  label: "Value-Add (New Construction)",                         active: false },
+  { code: "refi-new-construct",     label: "New Construction",                                     active: false },
+  { code: "refi-short-term",        label: "Short Term Refinance",                                 active: false },
+  { code: "refi-perm-rt",           label: "Permanent Refinance - Rate and Term",                  active: false },
+  { code: "refi-perm-cashout",      label: "Permanent Refinance - Cash Out / Other Acquisition",   active: false },
+  { code: "refi-other",             label: "Other",                                                active: false },
+];
 
 // CAPMOON_PREMIER_PHOTOS_4_PATCH_2026_05_10 — combined photo accessor (max 4)
 function getAssetPhotos(a: any): string[] {
@@ -1391,10 +1414,132 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
               </div>
             )}
 
-            {/* Step 5+: Everything below renders only when TIC resolved */}
+            {/* CAPMOON_PREMIER_V4_REORDER_2026_05_11 — Step 5+: Ownership Status → Asset Type → Deal Type */}
             {ticOK && (
               <>
-                <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Ownership Status</label><Select value={asset.ownershipStatus} onValueChange={(v) => upd("ownershipStatus", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+                <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Ownership Status</label><Select value={asset.ownershipStatus} onValueChange={(v) => upd("ownershipStatus", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+                {asset.ownershipStatus && (
+                  <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Asset Type</label><AssetTypeSelect value={asset.assetType} onChange={(v) => upd("assetType", v)} inputClass={inputClass} selectTriggerClass={selectTriggerClass} /></div>
+                )}
+                {asset.ownershipStatus && asset.assetType && asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" && asset.apartmentDealType === "refi-va-light" && (() => {
+                  const curVal      = parseCurrency(asset.propertyValue || "");
+                  const curLoan     = parseCurrency(asset.currentLoanAmount || "");
+                  const curNOI      = parseCurrency(asset.currentNetIncome || "");
+                  const newARV      = parseCurrency(asset.arvValue || "");
+                  const newNOI      = parseCurrency(asset.stabilizedNoi || "");
+                  const newLoan     = parseCurrency(asset.loanAmount || "");
+                  const currentLTV    = curVal > 0 && curLoan > 0 ? (curLoan / curVal) * 100 : 0;
+                  const currentDY     = curLoan > 0 && curNOI > 0 ? (curNOI / curLoan) * 100 : 0;
+                  const currentEquity = Math.max(0, curVal - curLoan);
+                  const currentCap    = curVal > 0 && curNOI > 0 ? (curNOI / curVal) * 100 : 0;
+                  const newCap        = newARV > 0 && newNOI > 0 ? (newNOI / newARV) * 100 : 0;
+                  const arltv         = newARV > 0 && newLoan > 0 ? (newLoan / newARV) * 100 : 0;
+                  return (
+                    <div className="md:col-span-2 rounded-xl border border-[#c9a84c]/40 bg-[#c9a84c]/5 p-4 space-y-4 mt-2">
+                      <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Current Details of Apartment</div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Current Units</label><Input value={asset.numUnits} onChange={(e) => upd("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Current Buildings</label><Input value={asset.numBuildings} onChange={(e) => upd("numBuildings", e.target.value)} placeholder="e.g. 4" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Property Value (As-Is)</label><Input value={asset.propertyValue} onChange={(e) => upd("propertyValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current NOI (Annual)</label><Input value={asset.currentNetIncome} onChange={(e) => upd("currentNetIncome", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Loan on Property</label><Input value={asset.currentLoanAmount || ""} onChange={(e) => upd("currentLoanAmount", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Year</label><Input value={asset.purchaseYear ?? String(new Date().getFullYear())} onChange={(e) => upd("purchaseYear" as any, e.target.value)} placeholder={String(new Date().getFullYear())} className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Interest Rate (%)</label><Input value={asset.currentRate || ""} onChange={(e) => upd("currentRate" as any, e.target.value)} placeholder="e.g. 6.5" className={inputClass} /></div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Previous Renovation?</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {(["Yes", "No"] as const).map((opt) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => upd("priorRenovation" as any, opt)}
+                              className={`p-3 rounded-xl border-2 text-center font-bold text-sm transition-all ${asset.priorRenovation === opt ? (opt === "Yes" ? "border-amber-500 bg-amber-50 text-amber-700" : "border-emerald-500 bg-emerald-50 text-emerald-700") : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30"}`}
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                        </div>
+                        {asset.priorRenovation === "Yes" && (
+                          <div className="mt-3"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">What Year?</label><Input value={asset.priorRenovationYear || ""} onChange={(e) => upd("priorRenovationYear" as any, e.target.value)} placeholder="e.g. 2018" className={inputClass} /></div>
+                        )}
+                      </div>
+
+                      <div className="border-t border-[#c9a84c]/20 pt-4 space-y-3">
+                        <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Stabilization Plan</div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Value-Add Total Budget</label><Input value={asset.constructionBudget || ""} onChange={(e) => upd("constructionBudget", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Estimated ARV</label><Input value={asset.arvValue || ""} onChange={(e) => upd("arvValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Estimated New NOI</label><Input value={asset.stabilizedNoi || ""} onChange={(e) => upd("stabilizedNoi", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Time to Completion</label><Input value={asset.timeToCompletion || ""} onChange={(e) => upd("timeToCompletion" as any, e.target.value)} placeholder="e.g. 18 months" className={inputClass} /></div>
+                          <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">New Requested Loan Amount</label><Input value={asset.loanAmount || ""} onChange={(e) => upd("loanAmount", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-[#c9a84c]/20 pt-4">
+                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label>
+                        <Select value={asset.recourseType} onValueChange={(v) => upd("recourseType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
+                      </div>
+
+                      {(curVal > 0 || curLoan > 0 || curNOI > 0 || newARV > 0 || newNOI > 0 || newLoan > 0) && (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 pt-4 border-t border-[#c9a84c]/20">
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current LTV</div><div className="text-sm font-bold text-[#0a1f44]">{currentLTV > 0 ? currentLTV.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current DY</div><div className="text-sm font-bold text-[#0a1f44]">{currentDY > 0 ? currentDY.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current Equity</div><div className="text-sm font-bold text-[#0a1f44]">{currentEquity > 0 ? "$" + (currentEquity / 1000000).toFixed(2) + "M" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current Cap Rate</div><div className="text-sm font-bold text-[#0a1f44]">{currentCap > 0 ? currentCap.toFixed(2) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New Cap Rate</div><div className="text-sm font-bold text-[#0a1f44]">{newCap > 0 ? newCap.toFixed(2) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">ARLTV</div><div className="text-sm font-bold text-[#0a1f44]">{arltv > 0 ? arltv.toFixed(1) + "%" : "—"}</div></div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+                {asset.ownershipStatus && asset.assetType && (
+                  <>
+                    {/* CAPMOON_PREMIER_V4_APARTMENT_BESPOKE_2026_05_11 — Apartments+Refinance gets pulldown; everything else gets normal Deal Type */}
+                    {asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" ? (
+                      <div className="md:col-span-2">
+                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Apartment Deal Type</label>
+                        <Select
+                          value={asset.apartmentDealType || ""}
+                          onValueChange={(v) => {
+                            const opt = APARTMENT_REFI_DEAL_TYPES.find((o) => o.code === v);
+                            if (opt && opt.active) upd("apartmentDealType" as any, v);
+                          }}
+                        >
+                          <SelectTrigger className={selectTriggerClass}>
+                            <SelectValue placeholder="Choose deal type…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {APARTMENT_REFI_DEAL_TYPES.map((opt) => (
+                              <SelectItem
+                                key={opt.code}
+                                value={opt.code}
+                                disabled={!opt.active}
+                              >
+                                {opt.label}{!opt.active ? " — Coming Soon" : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div className="md:col-span-2">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <label className="text-xs text-gray-500 font-medium uppercase">Deal Type</label>
+                          <div className="relative group">
+                            <div className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold cursor-help">i</div>
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 bg-[#0a1f44] text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
+                              Most transactions are considered "Investment"
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a1f44]" />
+                            </div>
+                          </div>
+                        </div>
+                        <Select value={asset.dealType} onValueChange={(v) => upd("dealType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{dealTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
+                      </div>
+                    )}
+                  </>
+                )}
               </>
             )}
           </>
@@ -1407,8 +1552,8 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
       {false && (
         <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Ownership Status</label><Select value={asset.ownershipStatus} onValueChange={(v) => upd("ownershipStatus", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
       )}
-      {/* CAPMOON_PREMIER_V3_GATING_PATCH_2026_05_10 — gate Deal Type / Asset Type behind ticOK */}
-      {(() => {
+      {/* CAPMOON_PREMIER_V4_REORDER_2026_05_11 — old v3 Deal Type / Asset Type gate suppressed (logic now lives in Edit 5a) */}
+      {false && (() => {
         const addr = asset.address || { street: "", unit: "", city: "", state: "", zip: "" } as any;
         const addressOK = !!(addr.street && addr.city && addr.state && addr.zip);
         const photosOK = addressOK && (!!(asset as any).propertyPhoto || !!asset.propertySkipPhotos);
@@ -1523,7 +1668,8 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
           </>
         );
       })()}
-      {/* CAPMOON_PREMIER_V3_GATING_PATCH_2026_05_10 — close ticOK gate after Asset Type + apartment branch */}
+      {/* CAPMOON_PREMIER_V4_APARTMENT_BESPOKE_2026_05_11 — suppress generic rendering for Apartments+Refinance+VAL bespoke path */}
+      {!(asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" && asset.apartmentDealType === "refi-va-light") && (<>
       {showUnits && (<><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Units</label><Input value={asset.numUnits} onChange={(e) => upd("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Buildings</label><Input value={asset.numBuildings} onChange={(e) => upd("numBuildings", e.target.value)} placeholder="e.g. 4" className={inputClass} /></div></>)}
       {showAcres && (<div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Acres</label><Input value={asset.numAcres} onChange={(e) => upd("numAcres", e.target.value)} placeholder="e.g. 12.5" className={inputClass} /></div>)}
       {showRetail && (
@@ -1969,6 +2115,8 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
       <div className="md:col-span-2 grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(metricBoxes.length, 4)}, 1fr)` }}>
         {metricBoxes.map(([label, val]) => (<div key={label} className="rounded-xl border border-gray-200 bg-gray-50 p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">{label}</div><div className="text-sm font-bold text-[#0a1f44]">{val}</div></div>))}
       </div>
+      </>)}
+      {/* CAPMOON_PREMIER_V4_APARTMENT_BESPOKE_2026_05_11 — close generic-rendering suppression */}
     </div>
   );
 }
