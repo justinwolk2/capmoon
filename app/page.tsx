@@ -931,6 +931,26 @@ function displayDealType(v: string): string {
   return DEAL_TYPE_ALIASES[v] || v;
 }
 
+// CAPMOON_PREMIER_V42_DEAL_TYPE_LABEL_2026_05_11 — short labels for "[Asset Type] Deal Type" header
+const ASSET_TYPE_SHORT_LABEL: Record<string, string> = {
+  "Hotel/Hospitality": "Hotel",
+  "IOS (Industrial Outdoor Storage)": "IOS",
+  "Gaming / Casinos": "Casino",
+  "Equipment, Autos, or Other Non Real Estate Products": "Non-RE",
+  "Retail - Multi Tenant": "Retail (Multi-Tenant)",
+  "Retail - Single Tenant": "Retail (Single-Tenant)",
+  "Warehouse / Heavy Industrial": "Warehouse",
+  "Hospital/Health Care": "Healthcare",
+  "Light Industrial": "Light Industrial",
+  "Mobile Home Park": "MHP",
+  "Mixed Use": "Mixed-Use",
+  "Lt Industrial": "Light Industrial",
+  "Gaming": "Casino",
+};
+function assetShortLabel(v: string): string {
+  return ASSET_TYPE_SHORT_LABEL[v] || v;
+}
+
 // CAPMOON_PREMIER_V4_APARTMENT_BESPOKE_2026_05_11 — apartment refinance pulldown (7 options)
 const APARTMENT_REFI_DEAL_TYPES = [
   { code: "refi-va-light",          label: "Value-Add (Light)",                                    active: true  },
@@ -1499,7 +1519,8 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                     {/* CAPMOON_PREMIER_V4_APARTMENT_BESPOKE_2026_05_11 — Apartments+Refinance gets pulldown; everything else gets normal Deal Type */}
                     {asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" ? (
                       <div className="md:col-span-2">
-                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Apartment Deal Type</label>
+                        {/* CAPMOON_PREMIER_V42_DEAL_TYPE_LABEL_2026_05_11 — dynamic per-asset-type label (apartments branch) */}
+                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">{assetShortLabel(asset.assetType)} Deal Type</label>
                         <Select
                           value={asset.apartmentDealType || ""}
                           onValueChange={(v) => {
@@ -1526,7 +1547,8 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                     ) : (
                       <div className="md:col-span-2">
                         <div className="flex items-center gap-1.5 mb-1">
-                          <label className="text-xs text-gray-500 font-medium uppercase">Deal Type</label>
+                          {/* CAPMOON_PREMIER_V42_DEAL_TYPE_LABEL_2026_05_11 — dynamic per-asset-type label */}
+                          <label className="text-xs text-gray-500 font-medium uppercase">{assetShortLabel(asset.assetType)} Deal Type</label>
                           <div className="relative group">
                             <div className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold cursor-help">i</div>
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 bg-[#0a1f44] text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
@@ -1668,8 +1690,8 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
           </>
         );
       })()}
-      {/* CAPMOON_PREMIER_V4_APARTMENT_BESPOKE_2026_05_11 — suppress generic rendering for Apartments+Refinance+VAL bespoke path */}
-      {!(asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" && asset.apartmentDealType === "refi-va-light") && (<>
+      {/* CAPMOON_PREMIER_V42_ASSETTYPE_GATE_2026_05_11 — gate ALL generic fields behind Asset Type being picked + bespoke suppression */}
+      {asset.assetType && !(asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" && asset.apartmentDealType === "refi-va-light") && (<>
       {showUnits && (<><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Units</label><Input value={asset.numUnits} onChange={(e) => upd("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Buildings</label><Input value={asset.numBuildings} onChange={(e) => upd("numBuildings", e.target.value)} placeholder="e.g. 4" className={inputClass} /></div></>)}
       {showAcres && (<div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Acres</label><Input value={asset.numAcres} onChange={(e) => upd("numAcres", e.target.value)} placeholder="e.g. 12.5" className={inputClass} /></div>)}
       {showRetail && (
