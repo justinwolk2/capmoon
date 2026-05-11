@@ -36,6 +36,9 @@ type AssetData = {
   ticEntireEncumbered?: "Yes" | "No";
   ticPercentage?: string;
   timeToCompletion?: string;
+  apartmentDealType?: string;
+  // CAPMOON_PREMIER_V3_GATING_PATCH_2026_05_10 — skip-photos flag for progressive disclosure
+  propertySkipPhotos?: boolean;
   // CAPMOON_PREMIER_PHOTOS_4_PATCH_2026_05_10 — extra photos beyond propertyPhoto
   propertyPhotos?: string[];
   selectedStates: string[]; recourseType: string;
@@ -1273,6 +1276,8 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
             <button type="button" onClick={() => upd("propertyPhoto" as any, "")} className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-lg">✕ Remove</button>
           </div>
         )}
+        {/* CAPMOON_PREMIER_V3_GATING_PATCH_2026_05_10 — Skip Photos button */}
+        <div className="flex items-center gap-3 mb-2">
         <label className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-2 border-dashed border-gray-300 text-gray-500 rounded-xl hover:border-[#0a1f44] hover:text-[#0a1f44] cursor-pointer transition-colors w-fit">
           📷 Upload Property Photo
           <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
@@ -1291,8 +1296,127 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
             if (data.url) upd("propertyPhoto" as any, data.url);
           }} />
         </label>
+        {/* CAPMOON_PREMIER_V3_GATING_PATCH_2026_05_10 — Skip Photos button */}
+        {!(asset as any).propertyPhoto && !asset.propertySkipPhotos && (
+          <button
+            type="button"
+            onClick={() => upd("propertySkipPhotos" as any, true)}
+            className="px-3 py-2 text-xs font-semibold text-gray-500 underline hover:text-[#0a1f44]"
+          >
+            Skip photos for now
+          </button>
+        )}
+        {asset.propertySkipPhotos && !(asset as any).propertyPhoto && (
+          <button
+            type="button"
+            onClick={() => upd("propertySkipPhotos" as any, false)}
+            className="px-3 py-2 text-xs font-semibold text-[#c9a84c] underline hover:text-[#0a1f44]"
+          >
+            ↩ Unskip (add a photo)
+          </button>
+        )}
+        </div>
       </div>
-      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Ownership Status</label><Select value={asset.ownershipStatus} onValueChange={(v) => upd("ownershipStatus", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+
+      {/* CAPMOON_PREMIER_V3_GATING_PATCH_2026_05_10 — gated progressive disclosure */}
+      {(() => {
+        const addr = asset.address || { street: "", unit: "", city: "", state: "", zip: "" } as any;
+        const addressOK = !!(addr.street && addr.city && addr.state && addr.zip);
+        const photosOK = addressOK && (!!(asset as any).propertyPhoto || !!asset.propertySkipPhotos);
+        const interestOK = photosOK && !!asset.ownershipInterest;
+        const ticOK = interestOK && (asset.isTIC === "No" || (asset.isTIC === "Yes" && !!asset.ticPercentage));
+
+        if (!addressOK) {
+          return (
+            <div className="md:col-span-2 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-xs text-gray-400">
+              Fill in the property address to continue.
+            </div>
+          );
+        }
+        if (!photosOK) {
+          return (
+            <div className="md:col-span-2 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-xs text-gray-400">
+              Upload a property photo or click "Skip photos for now" to continue.
+            </div>
+          );
+        }
+
+        return (
+          <>
+            {/* Step 3: Ownership Interest */}
+            <div className="md:col-span-2 rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/5 p-4">
+              <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Ownership Interest</label>
+              <div className="grid grid-cols-2 gap-3">
+                {(["Leasehold", "Leased Fee"] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => upd("ownershipInterest" as any, opt)}
+                    className={`p-3 rounded-xl border-2 text-center font-bold text-sm transition-all ${asset.ownershipInterest === opt ? "border-[#0a1f44] bg-[#0a1f44]/5 text-[#0a1f44]" : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30"}`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Step 4: Tenancy in Common */}
+            {interestOK && (
+              <div className="md:col-span-2 rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/5 p-4 space-y-3">
+                <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Is any part of this asset a Tenancy in Common?</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {(["Yes", "No"] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => upd("isTIC" as any, opt)}
+                      className={`p-3 rounded-xl border-2 text-center font-bold text-sm transition-all ${asset.isTIC === opt ? (opt === "Yes" ? "border-amber-500 bg-amber-50 text-amber-700" : "border-emerald-500 bg-emerald-50 text-emerald-700") : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30"}`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+                {asset.isTIC === "Yes" && (
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Percentage Ownership by Borrower</label>
+                    <Input
+                      value={asset.ticPercentage || ""}
+                      onChange={(e) => upd("ticPercentage" as any, e.target.value)}
+                      placeholder="e.g. 50"
+                      className={inputClass}
+                    />
+                    <div className="text-xs text-gray-400 mt-1">Enter percentage, e.g. 50 for 50%. (Ratio adjustments for partial ownership coming in a future update.)</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 5+: Everything below renders only when TIC resolved */}
+            {ticOK && (
+              <>
+                <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Ownership Status</label><Select value={asset.ownershipStatus} onValueChange={(v) => upd("ownershipStatus", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+              </>
+            )}
+          </>
+        );
+      })()}
+      {/* CAPMOON_PREMIER_V3_GATING_PATCH_2026_05_10 — end gated section.
+          The line below (original Ownership Status) is DUPLICATED above
+          inside the ticOK branch. We turn the original into a render-suppressed
+          fragment by wrapping in {false && (...)} to preserve JSX balance. */}
+      {false && (
+        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Ownership Status</label><Select value={asset.ownershipStatus} onValueChange={(v) => upd("ownershipStatus", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+      )}
+      {/* CAPMOON_PREMIER_V3_GATING_PATCH_2026_05_10 — gate Deal Type / Asset Type behind ticOK */}
+      {(() => {
+        const addr = asset.address || { street: "", unit: "", city: "", state: "", zip: "" } as any;
+        const addressOK = !!(addr.street && addr.city && addr.state && addr.zip);
+        const photosOK = addressOK && (!!(asset as any).propertyPhoto || !!asset.propertySkipPhotos);
+        const interestOK = photosOK && !!asset.ownershipInterest;
+        const ticOK = interestOK && (asset.isTIC === "No" || (asset.isTIC === "Yes" && !!asset.ticPercentage));
+        if (!ticOK) return null;
+        return (
+          <>
       <div>
         <div className="flex items-center gap-1.5 mb-1">
           <label className="text-xs text-gray-500 font-medium uppercase">Deal Type</label>
@@ -1309,6 +1433,97 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
       {asset.ownershipStatus === "Refinance" && (<div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Refinance Type</label><Select value={asset.refinanceType} onValueChange={(v) => upd("refinanceType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{refinanceTypes.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>)}
       {/* CAPMOON_PREMIER_ASSET_EXPANSION_PATCH_2026_05_10 — searchable asset select */}
       <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Asset Type</label><AssetTypeSelect value={asset.assetType} onChange={(v) => upd("assetType", v)} inputClass={inputClass} selectTriggerClass={selectTriggerClass} /></div>
+
+      {/* CAPMOON_PREMIER_V3_APARTMENT_BRANCH_PATCH_2026_05_10 — apartment-specific 12-option deal type + 6-a-1 form + gold tiles */}
+      {asset.assetType === "Apartments" && (
+        <div className="md:col-span-2 rounded-xl border border-[#c9a84c]/40 bg-white p-4 space-y-4">
+          <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Apartment Deal Type</div>
+          <div className="text-xs text-gray-400">
+            {asset.ownershipStatus === "Refinance" ? "Refinance options:" : asset.ownershipStatus === "Acquisition" ? "Acquisition options:" : "Pick Ownership Status above first."}
+          </div>
+          <div className="grid gap-2">
+            {(asset.ownershipStatus === "Refinance" ? APARTMENT_DEAL_TYPES_REFINANCE : asset.ownershipStatus === "Acquisition" ? APARTMENT_DEAL_TYPES_ACQUISITION : []).map((opt) => {
+              const selected = asset.apartmentDealType === opt.code;
+              return (
+                <button
+                  key={opt.code}
+                  type="button"
+                  disabled={!opt.active}
+                  onClick={() => opt.active && upd("apartmentDealType" as any, opt.code)}
+                  className={`flex items-center justify-between p-3 rounded-xl border-2 text-left transition-all ${
+                    !opt.active
+                      ? "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
+                      : selected
+                        ? "border-[#0a1f44] bg-[#0a1f44]/5 text-[#0a1f44]"
+                        : "border-gray-200 text-gray-700 hover:border-[#0a1f44]/30"
+                  }`}
+                >
+                  <span className="text-sm font-medium">{opt.label}</span>
+                  {!opt.active && (
+                    <span className="text-xs font-bold uppercase tracking-wide text-[#c9a84c] bg-[#c9a84c]/10 px-2 py-0.5 rounded">Coming Soon</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 6-a-1 form: Refinance + Value-Add Light */}
+          {asset.ownershipStatus === "Refinance" && asset.apartmentDealType === "refi-va-light" && (() => {
+            const curVal     = parseCurrency(asset.propertyValue || "");
+            const curLoan    = parseCurrency(asset.currentLoanAmount || "");
+            const curNOI     = parseCurrency(asset.currentNetIncome || "");
+            const newARV     = parseCurrency(asset.arvValue || "");
+            const newNOI     = parseCurrency(asset.stabilizedNoi || "");
+            const newLoan    = parseCurrency(asset.loanAmount || "");
+            const currentLTV    = curVal > 0 && curLoan > 0 ? (curLoan / curVal) * 100 : 0;
+            const currentDY     = curLoan > 0 && curNOI > 0 ? (curNOI / curLoan) * 100 : 0;
+            const currentEquity = Math.max(0, curVal - curLoan);
+            const currentCap    = curVal > 0 && curNOI > 0 ? (curNOI / curVal) * 100 : 0;
+            const newCap        = newARV > 0 && newNOI > 0 ? (newNOI / newARV) * 100 : 0;
+            const arltv         = newARV > 0 && newLoan > 0 ? (newLoan / newARV) * 100 : 0;
+            return (
+              <div className="mt-2 space-y-4 rounded-xl border border-[#c9a84c]/40 bg-[#c9a84c]/5 p-4">
+                <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Value-Add Refinance — Apartment Details</div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Current Units</label><Input value={asset.numUnits} onChange={(e) => upd("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div>
+                  <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Current Buildings</label><Input value={asset.numBuildings} onChange={(e) => upd("numBuildings", e.target.value)} placeholder="e.g. 4" className={inputClass} /></div>
+                  <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Property Value (As-Is)</label><Input value={asset.propertyValue} onChange={(e) => upd("propertyValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                  <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current NOI (Annual)</label><Input value={asset.currentNetIncome} onChange={(e) => upd("currentNetIncome", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                  <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Loan on Property</label><Input value={asset.currentLoanAmount || ""} onChange={(e) => upd("currentLoanAmount", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                </div>
+
+                <div className="border-t border-[#c9a84c]/20 pt-4 space-y-3">
+                  <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Stabilization Plan</div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Value-Add Total Budget</label><Input value={asset.constructionBudget || ""} onChange={(e) => upd("constructionBudget", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                    <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Estimated ARV</label><Input value={asset.arvValue || ""} onChange={(e) => upd("arvValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                    <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Estimated New NOI</label><Input value={asset.stabilizedNoi || ""} onChange={(e) => upd("stabilizedNoi", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                    <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Time to Completion</label><Input value={asset.timeToCompletion || ""} onChange={(e) => upd("timeToCompletion" as any, e.target.value)} placeholder="e.g. 18 months" className={inputClass} /></div>
+                    <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">New Requested Loan Amount</label><Input value={asset.loanAmount || ""} onChange={(e) => upd("loanAmount", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                  </div>
+                </div>
+
+                {(curVal > 0 || curLoan > 0 || curNOI > 0 || newARV > 0 || newNOI > 0 || newLoan > 0) && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 pt-4 border-t border-[#c9a84c]/20">
+                    <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current LTV</div><div className="text-sm font-bold text-[#0a1f44]">{currentLTV > 0 ? currentLTV.toFixed(1) + "%" : "—"}</div></div>
+                    <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current DY</div><div className="text-sm font-bold text-[#0a1f44]">{currentDY > 0 ? currentDY.toFixed(1) + "%" : "—"}</div></div>
+                    <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current Equity</div><div className="text-sm font-bold text-[#0a1f44]">{currentEquity > 0 ? "$" + (currentEquity / 1000000).toFixed(2) + "M" : "—"}</div></div>
+                    <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current Cap Rate</div><div className="text-sm font-bold text-[#0a1f44]">{currentCap > 0 ? currentCap.toFixed(2) + "%" : "—"}</div></div>
+                    <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New Cap Rate</div><div className="text-sm font-bold text-[#0a1f44]">{newCap > 0 ? newCap.toFixed(2) + "%" : "—"}</div></div>
+                    <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">ARLTV</div><div className="text-sm font-bold text-[#0a1f44]">{arltv > 0 ? arltv.toFixed(1) + "%" : "—"}</div></div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+          </>
+        );
+      })()}
+      {/* CAPMOON_PREMIER_V3_GATING_PATCH_2026_05_10 — close ticOK gate after Asset Type + apartment branch */}
       {showUnits && (<><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Units</label><Input value={asset.numUnits} onChange={(e) => upd("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Buildings</label><Input value={asset.numBuildings} onChange={(e) => upd("numBuildings", e.target.value)} placeholder="e.g. 4" className={inputClass} /></div></>)}
       {showAcres && (<div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Acres</label><Input value={asset.numAcres} onChange={(e) => upd("numAcres", e.target.value)} placeholder="e.g. 12.5" className={inputClass} /></div>)}
       {showRetail && (
@@ -2798,8 +3013,8 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                     selectTriggerClass={selectTriggerClass}
                   />
 
-                  {/* CAPMOON_PREMIER_APARTMENT_FLOW_PATCH_2026_05_10 — apartment-conditional block */}
-                  {prop.assetType === "Apartments" && (
+                  {/* CAPMOON_PREMIER_V3_HYBRID_CLEANUP_PATCH_2026_05_10 — disabled: apartment flow moved to AssetForm */}
+                  {false && prop.assetType === "Apartments" && (
                     <div className="mt-4 space-y-4 rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/5 p-4">
                       <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Apartment Specifics</div>
 
