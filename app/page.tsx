@@ -42,6 +42,9 @@ type AssetData = {
   // CAPMOON_PREMIER_V4_APARTMENT_BESPOKE_2026_05_11 — prior renovation history
   priorRenovation?: "Yes" | "No";
   priorRenovationYear?: string;
+  // CAPMOON_PREMIER_V44_STAB_FIELDS_2026_05_11 — post-stabilization counts
+  numUnitsAfterStab?: string;
+  numBuildingsAfterStab?: string;
   // CAPMOON_PREMIER_PHOTOS_4_PATCH_2026_05_10 — extra photos beyond propertyPhoto
   propertyPhotos?: string[];
   selectedStates: string[]; recourseType: string;
@@ -1442,7 +1445,8 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                 {asset.ownershipStatus && (
                   <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Asset Type</label><AssetTypeSelect value={asset.assetType} onChange={(v) => upd("assetType", v)} inputClass={inputClass} selectTriggerClass={selectTriggerClass} /></div>
                 )}
-                {asset.ownershipStatus && asset.assetType && asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" && asset.apartmentDealType === "refi-va-light" && (() => {
+                {/* CAPMOON_PREMIER_V44_PULLDOWN_ORDER_2026_05_11 — bespoke form suppressed here, moved to AFTER pulldown ternary */}
+                {false && asset.ownershipStatus && asset.assetType && asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" && asset.apartmentDealType === "refi-va-light" && (() => {
                   const curVal      = parseCurrency(asset.propertyValue || "");
                   const curLoan     = parseCurrency(asset.currentLoanAmount || "");
                   const curNOI      = parseCurrency(asset.currentNetIncome || "");
@@ -1563,6 +1567,83 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                     )}
                   </>
                 )}
+
+                {/* CAPMOON_PREMIER_V44_PULLDOWN_ORDER_2026_05_11 — bespoke form moved HERE (after pulldown) */}
+                {asset.ownershipStatus && asset.assetType && asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" && asset.apartmentDealType === "refi-va-light" && (() => {
+                  const curVal      = parseCurrency(asset.propertyValue || "");
+                  const curLoan     = parseCurrency(asset.currentLoanAmount || "");
+                  const curNOI      = parseCurrency(asset.currentNetIncome || "");
+                  const newARV      = parseCurrency(asset.arvValue || "");
+                  const newNOI      = parseCurrency(asset.stabilizedNoi || "");
+                  const newLoan     = parseCurrency(asset.loanAmount || "");
+                  const currentLTV    = curVal > 0 && curLoan > 0 ? (curLoan / curVal) * 100 : 0;
+                  const currentDY     = curLoan > 0 && curNOI > 0 ? (curNOI / curLoan) * 100 : 0;
+                  const currentEquity = Math.max(0, curVal - curLoan);
+                  const currentCap    = curVal > 0 && curNOI > 0 ? (curNOI / curVal) * 100 : 0;
+                  const newCap        = newARV > 0 && newNOI > 0 ? (newNOI / newARV) * 100 : 0;
+                  const arltv         = newARV > 0 && newLoan > 0 ? (newLoan / newARV) * 100 : 0;
+                  return (
+                    <div className="md:col-span-2 rounded-xl border border-[#c9a84c]/40 bg-[#c9a84c]/5 p-4 space-y-4 mt-2">
+                      <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Current Details of Apartment</div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Current Units</label><Input value={asset.numUnits} onChange={(e) => upd("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Current Buildings</label><Input value={asset.numBuildings} onChange={(e) => upd("numBuildings", e.target.value)} placeholder="e.g. 4" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Property Value (As-Is)</label><Input value={asset.propertyValue} onChange={(e) => upd("propertyValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current NOI (Annual)</label><Input value={asset.currentNetIncome} onChange={(e) => upd("currentNetIncome", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Loan on Property</label><Input value={asset.currentLoanAmount || ""} onChange={(e) => upd("currentLoanAmount", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Year</label><Input value={asset.purchaseYear ?? String(new Date().getFullYear())} onChange={(e) => upd("purchaseYear" as any, e.target.value)} placeholder={String(new Date().getFullYear())} className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Interest Rate (%)</label><Input value={asset.currentRate || ""} onChange={(e) => upd("currentRate" as any, e.target.value)} placeholder="e.g. 6.5" className={inputClass} /></div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Previous Renovation?</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {(["Yes", "No"] as const).map((opt) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => upd("priorRenovation" as any, opt)}
+                              className={`p-3 rounded-xl border-2 text-center font-bold text-sm transition-all ${asset.priorRenovation === opt ? (opt === "Yes" ? "border-amber-500 bg-amber-50 text-amber-700" : "border-emerald-500 bg-emerald-50 text-emerald-700") : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30"}`}
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                        </div>
+                        {asset.priorRenovation === "Yes" && (
+                          <div className="mt-3"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">What Year?</label><Input value={asset.priorRenovationYear || ""} onChange={(e) => upd("priorRenovationYear" as any, e.target.value)} placeholder="e.g. 2018" className={inputClass} /></div>
+                        )}
+                      </div>
+
+                      <div className="border-t border-[#c9a84c]/20 pt-4 space-y-3">
+                        <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Stabilization Plan</div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Value-Add Total Budget</label><Input value={asset.constructionBudget || ""} onChange={(e) => upd("constructionBudget", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Estimated ARV</label><Input value={asset.arvValue || ""} onChange={(e) => upd("arvValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Estimated New NOI</label><Input value={asset.stabilizedNoi || ""} onChange={(e) => upd("stabilizedNoi", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Time to Completion</label><Input value={asset.timeToCompletion || ""} onChange={(e) => upd("timeToCompletion" as any, e.target.value)} placeholder="e.g. 18 months" className={inputClass} /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Units After Stabilization</label><Input value={asset.numUnitsAfterStab || ""} onChange={(e) => upd("numUnitsAfterStab" as any, e.target.value)} placeholder="e.g. 120" className={inputClass} /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Buildings After Stabilization</label><Input value={asset.numBuildingsAfterStab || ""} onChange={(e) => upd("numBuildingsAfterStab" as any, e.target.value)} placeholder="e.g. 4" className={inputClass} /></div>
+                          <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">New Requested Loan Amount</label><Input value={asset.loanAmount || ""} onChange={(e) => upd("loanAmount", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-[#c9a84c]/20 pt-4">
+                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label>
+                        <Select value={asset.recourseType} onValueChange={(v) => upd("recourseType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
+                      </div>
+
+                      {(curVal > 0 || curLoan > 0 || curNOI > 0 || newARV > 0 || newNOI > 0 || newLoan > 0) && (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 pt-4 border-t border-[#c9a84c]/20">
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current LTV</div><div className="text-sm font-bold text-[#0a1f44]">{currentLTV > 0 ? currentLTV.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current DY</div><div className="text-sm font-bold text-[#0a1f44]">{currentDY > 0 ? currentDY.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current Equity</div><div className="text-sm font-bold text-[#0a1f44]">{currentEquity > 0 ? "$" + (currentEquity / 1000000).toFixed(2) + "M" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current Cap Rate</div><div className="text-sm font-bold text-[#0a1f44]">{currentCap > 0 ? currentCap.toFixed(2) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New Cap Rate</div><div className="text-sm font-bold text-[#0a1f44]">{newCap > 0 ? newCap.toFixed(2) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">ARLTV</div><div className="text-sm font-bold text-[#0a1f44]">{arltv > 0 ? arltv.toFixed(1) + "%" : "—"}</div></div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </>
             )}
           </>
