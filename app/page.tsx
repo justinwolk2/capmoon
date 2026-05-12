@@ -7207,3 +7207,4 @@ export default function Home() {
   }
   return <MainPortal session={session} onLogout={handleLogout} submittedDeals={submittedDeals} setSubmittedDeals={handleSetSubmittedDeals} users={users} setUsers={handleSetUsers} teamMembers={teamMembers} setTeamMembers={handleSetTeamMembers} deleteRequests={deleteRequests} setDeleteRequests={handleSetDeleteRequests} lenderChangeRequests={lenderChangeRequests} setLenderChangeRequests={handleSetLenderChangeRequests} />;
 }
+// vercel cache bust 1778591514
