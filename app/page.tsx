@@ -1491,7 +1491,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                       </div>
 
                       <div className="border-t border-[#c9a84c]/20 pt-4 space-y-3">
-                        <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Stabilization Plan</div>
+                        <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">STABILIZATION PLAN v4.6</div>
                         <div className="grid gap-3 md:grid-cols-2">
                           <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Value-Add Total Budget</label><Input value={asset.constructionBudget || ""} onChange={(e) => upd("constructionBudget", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
                           <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Estimated ARV</label><Input value={asset.arvValue || ""} onChange={(e) => upd("arvValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
@@ -1621,7 +1621,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                       </div>
 
                       <div className="border-t border-[#c9a84c]/20 pt-4 space-y-3">
-                        <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Stabilization Plan</div>
+                        <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">STABILIZATION PLAN v4.6</div>
                         <div className="grid gap-3 md:grid-cols-2">
                           <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Value-Add Total Budget</label><Input value={asset.constructionBudget || ""} onChange={(e) => upd("constructionBudget", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
                           <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Estimated ARV</label><Input value={asset.arvValue || ""} onChange={(e) => upd("arvValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
@@ -1757,7 +1757,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                 </div>
 
                 <div className="border-t border-[#c9a84c]/20 pt-4 space-y-3">
-                  <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Stabilization Plan</div>
+                  <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">STABILIZATION PLAN v4.6</div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <div>{/* CAPMOON_PREMIER_V46_VAB_TOOLTIP_2026_05_11 — info tooltip on Value-Add Total Budget */}<div className="flex items-center gap-1.5 mb-1"><label className="text-xs text-gray-500 font-medium uppercase">Value-Add Total Budget</label><div className="relative group"><div className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold cursor-help">i</div><div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 bg-[#0a1f44] text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">Value-add budget is the total project cost including refinancing any debt<div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0a1f44]" /></div></div></div><Input value={asset.constructionBudget || ""} onChange={(e) => upd("constructionBudget", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
                     <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Estimated ARV</label><Input value={asset.arvValue || ""} onChange={(e) => upd("arvValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
@@ -3412,7 +3412,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                             </div>
 
                             <div className="border-t border-[#c9a84c]/20 pt-4 space-y-3">
-                              <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Stabilization Plan</div>
+                              <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">STABILIZATION PLAN v4.6</div>
                               <div className="grid gap-3 md:grid-cols-2">
                                 <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Value-Add Total Budget</label><Input value={prop.constructionBudget || ""} onChange={(e) => updHybrid("constructionBudget", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
                                 <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Estimated ARV</label><Input value={prop.arvValue || ""} onChange={(e) => updHybrid("arvValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
