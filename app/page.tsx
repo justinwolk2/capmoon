@@ -1506,16 +1506,23 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                         <Select value={asset.recourseType} onValueChange={(v) => upd("recourseType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
                       </div>
 
-                      {(curVal > 0 || curLoan > 0 || curNOI > 0 || newARV > 0 || newNOI > 0 || newLoan > 0) && (
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 pt-4 border-t border-[#c9a84c]/20">
+                      {/* CAPMOON_PREMIER_V45_NEW_METRICS_2026_05_11 — 8 tiles in 2x4 grid, with New Equity + New DY */}
+                      {(curVal > 0 || curLoan > 0 || curNOI > 0 || newARV > 0 || newNOI > 0 || newLoan > 0) && (() => {
+                        const newEquity = Math.max(0, newARV - newLoan);
+                        const newDY     = newLoan > 0 && newNOI > 0 ? (newNOI / newLoan) * 100 : 0;
+                        return (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-4 border-t border-[#c9a84c]/20">
                           <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current LTV</div><div className="text-sm font-bold text-[#0a1f44]">{currentLTV > 0 ? currentLTV.toFixed(1) + "%" : "—"}</div></div>
                           <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current DY</div><div className="text-sm font-bold text-[#0a1f44]">{currentDY > 0 ? currentDY.toFixed(1) + "%" : "—"}</div></div>
                           <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current Equity</div><div className="text-sm font-bold text-[#0a1f44]">{currentEquity > 0 ? "$" + (currentEquity / 1000000).toFixed(2) + "M" : "—"}</div></div>
                           <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current Cap Rate</div><div className="text-sm font-bold text-[#0a1f44]">{currentCap > 0 ? currentCap.toFixed(2) + "%" : "—"}</div></div>
                           <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New Cap Rate</div><div className="text-sm font-bold text-[#0a1f44]">{newCap > 0 ? newCap.toFixed(2) + "%" : "—"}</div></div>
                           <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">ARLTV</div><div className="text-sm font-bold text-[#0a1f44]">{arltv > 0 ? arltv.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New Equity</div><div className="text-sm font-bold text-[#0a1f44]">{newEquity > 0 ? "$" + (newEquity / 1000000).toFixed(2) + "M" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New DY</div><div className="text-sm font-bold text-[#0a1f44]">{newDY > 0 ? newDY.toFixed(1) + "%" : "—"}</div></div>
                         </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   );
                 })()}
@@ -1631,16 +1638,23 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                         <Select value={asset.recourseType} onValueChange={(v) => upd("recourseType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
                       </div>
 
-                      {(curVal > 0 || curLoan > 0 || curNOI > 0 || newARV > 0 || newNOI > 0 || newLoan > 0) && (
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 pt-4 border-t border-[#c9a84c]/20">
+                      {/* CAPMOON_PREMIER_V45_NEW_METRICS_2026_05_11 — 8 tiles in 2x4 grid, with New Equity + New DY */}
+                      {(curVal > 0 || curLoan > 0 || curNOI > 0 || newARV > 0 || newNOI > 0 || newLoan > 0) && (() => {
+                        const newEquity = Math.max(0, newARV - newLoan);
+                        const newDY     = newLoan > 0 && newNOI > 0 ? (newNOI / newLoan) * 100 : 0;
+                        return (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-4 border-t border-[#c9a84c]/20">
                           <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current LTV</div><div className="text-sm font-bold text-[#0a1f44]">{currentLTV > 0 ? currentLTV.toFixed(1) + "%" : "—"}</div></div>
                           <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current DY</div><div className="text-sm font-bold text-[#0a1f44]">{currentDY > 0 ? currentDY.toFixed(1) + "%" : "—"}</div></div>
                           <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current Equity</div><div className="text-sm font-bold text-[#0a1f44]">{currentEquity > 0 ? "$" + (currentEquity / 1000000).toFixed(2) + "M" : "—"}</div></div>
                           <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current Cap Rate</div><div className="text-sm font-bold text-[#0a1f44]">{currentCap > 0 ? currentCap.toFixed(2) + "%" : "—"}</div></div>
                           <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New Cap Rate</div><div className="text-sm font-bold text-[#0a1f44]">{newCap > 0 ? newCap.toFixed(2) + "%" : "—"}</div></div>
                           <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">ARLTV</div><div className="text-sm font-bold text-[#0a1f44]">{arltv > 0 ? arltv.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New Equity</div><div className="text-sm font-bold text-[#0a1f44]">{newEquity > 0 ? "$" + (newEquity / 1000000).toFixed(2) + "M" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New DY</div><div className="text-sm font-bold text-[#0a1f44]">{newDY > 0 ? newDY.toFixed(1) + "%" : "—"}</div></div>
                         </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   );
                 })()}
