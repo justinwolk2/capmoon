@@ -23,6 +23,7 @@ type LenderRecord = {
 type RetailUnit = { id: number; tenant: string; rent: string; sqft: string; };
 type AssetAddress = { street: string; unit: string; city: string; state: string; zip: string; };
 type AssetData = {
+  borrowerName: string;
   id: number; ownershipStatus: string; dealType: string; refinanceType: string; assetType: string;
   loanAmount: string; seniorLoanAmount: string; subordinateAmount: string;
   propertyValue: string; purchasePrice: string; currentLoanAmount: string;
@@ -1048,7 +1049,7 @@ function normalizeRecourse(v: string) { return v === "SELECTIVE" || !v ? "CASE B
 function blankAddress(): AssetAddress { return { street: "", unit: "", city: "", state: "", zip: "" }; }
 function blankAsset(id: number): AssetData {
   // CAPMOON_PREMIER_V43_CLEAR_DEFAULTS_2026_05_11 — assetType default cleared so v4.2 gate actually gates
-  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dy: "", currentRate: "", arvValue: "", stabilizedNoi: "", constructionBudget: "", purchaseYear: String(new Date().getFullYear()), fullyEntitled: undefined, currentPropertyValue: "", additionalEquity: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
+  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "", borrowerName: "", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dy: "", currentRate: "", arvValue: "", stabilizedNoi: "", constructionBudget: "", purchaseYear: String(new Date().getFullYear()), fullyEntitled: undefined, currentPropertyValue: "", additionalEquity: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
 }
 function blankLenderForm(): NewLenderForm {
   return { programName: "", contactPerson: "", email: "", phone: "", website: "", typeOfLenders: [], typeOfLoans: [], programTypes: [], propertyTypes: [], loanTerms: [], notes: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalTypes: [], capitalTypePrograms: [], contacts: [], status: "Active" };
@@ -2916,6 +2917,37 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
   const [prefillBanner, setPrefillBanner] = useState("");
   const [selectedMatchIds, setSelectedMatchIds] = useState<number[]>([]);
   const [editableSeekerName, setEditableSeekerName] = useState(seekerName || "");
+  // CAPMOON_PREMIER_V48_STEP4_GUARANTORS_2026_05_17 — deal-level guarantors for Step 4
+  type GuarantorEntry = {
+    id: number;
+    name: string;
+    address: string;
+    creditScore: string;
+    netWorth: string;
+    liquidNetWorth: string;
+    guarantyPct: string;
+    guaranteesAll: boolean;
+    assetIds: number[]; // populated only when guaranteesAll === false
+  };
+  const [guarantors, setGuarantors] = useState<GuarantorEntry[]>([
+    { id: 1, name: "", address: "", creditScore: "", netWorth: "", liquidNetWorth: "", guarantyPct: "100", guaranteesAll: true, assetIds: [] },
+  ]);
+  const addGuarantor = () => {
+    setGuarantors(prev => [...prev, { id: Date.now(), name: "", address: "", creditScore: "", netWorth: "", liquidNetWorth: "", guarantyPct: "100", guaranteesAll: true, assetIds: [] }]);
+  };
+  const removeGuarantor = (id: number) => {
+    setGuarantors(prev => prev.length <= 1 ? prev : prev.filter(g => g.id !== id));
+  };
+  const updateGuarantor = (id: number, field: keyof GuarantorEntry, value: string | boolean | number[]) => {
+    setGuarantors(prev => prev.map(g => g.id === id ? { ...g, [field]: value } as GuarantorEntry : g));
+  };
+  const toggleGuarantorAsset = (id: number, assetId: number) => {
+    setGuarantors(prev => prev.map(g => {
+      if (g.id !== id) return g;
+      const has = g.assetIds.includes(assetId);
+      return { ...g, assetIds: has ? g.assetIds.filter(a => a !== assetId) : [...g.assetIds, assetId] };
+    }));
+  };
   const [additionalSearch, setAdditionalSearch] = useState("");
   const [additionalSelected, setAdditionalSelected] = useState<number[]>([]);
   // Hybrid/Stretch Senior state
@@ -3883,10 +3915,20 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                         <div><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Asset {idx + 1}</div><div className="text-base font-bold text-[#0a1f44]">{asset.assetType}</div><div className="text-xs text-gray-500">{asset.ownershipStatus} · {asset.dealType}</div>{asset.address?.city && <div className="text-xs text-gray-400 mt-0.5">{asset.address.street ? `${asset.address.street}, ` : ""}{asset.address.city}, {asset.address.state} {asset.address.zip}</div>}</div>
                         <button onClick={() => { setCurrentAssetIndex(idx); setMatcherStep("asset-form"); }} className="flex items-center gap-1 px-3 py-1.5 text-xs border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-[#0a1f44]/10 font-medium"><Edit2 className="h-3 w-3" /> Edit</button>
                       </div>
+                      {/* CAPMOON_PREMIER_V48_STEP4_GUARANTORS_2026_05_17 — Asset tile rewrite for 6-a-2 Step 4 */}
                       <div className="grid grid-cols-2 gap-2">
-                        {[["Loan Amount", asset.loanAmount || "—"], ["Property Value", asset.propertyValue || "—"], ["Senior LTV", formatPercent(m.seniorLtv)]].map(([label, val]) => (
-                          <div key={String(label)} className="rounded-lg bg-gray-50 p-2"><div className="text-xs text-gray-400 mb-0.5">{label}</div><div className="text-xs font-bold text-[#0a1f44]">{val}</div></div>
-                        ))}
+                        {(() => {
+                          const loanAmt = parseCurrency(asset.loanAmount);
+                          const arv = parseCurrency(asset.arvValue);
+                          const arLtv = arv > 0 && loanAmt > 0 ? (loanAmt / arv) * 100 : 0;
+                          return [
+                            ["New Requested Loan Amount", asset.loanAmount || "—"],
+                            ["AR Property Value", asset.arvValue || "—"],
+                            ["AR LTV", arLtv > 0 ? arLtv.toFixed(1) + "%" : "—"],
+                          ].map(([label, val]) => (
+                            <div key={String(label)} className="rounded-lg bg-gray-50 p-2"><div className="text-xs text-gray-400 mb-0.5">{label}</div><div className="text-xs font-bold text-[#0a1f44]">{val}</div></div>
+                          ));
+                        })()}
                       </div>
                     </div>
                   );
@@ -3894,28 +3936,154 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
               </div>
             )}
 
-            {/* Editable summary fields */}
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 mb-6 space-y-4">
-              <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-2">Quick Edit — Final Details</div>
-              <div className="grid gap-3 md:grid-cols-3">
-                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Borrower Name</label>
-                  <input value={editableSeekerName} onChange={e => setEditableSeekerName(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
-                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Loan Amount</label>
-                  <input value={assets[0]?.loanAmount || ""} onChange={e => setAssets(prev => prev.map((a,i) => i===0 ? {...a, loanAmount: e.target.value} : a))}
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
-                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Property Value</label>
-                  <input value={assets[0]?.propertyValue || ""} onChange={e => setAssets(prev => prev.map((a,i) => i===0 ? {...a, propertyValue: e.target.value} : a))}
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
-                <div style={{display:'none'}}><input value={""} onChange={e => {}}
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
-                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Net Income (NOI)</label>
-                  <input value={assets[0]?.currentNetIncome || ""} onChange={e => setAssets(prev => prev.map((a,i) => i===0 ? {...a, currentNetIncome: e.target.value} : a))}
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" /></div>
-                <div><label className="text-xs text-gray-500 mb-1 block font-bold uppercase">Capital Type</label>
-                  <div className="w-full px-3 py-2 text-sm bg-gray-100 border border-gray-200 rounded-xl text-gray-600">{capitalType}</div></div>
+            {/* CAPMOON_PREMIER_V48_STEP4_GUARANTORS_2026_05_17 — Quick Edit rebuilt: per-asset borrowers + deal-level guarantors + rollup tiles */}
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 mb-6 space-y-5">
+              <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide">Quick Edit — Final Details</div>
+
+              {/* Per-asset borrower names (SPEs may differ per asset) */}
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide">Borrower (per asset)</div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {assets.map((a, i) => (
+                    <div key={a.id}>
+                      <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Asset {i + 1} Borrower Name</label>
+                      <input
+                        value={a.borrowerName || ""}
+                        onChange={e => {
+                          const v = e.target.value;
+                          setAssets(prev => prev.map((x, idx) => idx === i ? { ...x, borrowerName: v } : x));
+                          if (i === 0) setEditableSeekerName(v);
+                        }}
+                        placeholder="e.g. 123 Main St SPE LLC"
+                        className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]"
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
 
+              {/* Guarantors (deal-level) */}
+              <div className="space-y-3 border-t border-gray-200 pt-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide">Guarantors</div>
+                  <button type="button" onClick={addGuarantor} className="text-xs font-semibold text-[#0a1f44] hover:underline">+ Add Guarantor</button>
+                </div>
+
+                {guarantors.map((g, gi) => (
+                  <div key={g.id} className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-bold uppercase tracking-wide text-[#c9a84c]">Guarantor {gi + 1}</div>
+                      {guarantors.length > 1 && (
+                        <button type="button" onClick={() => removeGuarantor(g.id)} className="text-xs text-red-500 hover:underline">Delete</button>
+                      )}
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Name</label>
+                        <input value={g.name} onChange={e => updateGuarantor(g.id, "name", e.target.value)} placeholder="Full name" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Address</label>
+                        <input value={g.address} onChange={e => updateGuarantor(g.id, "address", e.target.value)} placeholder="Street, City, State" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Credit Score (est.)</label>
+                        <input value={g.creditScore} onChange={e => updateGuarantor(g.id, "creditScore", e.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="e.g. 720" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Guaranty %</label>
+                        <input value={g.guarantyPct} onChange={e => updateGuarantor(g.id, "guarantyPct", e.target.value.replace(/[^0-9.]/g, ""))} placeholder="100" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Net Worth</label>
+                        <input value={g.netWorth} onChange={e => updateGuarantor(g.id, "netWorth", formatCurrencyInput(e.target.value))} placeholder="$0" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Liquid Net Worth</label>
+                        <input value={g.liquidNetWorth} onChange={e => updateGuarantor(g.id, "liquidNetWorth", formatCurrencyInput(e.target.value))} placeholder="$0" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
+                      </div>
+                    </div>
+
+                    {/* Per-property coverage — only renders when there's more than one asset */}
+                    {assets.length > 1 && (
+                      <div className="border-t border-gray-100 pt-3 space-y-2">
+                        <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                          <input type="checkbox" checked={g.guaranteesAll} onChange={e => updateGuarantor(g.id, "guaranteesAll", e.target.checked)} className="rounded" />
+                          <span className="font-medium">Will this guarantor be guaranteeing all properties?</span>
+                        </label>
+                        {!g.guaranteesAll && (
+                          <div className="pl-6 space-y-1.5">
+                            <div className="text-xs text-gray-400 uppercase tracking-wide">Select properties this guarantor backs:</div>
+                            <div className="flex flex-wrap gap-2">
+                              {assets.map((a, i) => {
+                                const checked = g.assetIds.includes(a.id);
+                                return (
+                                  <button
+                                    key={a.id}
+                                    type="button"
+                                    onClick={() => toggleGuarantorAsset(g.id, a.id)}
+                                    className={`text-xs px-3 py-1.5 rounded-lg border-2 transition-all ${checked ? "border-[#0a1f44] bg-[#0a1f44]/10 text-[#0a1f44] font-bold" : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30"}`}
+                                  >
+                                    Asset {i + 1}{a.borrowerName ? " — " + a.borrowerName : ""}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Four rollup tiles — deal-level guarantor strength */}
+              {(() => {
+                // Determine which assets each guarantor backs.
+                const guarantorAssetIds = (g: typeof guarantors[number]) =>
+                  (assets.length <= 1 || g.guaranteesAll) ? assets.map(a => a.id) : g.assetIds;
+
+                // For each asset, sum (NW × guaranty%) and (Liquid NW × guaranty%) across guarantors backing it.
+                let weightedNWNumerator = 0;     // for Tile 1 (Total NW)
+                let weightedLiqNumerator = 0;    // for Tile 2 numerator (Total Liquidity numerator)
+                let totalLoanAmount = 0;
+                assets.forEach(a => {
+                  const loan = parseCurrency(a.loanAmount);
+                  totalLoanAmount += loan;
+                  guarantors.forEach(g => {
+                    if (!guarantorAssetIds(g).includes(a.id)) return;
+                    const pct = (parseFloat(g.guarantyPct) || 0) / 100;
+                    weightedNWNumerator  += parseCurrency(g.netWorth) * pct;
+                    weightedLiqNumerator += parseCurrency(g.liquidNetWorth) * pct;
+                  });
+                });
+
+                const totalNW = weightedNWNumerator;
+                const totalLiqPct = weightedNWNumerator > 0 ? (weightedLiqNumerator / weightedNWNumerator) * 100 : 0;
+                const nwToLoan = totalLoanAmount > 0 ? weightedNWNumerator / totalLoanAmount : 0;
+                const liqToLoan = totalLoanAmount > 0 ? weightedLiqNumerator / totalLoanAmount : 0;
+
+                const fmtMoney = (n: number) => n > 0 ? "$" + (n / 1000000).toFixed(2) + "M" : "—";
+                const fmtRatio = (n: number) => n > 0 ? n.toFixed(2) + "x" : "—";
+                const fmtPct = (n: number) => n > 0 ? n.toFixed(1) + "%" : "—";
+
+                return (
+                  <div className="border-t border-gray-200 pt-4">
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Guarantor Strength (Deal-Level)</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Total Net Worth</div><div className="text-sm font-bold text-[#0a1f44]">{fmtMoney(totalNW)}</div></div>
+                      <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Total Liquidity</div><div className="text-sm font-bold text-[#0a1f44]">{fmtPct(totalLiqPct)}</div></div>
+                      <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Net Worth / Loan</div><div className="text-sm font-bold text-[#0a1f44]">{fmtRatio(nwToLoan)}</div></div>
+                      <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Liquidity / Loan</div><div className="text-sm font-bold text-[#0a1f44]">{fmtRatio(liqToLoan)}</div></div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="border-t border-gray-200 pt-3">
+                <div className="text-xs text-gray-500"><span className="font-bold uppercase tracking-wide">Capital Type:</span> {capitalType}</div>
+              </div>
             </div>
 
             <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4 mb-6 flex items-center justify-between">
