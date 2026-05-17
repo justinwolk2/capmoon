@@ -25,6 +25,7 @@ type AssetAddress = { street: string; unit: string; city: string; state: string;
 type AssetData = {
   borrowerName: string;
   // CAPMOON_PREMIER_V48_6A3_GROUND_UP_V4_2026_05_17 — ground-up dedicated fields (landCost reuses existing)
+  // CAPMOON_PREMIER_V48_6A3_GROUND_UP_V5_2026_05_17 — retargeted to refi-va-new-construct (live code)
   landAcquisitionInvolved?: "Yes" | "No" | "";
   hardCostsGroundup?: string;
   softCostsGroundup?: string;
@@ -969,7 +970,7 @@ function assetShortLabel(v: string): string {
 // CAPMOON_PREMIER_V4_APARTMENT_BESPOKE_2026_05_11 — apartment refinance pulldown (7 options)
 const APARTMENT_REFI_DEAL_TYPES = [
   { code: "refi-va-light",          label: "Value-Add (Light)",                                    active: true  },
-  { code: "refi-va-new-construct",  label: "Value-Add (New Construction)",                         active: false },
+  { code: "refi-va-new-construct",  label: "Value-Add Ground-Up",                                  active: true  },
   { code: "refi-new-construct",     label: "New Construction",                                     active: false },
   { code: "refi-short-term",        label: "Short Term Refinance",                                 active: false },
   { code: "refi-perm-rt",           label: "Permanent Refinance - Rate and Term",                  active: false },
@@ -994,7 +995,7 @@ function getAssetPhotos(a: any): string[] {
 const APARTMENT_DEAL_TYPES_REFINANCE = [
   { code: "refi-va-light",       label: "Value-Add (Light / No Construction)",  active: true  },
   { code: "refi-va-heavy",       label: "Value-Add (Heavy Construction)",       active: false },
-  { code: "refi-new-dev",        label: "Value-Add Ground-Up",                  active: true  },
+  { code: "refi-new-dev",        label: "New Construction / Development",       active: false },
   { code: "refi-short-term",     label: "Short Term Refinance",                 active: false },
   { code: "refi-long-term",      label: "Long Term / Permanent Refinance",      active: false },
   { code: "refi-other",          label: "Other (Leave Options Open)",           active: false },
@@ -1794,7 +1795,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
           })()}
 
           {/* CAPMOON_PREMIER_V48_6A3_GROUND_UP_V4_2026_05_17 — 6-a-3 form: Refinance + Value-Add Ground-Up */}
-          {asset.ownershipStatus === "Refinance" && asset.apartmentDealType === "refi-new-dev" && (() => {
+          {asset.ownershipStatus === "Refinance" && asset.apartmentDealType === "refi-va-new-construct" && (() => {
             const curVal     = parseCurrency(asset.propertyValue || "");
             const curLoan    = parseCurrency(asset.currentLoanAmount || "");
             const curNOI     = parseCurrency(asset.currentNetIncome || "");
@@ -1912,7 +1913,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
         );
       })()}
       {/* CAPMOON_PREMIER_V46_DEAL_TYPE_GATE_2026_05_11 — gate ALL generic fields behind Deal Type being picked + bespoke suppression */}
-      {asset.assetType && ((asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance") ? !!asset.apartmentDealType : !!asset.dealType) && !(asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" && (asset.apartmentDealType === "refi-va-light" || asset.apartmentDealType === "refi-new-dev")) && (<>
+      {asset.assetType && ((asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance") ? !!asset.apartmentDealType : !!asset.dealType) && !(asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" && (asset.apartmentDealType === "refi-va-light" || asset.apartmentDealType === "refi-va-new-construct")) && (<>
       {showUnits && (<><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Units</label><Input value={asset.numUnits} onChange={(e) => upd("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Buildings</label><Input value={asset.numBuildings} onChange={(e) => upd("numBuildings", e.target.value)} placeholder="e.g. 4" className={inputClass} /></div></>)}
       {showAcres && (<div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Acres</label><Input value={asset.numAcres} onChange={(e) => upd("numAcres", e.target.value)} placeholder="e.g. 12.5" className={inputClass} /></div>)}
       {showRetail && (
@@ -4121,7 +4122,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                       <div className="grid grid-cols-2 gap-2">
                         {(() => {
                           // CAPMOON_PREMIER_V48_6A3_GROUND_UP_V4_2026_05_17 — ground-up reads from valueAfterConstruction + loanAmountGroundup
-                          const isGroundup = asset.apartmentDealType === "refi-new-dev";
+                          const isGroundup = asset.apartmentDealType === "refi-va-new-construct";
                           const loanAmtRaw = isGroundup ? (asset.loanAmountGroundup || "") : (asset.loanAmount || "");
                           const arvRaw     = isGroundup ? (asset.valueAfterConstruction || "") : (asset.arvValue || "");
                           const loanAmt = parseCurrency(loanAmtRaw);
