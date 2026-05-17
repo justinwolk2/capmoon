@@ -65,6 +65,7 @@ type NewLenderForm = {
 type TeamMember = {
   id: number; name: string; email: string; phone: string; photo: string;
   geographicMarket: string; specialtyAreas: string[]; title: string;
+  linkedinUrl?: string; // CAPMOON_TEAM_PROFILE_V1_2026_05_17
 };
 type AppUser = {
   id: number; username: string; password: string; role: "admin" | "advisor" | "staff" | "intern" | "capital-seeker" | "lender"; linkedLenderId?: number; emailPrefs?: EmailPrefs; advisorCode?: string; dealSequenceStart?: number; blocked?: boolean;
@@ -2787,7 +2788,7 @@ function TeamPhotoUploader({
 }
 // CAPMOON_TEAM_PHOTO_PATCH — end TeamPhotoUploader
 
-function DealTeamTab({ teamMembers, setTeamMembers, currentUserId, isAdmin, inputClass, selectTriggerClass, cardClass }: { teamMembers: TeamMember[]; setTeamMembers: (m: TeamMember[]) => void; currentUserId: number; isAdmin: boolean; inputClass: string; selectTriggerClass: string; cardClass: string }) {
+function DealTeamTab({ teamMembers, setTeamMembers, currentUserId, isAdmin, session, inputClass, selectTriggerClass, cardClass }: { teamMembers: TeamMember[]; setTeamMembers: (m: TeamMember[]) => void; currentUserId: number; isAdmin: boolean; session: any; inputClass: string; selectTriggerClass: string; cardClass: string }) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [newMember, setNewMember] = useState<Partial<TeamMember>>({ name: "", email: "", phone: "", photo: "", geographicMarket: "", specialtyAreas: [], title: "" });
 
@@ -2795,7 +2796,7 @@ function DealTeamTab({ teamMembers, setTeamMembers, currentUserId, isAdmin, inpu
   function deleteMember(id: number) { if (window.confirm("Remove this team member?")) setTeamMembers(teamMembers.filter((m) => m.id !== id)); }
   function addMember() {
     if (!newMember.name || !newMember.email) return;
-    setTeamMembers([...teamMembers, { id: Date.now(), name: newMember.name!, email: newMember.email!, phone: newMember.phone || "", photo: newMember.photo || "", geographicMarket: newMember.geographicMarket || "", specialtyAreas: newMember.specialtyAreas || [], title: newMember.title || "" }]);
+    setTeamMembers([...teamMembers, { id: Date.now(), name: newMember.name!, email: newMember.email!, phone: newMember.phone || "", photo: newMember.photo || "", geographicMarket: newMember.geographicMarket || "", specialtyAreas: newMember.specialtyAreas || [], title: newMember.title || "", linkedinUrl: newMember.linkedinUrl || "" }]);
     setNewMember({ name: "", email: "", phone: "", photo: "", geographicMarket: "", specialtyAreas: [], title: "" });
   }
 
@@ -2805,6 +2806,42 @@ function DealTeamTab({ teamMembers, setTeamMembers, currentUserId, isAdmin, inpu
         <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">CapMoon</div>
         <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-6">Deal Team</h2>
         <div className="grid gap-6 md:grid-cols-2">
+          {/* CAPMOON_TEAM_PROFILE_V1_2026_05_17 — Self-onboarding banner: shown when logged-in user has no team card */}
+          {(() => {
+            const userRole = session?.user?.role;
+            const eligibleRole = userRole === "admin" || userRole === "advisor" || userRole === "staff" || userRole === "intern";
+            const needsCard = eligibleRole && currentUserId === -1 && !teamMembers.some(m => m.email && session?.user?.email && m.email.toLowerCase() === session.user.email.toLowerCase());
+            if (!needsCard) return null;
+            return (
+              <div className="mb-5 rounded-xl border border-[#c9a84c]/30 bg-[#c9a84c]/5 p-5 flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm font-bold text-[#0a1f44] mb-1">You don\'t have a team card yet</div>
+                  <div className="text-xs text-gray-500">Create one so you appear in advisor assignments, Deal Memos, and lender-facing pages.</div>
+                </div>
+                <button
+                  onClick={() => {
+                    const newId = Date.now();
+                    const newMember: TeamMember = {
+                      id: newId,
+                      name: session?.user?.name || "",
+                      email: session?.user?.email || session?.user?.username || "",
+                      phone: session?.user?.phone || "",
+                      photo: "",
+                      geographicMarket: "",
+                      specialtyAreas: [],
+                      title: userRole === "admin" ? "Admin" : userRole === "advisor" ? "Capital Advisor" : userRole === "staff" ? "Staff" : "Intern",
+                      linkedinUrl: "",
+                    };
+                    setTeamMembers([...teamMembers, newMember]);
+                    setTimeout(() => setEditingId(newId), 50);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 whitespace-nowrap"
+                >
+                  Create My Team Card
+                </button>
+              </div>
+            );
+          })()}
           {teamMembers.map((member) => {
             const canEdit = isAdmin || member.id === teamMembers.find((m) => m.id === currentUserId)?.id;
             const isEditing = editingId === member.id;
@@ -2886,7 +2923,49 @@ function EditMemberForm({ member, onSave, onCancel, isAdmin, inputClass, selectT
       <div><label className="text-xs text-gray-400 mb-1 block">Email <span className="text-gray-300">(locked)</span></label><div className="px-3 py-2 text-sm text-gray-400 bg-gray-100 rounded-xl border border-gray-200">{form.email}</div></div>
       {isAdmin && <div><label className="text-xs text-gray-400 mb-1 block">Title</label><Input value={form.title} onChange={(e) => upd("title", e.target.value)} className={inputClass} /></div>}
       <div><label className="text-xs text-gray-400 mb-1 block">Phone</label><Input value={form.phone} onChange={(e) => upd("phone", e.target.value)} className={inputClass} /></div>
-      <div><label className="text-xs text-gray-400 mb-1 block">Photo URL (e.g. /photo.jpg)</label><Input value={form.photo} onChange={(e) => upd("photo", e.target.value)} placeholder="/photo.jpg" className={inputClass} /></div>
+      {/* CAPMOON_TEAM_PROFILE_V1_2026_05_17 — Photo upload (Vercel Blob via /api/upload scope=team-member) + URL fallback */}
+      <div>
+        <label className="text-xs text-gray-400 mb-1 block">Profile Photo</label>
+        <div className="flex items-center gap-3">
+          <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+            {form.photo ? (
+              <img src={form.photo} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+            ) : (
+              <span className="text-xs text-gray-400">No photo</span>
+            )}
+          </div>
+          <div className="flex-1">
+            <label className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80 cursor-pointer">
+              <span>Upload Photo</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const fd = new FormData();
+                  fd.append("file", file);
+                  fd.append("scope", "team-member");
+                  try {
+                    const res = await fetch("/api/upload", { method: "POST", body: fd });
+                    const data = await res.json();
+                    if (data?.url) {
+                      upd("photo", data.url);
+                    } else {
+                      alert("Upload failed: " + (data?.error || "unknown error"));
+                    }
+                  } catch (err: any) {
+                    alert("Upload error: " + err.message);
+                  }
+                }}
+              />
+            </label>
+            <Input value={form.photo} onChange={(e) => upd("photo", e.target.value)} placeholder="…or paste an image URL" className={inputClass + " mt-2 text-xs"} />
+          </div>
+        </div>
+      </div>
+      <div><label className="text-xs text-gray-400 mb-1 block">LinkedIn URL</label><Input value={form.linkedinUrl || ""} onChange={(e) => upd("linkedinUrl", e.target.value)} placeholder="https://linkedin.com/in/yourhandle" className={inputClass} /></div>
       <div><label className="text-xs text-gray-400 mb-1 block">Geographic Market</label><Input value={form.geographicMarket} onChange={(e) => upd("geographicMarket", e.target.value)} className={inputClass} /></div>
       <CheckboxGroup label="Specialty Areas" options={capitalTypes} selected={form.specialtyAreas} onChange={(v) => upd("specialtyAreas", v)} />
       <div className="flex gap-2 pt-2">
@@ -6430,7 +6509,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
               {activeTab === "deal-matcher-plus" && <MatcherHub session={session} submittedDeals={submittedDeals} setSubmittedDeals={setSubmittedDeals} lenderRecords={lenderRecords} teamMembers={teamMembers} prefillDeal={prefillDeal} setPrefillDeal={setPrefillDeal} setActiveTab={setActiveTab} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />}
 
               {activeTab === "deal-team" && (
-                <DealTeamTab teamMembers={teamMembers} setTeamMembers={setTeamMembers} currentUserId={session?.user.teamMemberId || -1} isAdmin={isAdmin} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />
+                <DealTeamTab teamMembers={teamMembers} setTeamMembers={setTeamMembers} currentUserId={session?.user.teamMemberId || -1} isAdmin={isAdmin} session={session} inputClass={inputClass} selectTriggerClass={selectTriggerClass} cardClass={cardClass} />
               )}
 
               {/* Submitted Deals */}
