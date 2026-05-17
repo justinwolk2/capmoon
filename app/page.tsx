@@ -1683,7 +1683,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                   const totalBudget = land + hardC + softC;
                   const valAfter   = parseCurrency(asset.valueAfterConstruction || "");
                   const newNOI     = parseCurrency(asset.noiAfterConstruction || "");
-                  const newLoan    = parseCurrency(asset.loanAmountGroundup || "");
+                  const newLoan    = parseCurrency(asset.loanAmountGroundup || (totalBudget > 0 ? String(Math.round(totalBudget)) : "")); // CAPMOON_PREMIER_V48_6A3_NEWLOAN_FALLBACK_2026_05_17 — fallback to budget so AR LTV / New Equity / New DY populate live
                   const currentLTV    = curVal > 0 && curLoan > 0 ? (curLoan / curVal) * 100 : 0;
                   const currentDY     = curLoan > 0 && curNOI > 0 ? (curNOI / curLoan) * 100 : 0;
                   const currentEquity = Math.max(0, curVal - curLoan);
