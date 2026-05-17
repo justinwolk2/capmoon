@@ -2921,7 +2921,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
   type GuarantorEntry = {
     id: number;
     name: string;
-    address: string;
+    address: AssetAddress;
     creditScore: string;
     netWorth: string;
     liquidNetWorth: string;
@@ -2930,15 +2930,15 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
     assetIds: number[]; // populated only when guaranteesAll === false
   };
   const [guarantors, setGuarantors] = useState<GuarantorEntry[]>([
-    { id: 1, name: "", address: "", creditScore: "", netWorth: "", liquidNetWorth: "", guarantyPct: "100", guaranteesAll: true, assetIds: [] },
+    { id: 1, name: "", address: blankAddress(), creditScore: "", netWorth: "", liquidNetWorth: "", guarantyPct: "100", guaranteesAll: true, assetIds: [] },
   ]);
   const addGuarantor = () => {
-    setGuarantors(prev => [...prev, { id: Date.now(), name: "", address: "", creditScore: "", netWorth: "", liquidNetWorth: "", guarantyPct: "100", guaranteesAll: true, assetIds: [] }]);
+    setGuarantors(prev => [...prev, { id: Date.now(), name: "", address: blankAddress(), creditScore: "", netWorth: "", liquidNetWorth: "", guarantyPct: "100", guaranteesAll: true, assetIds: [] }]);
   };
   const removeGuarantor = (id: number) => {
     setGuarantors(prev => prev.length <= 1 ? prev : prev.filter(g => g.id !== id));
   };
-  const updateGuarantor = (id: number, field: keyof GuarantorEntry, value: string | boolean | number[]) => {
+  const updateGuarantor = (id: number, field: keyof GuarantorEntry, value: string | boolean | number[] | AssetAddress) => {
     setGuarantors(prev => prev.map(g => g.id === id ? { ...g, [field]: value } as GuarantorEntry : g));
   };
   const toggleGuarantorAsset = (id: number, assetId: number) => {
@@ -3983,10 +3983,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                         <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Name</label>
                         <input value={g.name} onChange={e => updateGuarantor(g.id, "name", e.target.value)} placeholder="Full name" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
                       </div>
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Address</label>
-                        <input value={g.address} onChange={e => updateGuarantor(g.id, "address", e.target.value)} placeholder="Street, City, State" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
-                      </div>
+                      {/* CAPMOON_PREMIER_V48_GUARANTOR_ADDRESS_AUTOCOMPLETE_2026_05_17 — Address slot intentionally empty; full AddressFields rendered below the grid */}
                       <div>
                         <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Credit Score (est.)</label>
                         <input value={g.creditScore} onChange={e => updateGuarantor(g.id, "creditScore", e.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="e.g. 720" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
@@ -4003,6 +4000,16 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                         <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Liquid Net Worth</label>
                         <input value={g.liquidNetWorth} onChange={e => updateGuarantor(g.id, "liquidNetWorth", formatCurrencyInput(e.target.value))} placeholder="$0" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
                       </div>
+                    </div>
+
+                    {/* CAPMOON_PREMIER_V48_GUARANTOR_ADDRESS_AUTOCOMPLETE_2026_05_17 — Address with Mapbox autocomplete */}
+                    <div>
+                      <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Address</label>
+                      <AddressFields
+                        address={g.address || blankAddress()}
+                        onChange={(a) => updateGuarantor(g.id, "address", a)}
+                        inputClass="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]"
+                      />
                     </div>
 
                     {/* Per-property coverage — only renders when there's more than one asset */}
