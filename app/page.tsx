@@ -4038,35 +4038,26 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                 ))}
               </div>
 
-              {/* Four rollup tiles — deal-level guarantor strength */}
+              {/* CAPMOON_PREMIER_V48_STEP4_TILE_MATH_FIX_2026_05_17 — Option B math: simple sums for totals, guaranty%-weighted for ratios */}
               {(() => {
-                // Determine which assets each guarantor backs.
-                const guarantorAssetIds = (g: typeof guarantors[number]) =>
-                  (assets.length <= 1 || g.guaranteesAll) ? assets.map(a => a.id) : g.assetIds;
+                // Simple sums across all guarantors — no weighting, no asset loop
+                const totalNW  = guarantors.reduce((sum, g) => sum + parseCurrency(g.netWorth), 0);
+                const totalLiq = guarantors.reduce((sum, g) => sum + parseCurrency(g.liquidNetWorth), 0);
 
-                // For each asset, sum (NW × guaranty%) and (Liquid NW × guaranty%) across guarantors backing it.
-                let weightedNWNumerator = 0;     // for Tile 1 (Total NW)
-                let weightedLiqNumerator = 0;    // for Tile 2 numerator (Total Liquidity numerator)
-                let totalLoanAmount = 0;
-                assets.forEach(a => {
-                  const loan = parseCurrency(a.loanAmount);
-                  totalLoanAmount += loan;
-                  guarantors.forEach(g => {
-                    if (!guarantorAssetIds(g).includes(a.id)) return;
-                    const pct = (parseFloat(g.guarantyPct) || 0) / 100;
-                    weightedNWNumerator  += parseCurrency(g.netWorth) * pct;
-                    weightedLiqNumerator += parseCurrency(g.liquidNetWorth) * pct;
-                  });
-                });
+                // Guaranty%-weighted sums — used only for the loan-coverage ratios
+                const weightedNW  = guarantors.reduce((sum, g) => sum + parseCurrency(g.netWorth)        * ((parseFloat(g.guarantyPct) || 0) / 100), 0);
+                const weightedLiq = guarantors.reduce((sum, g) => sum + parseCurrency(g.liquidNetWorth)  * ((parseFloat(g.guarantyPct) || 0) / 100), 0);
 
-                const totalNW = weightedNWNumerator;
-                const totalLiqPct = weightedNWNumerator > 0 ? (weightedLiqNumerator / weightedNWNumerator) * 100 : 0;
-                const nwToLoan = totalLoanAmount > 0 ? weightedNWNumerator / totalLoanAmount : 0;
-                const liqToLoan = totalLoanAmount > 0 ? weightedLiqNumerator / totalLoanAmount : 0;
+                // Total loan amount across all assets in the deal
+                const totalLoanAmount = assets.reduce((sum, a) => sum + parseCurrency(a.loanAmount), 0);
+
+                const totalLiqPct = totalNW > 0 ? (totalLiq / totalNW) * 100 : 0;
+                const nwToLoan    = totalLoanAmount > 0 ? weightedNW  / totalLoanAmount : 0;
+                const liqToLoan   = totalLoanAmount > 0 ? weightedLiq / totalLoanAmount : 0;
 
                 const fmtMoney = (n: number) => n > 0 ? "$" + (n / 1000000).toFixed(2) + "M" : "—";
                 const fmtRatio = (n: number) => n > 0 ? n.toFixed(2) + "x" : "—";
-                const fmtPct = (n: number) => n > 0 ? n.toFixed(1) + "%" : "—";
+                const fmtPct   = (n: number) => n > 0 ? n.toFixed(1) + "%" : "—";
 
                 return (
                   <div className="border-t border-gray-200 pt-4">
