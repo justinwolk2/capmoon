@@ -40,3 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+
+# Patch script artifacts (added 2026-05-17)
+*.bak
+*.bak.*
+*.bakv*
+patch_*.sh
