@@ -1562,7 +1562,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                           </SelectTrigger>
                           <SelectContent>
                             {APARTMENT_REFI_DEAL_TYPES.map((opt) => {
-                              // CAPMOON_PREMIER_V48_6A4_SHORT_TERM_2026_05_17 — option tooltips
+                              // CAPMOON_PREMIER_V48_6A4_FIXES_2026_05_17 — option tooltips, rebuilt with stronger styles
                               const tooltipMap: Record<string, string> = {
                                 "refi-va-new-construct": "For existing properties that will either be knocked down or add new buildings",
                                 "refi-short-term": "For existing properties that need a shorter term bridge loan",
@@ -1574,12 +1574,53 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                                   value={opt.code}
                                   disabled={!opt.active}
                                 >
-                                  <span className="inline-flex items-center gap-1.5">
+                                  <span style={{display:"inline-flex",alignItems:"center",gap:"6px"}}>
                                     <span>{opt.label}{!opt.active ? " — Coming Soon" : ""}</span>
                                     {tip && (
-                                      <span className="relative group inline-flex">
-                                        <span className="w-3.5 h-3.5 rounded-full bg-gray-200 text-gray-500 inline-flex items-center justify-center text-[10px] font-bold cursor-help">i</span>
-                                        <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 w-56 bg-[#0a1f44] text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg whitespace-normal">{tip}</span>
+                                      <span
+                                        className="group"
+                                        style={{position:"relative",display:"inline-flex"}}
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <span
+                                          style={{
+                                            width:"14px",
+                                            height:"14px",
+                                            borderRadius:"50%",
+                                            background:"#0a1f44",
+                                            color:"#ffffff",
+                                            display:"inline-flex",
+                                            alignItems:"center",
+                                            justifyContent:"center",
+                                            fontSize:"10px",
+                                            fontWeight:700,
+                                            cursor:"help",
+                                            fontStyle:"italic",
+                                            fontFamily:"serif"
+                                          }}
+                                        >i</span>
+                                        <span
+                                          className="opacity-0 group-hover:opacity-100"
+                                          style={{
+                                            position:"absolute",
+                                            left:"calc(100% + 8px)",
+                                            top:"50%",
+                                            transform:"translateY(-50%)",
+                                            background:"#0a1f44",
+                                            color:"#ffffff",
+                                            fontSize:"11px",
+                                            lineHeight:"1.4",
+                                            padding:"8px 10px",
+                                            borderRadius:"8px",
+                                            width:"220px",
+                                            pointerEvents:"none",
+                                            transition:"opacity 0.15s",
+                                            boxShadow:"0 4px 12px rgba(0,0,0,0.15)",
+                                            zIndex:9999,
+                                            whiteSpace:"normal",
+                                            fontWeight:500,
+                                          }}
+                                        >{tip}</span>
                                       </span>
                                     )}
                                   </span>
@@ -1817,18 +1858,43 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                   const newLTV        = curVal > 0 && newLoan > 0 ? (newLoan / curVal) * 100 : 0;
                   const newEquity     = Math.max(0, curVal - newLoan);
                   const newDY         = newLoan > 0 && curNOI > 0 ? (curNOI / newLoan) * 100 : 0;
-                  // Use-of-proceeds / Source-of-funds itemizer state
-                  const proceedsItems = asset.useOfProceedsItems || [];
-                  const sourceItems   = asset.sourceOfFundsItems || [];
+                  // CAPMOON_PREMIER_V48_6A4_FIXES_2026_05_17 — Use-of-proceeds / Source-of-funds, redone
+                  // Denominator = FULL new loan (cash-out) or FULL current loan (paydown)
+                  // Auto-seed first row with payoff/proceeds when items array is empty
                   const excess = newLoan - curLoan;
                   const showProceeds = excess > 0;
                   const showSource   = excess < 0;
+                  const proceedsTarget = newLoan;      // full new loan must be allocated
+                  const sourceTarget   = curLoan;       // full current loan must be paid off
+                  const seedProceeds = showProceeds && curLoan > 0
+                    ? [{ id: -1, label: "Payoff of existing loan", amount: formatCurrencyInput(String(Math.round(curLoan))) }]
+                    : [];
+                  const seedSource = showSource && newLoan > 0
+                    ? [{ id: -1, label: "New loan proceeds", amount: formatCurrencyInput(String(Math.round(newLoan))) }]
+                    : [];
+                  const rawProceeds  = asset.useOfProceedsItems || [];
+                  const rawSource    = asset.sourceOfFundsItems || [];
+                  // If the user has not yet started entering items, display the seed as a virtual first row.
+                  const proceedsItems = rawProceeds.length > 0 ? rawProceeds : seedProceeds;
+                  const sourceItems   = rawSource.length   > 0 ? rawSource   : seedSource;
                   const proceedsSum  = proceedsItems.reduce((s, x) => s + parseCurrency(x.amount), 0);
                   const sourceSum    = sourceItems.reduce((s, x) => s + parseCurrency(x.amount), 0);
-                  const proceedsOver = showProceeds && proceedsSum > excess;
-                  const sourceOver   = showSource && sourceSum > Math.abs(excess);
+                  const proceedsOver = showProceeds && proceedsSum > proceedsTarget;
+                  const sourceOver   = showSource && sourceSum > sourceTarget;
+                  // Promote the virtual seed into real state when the user first interacts
+                  const commitSeed = (field: "useOfProceedsItems" | "sourceOfFundsItems") => {
+                    const seed = field === "useOfProceedsItems" ? seedProceeds : seedSource;
+                    if (((asset[field] as any) || []).length === 0 && seed.length > 0) {
+                      upd(field as any, seed.map((it, i) => ({ ...it, id: Date.now() + i })));
+                    }
+                  };
                   const addItem = (field: "useOfProceedsItems" | "sourceOfFundsItems") => {
-                    const cur = (asset[field] || []) as { id: number; label: string; amount: string }[];
+                    let cur = (asset[field] || []) as { id: number; label: string; amount: string }[];
+                    if (cur.length === 0) {
+                      // First click on +: promote the seed AND add a blank row
+                      const seed = field === "useOfProceedsItems" ? seedProceeds : seedSource;
+                      cur = seed.map((it, i) => ({ ...it, id: Date.now() + i }));
+                    }
                     upd(field as any, [...cur, { id: Date.now() + Math.floor(Math.random() * 1000), label: "", amount: "" }]);
                   };
                   const removeItem = (field: "useOfProceedsItems" | "sourceOfFundsItems", id: number) => {
@@ -1836,7 +1902,14 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                     upd(field as any, cur.filter(x => x.id !== id));
                   };
                   const updateItem = (field: "useOfProceedsItems" | "sourceOfFundsItems", id: number, prop: "label" | "amount", value: string) => {
-                    const cur = (asset[field] || []) as { id: number; label: string; amount: string }[];
+                    // If the user is editing a virtual seed row (id === -1), promote real state first
+                    let cur = (asset[field] || []) as { id: number; label: string; amount: string }[];
+                    if (cur.length === 0 && id === -1) {
+                      const seed = field === "useOfProceedsItems" ? seedProceeds : seedSource;
+                      cur = seed.map((it, i) => ({ ...it, id: Date.now() + i }));
+                      upd(field as any, cur.map(x => ({ ...x, [prop]: value })));
+                      return;
+                    }
                     upd(field as any, cur.map(x => x.id === id ? { ...x, [prop]: value } : x));
                   };
                   return (
@@ -1882,15 +1955,15 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                           <div className="flex items-center justify-between">
                             <div>
                               <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Use of Proceeds</div>
-                              <div className="text-xs text-gray-500 mt-0.5">Please itemize the use of proceeds — total should equal {formatCurrencyInput(String(Math.round(excess)))}</div>
+                              <div className="text-xs text-gray-500 mt-0.5">Please itemize the full use of proceeds (including loan payoff) — total should equal {formatCurrencyInput(String(Math.round(proceedsTarget)))}</div>
                             </div>
                             <div className={`text-sm font-bold ${proceedsOver ? "text-red-600" : "text-[#0a1f44]"}`}>
-                              {formatCurrencyInput(String(Math.round(proceedsSum)))} / {formatCurrencyInput(String(Math.round(excess)))}
+                              {formatCurrencyInput(String(Math.round(proceedsSum)))} / {formatCurrencyInput(String(Math.round(proceedsTarget)))}
                             </div>
                           </div>
                           {proceedsOver && (
                             <div className="text-xs font-bold text-red-600 bg-red-100 border border-red-300 rounded-lg p-2">
-                              ⚠️ Itemized total exceeds excess proceeds. Please adjust.
+                              ⚠️ Itemized total exceeds the new loan amount. Please adjust.
                             </div>
                           )}
                           {proceedsItems.map((item, idx) => (
@@ -1909,16 +1982,16 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                         <div className={`rounded-xl border-2 p-4 space-y-3 ${sourceOver ? "border-red-400 bg-red-50" : "border-[#c9a84c]/30 bg-white"}`}>
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Source of Funds for the Deficiency</div>
-                              <div className="text-xs text-gray-500 mt-0.5">Please itemize the additional capital coming in — total should equal {formatCurrencyInput(String(Math.round(Math.abs(excess))))}</div>
+                              <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Source of Funds</div>
+                              <div className="text-xs text-gray-500 mt-0.5">Please itemize the full source of funds (including new loan proceeds) — total should equal {formatCurrencyInput(String(Math.round(sourceTarget)))}</div>
                             </div>
                             <div className={`text-sm font-bold ${sourceOver ? "text-red-600" : "text-[#0a1f44]"}`}>
-                              {formatCurrencyInput(String(Math.round(sourceSum)))} / {formatCurrencyInput(String(Math.round(Math.abs(excess))))}
+                              {formatCurrencyInput(String(Math.round(sourceSum)))} / {formatCurrencyInput(String(Math.round(sourceTarget)))}
                             </div>
                           </div>
                           {sourceOver && (
                             <div className="text-xs font-bold text-red-600 bg-red-100 border border-red-300 rounded-lg p-2">
-                              ⚠️ Itemized total exceeds the deficiency. Please adjust.
+                              ⚠️ Itemized total exceeds the current loan amount. Please adjust.
                             </div>
                           )}
                           {sourceItems.map((item, idx) => (
