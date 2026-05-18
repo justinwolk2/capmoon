@@ -35,6 +35,11 @@ type AssetData = {
   valueAfterConstruction?: string;
   noiAfterConstruction?: string;
   loanAmountGroundup?: string;
+  // CAPMOON_PREMIER_V48_6A4_SHORT_TERM_2026_05_17 — short-term refinance fields
+  desiredLoanTerm?: "1" | "2" | ">2" | "";
+  desiredNewLoanAmount?: string;
+  useOfProceedsItems?: { id: number; label: string; amount: string }[];
+  sourceOfFundsItems?: { id: number; label: string; amount: string }[];
   id: number; ownershipStatus: string; dealType: string; refinanceType: string; assetType: string;
   loanAmount: string; seniorLoanAmount: string; subordinateAmount: string;
   propertyValue: string; purchasePrice: string; currentLoanAmount: string;
@@ -971,8 +976,7 @@ function assetShortLabel(v: string): string {
 const APARTMENT_REFI_DEAL_TYPES = [
   { code: "refi-va-light",          label: "Value-Add (Light)",                                    active: true  },
   { code: "refi-va-new-construct",  label: "Value-Add Ground-Up",                                  active: true  },
-  { code: "refi-new-construct",     label: "New Construction",                                     active: false },
-  { code: "refi-short-term",        label: "Short Term Refinance",                                 active: false },
+  { code: "refi-short-term",        label: "Short Term Refinance",                                 active: true  },
   { code: "refi-perm-rt",           label: "Permanent Refinance - Rate and Term",                  active: false },
   { code: "refi-perm-cashout",      label: "Permanent Refinance - Cash Out / Other Acquisition",   active: false },
   { code: "refi-other",             label: "Other",                                                active: false },
@@ -1061,7 +1065,7 @@ function normalizeRecourse(v: string) { return v === "SELECTIVE" || !v ? "CASE B
 function blankAddress(): AssetAddress { return { street: "", unit: "", city: "", state: "", zip: "" }; }
 function blankAsset(id: number): AssetData {
   // CAPMOON_PREMIER_V43_CLEAR_DEFAULTS_2026_05_11 — assetType default cleared so v4.2 gate actually gates
-  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "", borrowerName: "", landAcquisitionInvolved: "", hardCostsGroundup: "", softCostsGroundup: "", totalBudgetGroundup: "", buildingsAfterConstruction: "", unitsAfterConstruction: "", valueAfterConstruction: "", noiAfterConstruction: "", loanAmountGroundup: "", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dy: "", currentRate: "", arvValue: "", stabilizedNoi: "", constructionBudget: "", purchaseYear: String(new Date().getFullYear()), fullyEntitled: undefined, currentPropertyValue: "", additionalEquity: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
+  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "", borrowerName: "", landAcquisitionInvolved: "", hardCostsGroundup: "", softCostsGroundup: "", totalBudgetGroundup: "", buildingsAfterConstruction: "", unitsAfterConstruction: "", valueAfterConstruction: "", noiAfterConstruction: "", loanAmountGroundup: "", desiredLoanTerm: "", desiredNewLoanAmount: "", useOfProceedsItems: [], sourceOfFundsItems: [], loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dy: "", currentRate: "", arvValue: "", stabilizedNoi: "", constructionBudget: "", purchaseYear: String(new Date().getFullYear()), fullyEntitled: undefined, currentPropertyValue: "", additionalEquity: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
 }
 function blankLenderForm(): NewLenderForm {
   return { programName: "", contactPerson: "", email: "", phone: "", website: "", typeOfLenders: [], typeOfLoans: [], programTypes: [], propertyTypes: [], loanTerms: [], notes: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalTypes: [], capitalTypePrograms: [], contacts: [], status: "Active" };
@@ -1557,15 +1561,31 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                             <SelectValue placeholder="Choose deal type…" />
                           </SelectTrigger>
                           <SelectContent>
-                            {APARTMENT_REFI_DEAL_TYPES.map((opt) => (
-                              <SelectItem
-                                key={opt.code}
-                                value={opt.code}
-                                disabled={!opt.active}
-                              >
-                                {opt.label}{!opt.active ? " — Coming Soon" : ""}
-                              </SelectItem>
-                            ))}
+                            {APARTMENT_REFI_DEAL_TYPES.map((opt) => {
+                              // CAPMOON_PREMIER_V48_6A4_SHORT_TERM_2026_05_17 — option tooltips
+                              const tooltipMap: Record<string, string> = {
+                                "refi-va-new-construct": "For existing properties that will either be knocked down or add new buildings",
+                                "refi-short-term": "For existing properties that need a shorter term bridge loan",
+                              };
+                              const tip = tooltipMap[opt.code];
+                              return (
+                                <SelectItem
+                                  key={opt.code}
+                                  value={opt.code}
+                                  disabled={!opt.active}
+                                >
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <span>{opt.label}{!opt.active ? " — Coming Soon" : ""}</span>
+                                    {tip && (
+                                      <span className="relative group inline-flex">
+                                        <span className="w-3.5 h-3.5 rounded-full bg-gray-200 text-gray-500 inline-flex items-center justify-center text-[10px] font-bold cursor-help">i</span>
+                                        <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 w-56 bg-[#0a1f44] text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg whitespace-normal">{tip}</span>
+                                      </span>
+                                    )}
+                                  </span>
+                                </SelectItem>
+                              );
+                            })}
                           </SelectContent>
                         </Select>
                       </div>
@@ -1784,6 +1804,151 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                   );
                 })()}
 
+                {/* CAPMOON_PREMIER_V48_6A4_SHORT_TERM_2026_05_17 — 6-a-4 form: Refinance + Short Term Refinance */}
+                {asset.ownershipStatus === "Refinance" && asset.apartmentDealType === "refi-short-term" && (() => {
+                  const curVal     = parseCurrency(asset.propertyValue || "");
+                  const curLoan    = parseCurrency(asset.currentLoanAmount || "");
+                  const curNOI     = parseCurrency(asset.currentNetIncome || "");
+                  const newLoan    = parseCurrency(asset.desiredNewLoanAmount || "");
+                  const currentLTV    = curVal > 0 && curLoan > 0 ? (curLoan / curVal) * 100 : 0;
+                  const currentDY     = curLoan > 0 && curNOI > 0 ? (curNOI / curLoan) * 100 : 0;
+                  const currentEquity = Math.max(0, curVal - curLoan);
+                  const currentCap    = curVal > 0 && curNOI > 0 ? (curNOI / curVal) * 100 : 0;
+                  const newLTV        = curVal > 0 && newLoan > 0 ? (newLoan / curVal) * 100 : 0;
+                  const newEquity     = Math.max(0, curVal - newLoan);
+                  const newDY         = newLoan > 0 && curNOI > 0 ? (curNOI / newLoan) * 100 : 0;
+                  // Use-of-proceeds / Source-of-funds itemizer state
+                  const proceedsItems = asset.useOfProceedsItems || [];
+                  const sourceItems   = asset.sourceOfFundsItems || [];
+                  const excess = newLoan - curLoan;
+                  const showProceeds = excess > 0;
+                  const showSource   = excess < 0;
+                  const proceedsSum  = proceedsItems.reduce((s, x) => s + parseCurrency(x.amount), 0);
+                  const sourceSum    = sourceItems.reduce((s, x) => s + parseCurrency(x.amount), 0);
+                  const proceedsOver = showProceeds && proceedsSum > excess;
+                  const sourceOver   = showSource && sourceSum > Math.abs(excess);
+                  const addItem = (field: "useOfProceedsItems" | "sourceOfFundsItems") => {
+                    const cur = (asset[field] || []) as { id: number; label: string; amount: string }[];
+                    upd(field as any, [...cur, { id: Date.now() + Math.floor(Math.random() * 1000), label: "", amount: "" }]);
+                  };
+                  const removeItem = (field: "useOfProceedsItems" | "sourceOfFundsItems", id: number) => {
+                    const cur = (asset[field] || []) as { id: number; label: string; amount: string }[];
+                    upd(field as any, cur.filter(x => x.id !== id));
+                  };
+                  const updateItem = (field: "useOfProceedsItems" | "sourceOfFundsItems", id: number, prop: "label" | "amount", value: string) => {
+                    const cur = (asset[field] || []) as { id: number; label: string; amount: string }[];
+                    upd(field as any, cur.map(x => x.id === id ? { ...x, [prop]: value } : x));
+                  };
+                  return (
+                    <div className="md:col-span-2 rounded-xl border border-[#c9a84c]/40 bg-[#c9a84c]/5 p-4 space-y-4 mt-2">
+                      <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Apartment Details</div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Current Units</label><Input value={asset.numUnits} onChange={(e) => upd("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Current Buildings</label><Input value={asset.numBuildings} onChange={(e) => upd("numBuildings", e.target.value)} placeholder="e.g. 4" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Property Appraised Value (As-Is)</label><Input value={asset.propertyValue} onChange={(e) => upd("propertyValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current NOI (Annual)</label><Input value={asset.currentNetIncome || ""} onChange={(e) => upd("currentNetIncome", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                      </div>
+
+                      {/* Desired Loan Term — 3 button group */}
+                      <div>
+                        <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Desired Loan Term</label>
+                        <div className="grid grid-cols-3 gap-3 max-w-xl">
+                          {([
+                            ["1", "1 Year"],
+                            ["2", "2 Years"],
+                            [">2", "More Than 2 Years"],
+                          ] as const).map(([code, lbl]) => (
+                            <button
+                              key={code}
+                              type="button"
+                              onClick={() => upd("desiredLoanTerm", code)}
+                              className={`p-3 rounded-xl border-2 text-center font-bold text-sm transition-all ${asset.desiredLoanTerm === code ? "border-[#0a1f44] bg-[#0a1f44]/5 text-[#0a1f44]" : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30"}`}
+                            >
+                              {lbl}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Loan Amount (if any)</label><Input value={asset.currentLoanAmount || ""} onChange={(e) => upd("currentLoanAmount", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Desired New Loan Amount</label><Input value={asset.desiredNewLoanAmount || ""} onChange={(e) => upd("desiredNewLoanAmount", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                      </div>
+
+                      {/* Use-of-proceeds (when new > current) */}
+                      {showProceeds && (
+                        <div className={`rounded-xl border-2 p-4 space-y-3 ${proceedsOver ? "border-red-400 bg-red-50" : "border-[#c9a84c]/30 bg-white"}`}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Use of Proceeds</div>
+                              <div className="text-xs text-gray-500 mt-0.5">Please itemize the use of proceeds — total should equal {formatCurrencyInput(String(Math.round(excess)))}</div>
+                            </div>
+                            <div className={`text-sm font-bold ${proceedsOver ? "text-red-600" : "text-[#0a1f44]"}`}>
+                              {formatCurrencyInput(String(Math.round(proceedsSum)))} / {formatCurrencyInput(String(Math.round(excess)))}
+                            </div>
+                          </div>
+                          {proceedsOver && (
+                            <div className="text-xs font-bold text-red-600 bg-red-100 border border-red-300 rounded-lg p-2">
+                              ⚠️ Itemized total exceeds excess proceeds. Please adjust.
+                            </div>
+                          )}
+                          {proceedsItems.map((item, idx) => (
+                            <div key={item.id} className="grid grid-cols-[1fr_180px_auto] gap-2 items-center">
+                              <Input value={item.label} onChange={(e) => updateItem("useOfProceedsItems", item.id, "label", e.target.value)} placeholder={`Item ${idx + 1} (e.g. Renovation reserve)`} className={inputClass} />
+                              <Input value={item.amount} onChange={(e) => updateItem("useOfProceedsItems", item.id, "amount", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} />
+                              <button type="button" onClick={() => removeItem("useOfProceedsItems", item.id)} className="px-3 py-2 text-xs border border-red-200 text-red-500 rounded-lg hover:bg-red-50">−</button>
+                            </div>
+                          ))}
+                          <button type="button" onClick={() => addItem("useOfProceedsItems")} className="text-xs font-semibold text-[#0a1f44] hover:underline">+ Add Item</button>
+                        </div>
+                      )}
+
+                      {/* Source-of-funds (when new < current) */}
+                      {showSource && (
+                        <div className={`rounded-xl border-2 p-4 space-y-3 ${sourceOver ? "border-red-400 bg-red-50" : "border-[#c9a84c]/30 bg-white"}`}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Source of Funds for the Deficiency</div>
+                              <div className="text-xs text-gray-500 mt-0.5">Please itemize the additional capital coming in — total should equal {formatCurrencyInput(String(Math.round(Math.abs(excess))))}</div>
+                            </div>
+                            <div className={`text-sm font-bold ${sourceOver ? "text-red-600" : "text-[#0a1f44]"}`}>
+                              {formatCurrencyInput(String(Math.round(sourceSum)))} / {formatCurrencyInput(String(Math.round(Math.abs(excess))))}
+                            </div>
+                          </div>
+                          {sourceOver && (
+                            <div className="text-xs font-bold text-red-600 bg-red-100 border border-red-300 rounded-lg p-2">
+                              ⚠️ Itemized total exceeds the deficiency. Please adjust.
+                            </div>
+                          )}
+                          {sourceItems.map((item, idx) => (
+                            <div key={item.id} className="grid grid-cols-[1fr_180px_auto] gap-2 items-center">
+                              <Input value={item.label} onChange={(e) => updateItem("sourceOfFundsItems", item.id, "label", e.target.value)} placeholder={`Item ${idx + 1} (e.g. Sponsor cash equity)`} className={inputClass} />
+                              <Input value={item.amount} onChange={(e) => updateItem("sourceOfFundsItems", item.id, "amount", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} />
+                              <button type="button" onClick={() => removeItem("sourceOfFundsItems", item.id)} className="px-3 py-2 text-xs border border-red-200 text-red-500 rounded-lg hover:bg-red-50">−</button>
+                            </div>
+                          ))}
+                          <button type="button" onClick={() => addItem("sourceOfFundsItems")} className="text-xs font-semibold text-[#0a1f44] hover:underline">+ Add Item</button>
+                        </div>
+                      )}
+
+                      {/* Gold tile row — 7 boxes */}
+                      {(curVal > 0 || curLoan > 0 || curNOI > 0 || newLoan > 0) && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-4 border-t border-[#c9a84c]/20">
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current LTV</div><div className="text-sm font-bold text-[#0a1f44]">{currentLTV > 0 ? currentLTV.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current DY</div><div className="text-sm font-bold text-[#0a1f44]">{currentDY > 0 ? currentDY.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current Equity</div><div className="text-sm font-bold text-[#0a1f44]">{currentEquity > 0 ? "$" + (currentEquity / 1000000).toFixed(2) + "M" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current Cap Rate</div><div className="text-sm font-bold text-[#0a1f44]">{currentCap > 0 ? currentCap.toFixed(2) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New LTV</div><div className="text-sm font-bold text-[#0a1f44]">{newLTV > 0 ? newLTV.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New Equity</div><div className="text-sm font-bold text-[#0a1f44]">{newEquity > 0 ? "$" + (newEquity / 1000000).toFixed(2) + "M" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New DY</div><div className="text-sm font-bold text-[#0a1f44]">{newDY > 0 ? newDY.toFixed(1) + "%" : "—"}</div></div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+
               </>
             )}
           </>
@@ -1914,7 +2079,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
         );
       })()}
       {/* CAPMOON_PREMIER_V46_DEAL_TYPE_GATE_2026_05_11 — gate ALL generic fields behind Deal Type being picked + bespoke suppression */}
-      {asset.assetType && ((asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance") ? !!asset.apartmentDealType : !!asset.dealType) && !(asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" && (asset.apartmentDealType === "refi-va-light" || asset.apartmentDealType === "refi-va-new-construct")) && (<>
+      {asset.assetType && ((asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance") ? !!asset.apartmentDealType : !!asset.dealType) && !(asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" && (asset.apartmentDealType === "refi-va-light" || asset.apartmentDealType === "refi-va-new-construct" || asset.apartmentDealType === "refi-short-term")) && (<>
       {showUnits && (<><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Units</label><Input value={asset.numUnits} onChange={(e) => upd("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Buildings</label><Input value={asset.numBuildings} onChange={(e) => upd("numBuildings", e.target.value)} placeholder="e.g. 4" className={inputClass} /></div></>)}
       {showAcres && (<div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Acres</label><Input value={asset.numAcres} onChange={(e) => upd("numAcres", e.target.value)} placeholder="e.g. 12.5" className={inputClass} /></div>)}
       {showRetail && (
@@ -4123,9 +4288,11 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                       <div className="grid grid-cols-2 gap-2">
                         {(() => {
                           // CAPMOON_PREMIER_V48_6A3_GROUND_UP_V4_2026_05_17 — ground-up reads from valueAfterConstruction + loanAmountGroundup
-                          const isGroundup = asset.apartmentDealType === "refi-va-new-construct";
-                          const loanAmtRaw = isGroundup ? (asset.loanAmountGroundup || "") : (asset.loanAmount || "");
-                          const arvRaw     = isGroundup ? (asset.valueAfterConstruction || "") : (asset.arvValue || "");
+                          // CAPMOON_PREMIER_V48_6A4_SHORT_TERM_2026_05_17 — short-term refi reads from desiredNewLoanAmount + propertyValue (current)
+                          const isGroundup  = asset.apartmentDealType === "refi-va-new-construct";
+                          const isShortTerm = asset.apartmentDealType === "refi-short-term";
+                          const loanAmtRaw = isShortTerm ? (asset.desiredNewLoanAmount || "") : isGroundup ? (asset.loanAmountGroundup || "") : (asset.loanAmount || "");
+                          const arvRaw     = isShortTerm ? (asset.propertyValue || "") : isGroundup ? (asset.valueAfterConstruction || "") : (asset.arvValue || "");
                           const loanAmt = parseCurrency(loanAmtRaw);
                           const arv = parseCurrency(arvRaw);
                           const arLtv = arv > 0 && loanAmt > 0 ? (loanAmt / arv) * 100 : 0;
