@@ -4504,7 +4504,14 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                 const weightedLiq = guarantors.reduce((sum, g) => sum + parseCurrency(g.liquidNetWorth)  * ((parseFloat(g.guarantyPct) || 0) / 100), 0);
 
                 // Total loan amount across all assets in the deal
-                const totalLoanAmount = assets.reduce((sum, a) => sum + parseCurrency(a.loanAmount), 0);
+                // CAPMOON_PREMIER_V48_STEP4_GUARANTOR_DENOM_2026_05_17 — pick the right loan field per asset based on dealType
+                const totalLoanAmount = assets.reduce((sum, a) => {
+                  const code = a.apartmentDealType;
+                  const loanRaw = code === "refi-va-new-construct" ? (a.loanAmountGroundup || "")
+                              : code === "refi-short-term"       ? (a.desiredNewLoanAmount || "")
+                              : (a.loanAmount || "");
+                  return sum + parseCurrency(loanRaw);
+                }, 0);
 
                 const totalLiqPct = totalNW > 0 ? (totalLiq / totalNW) * 100 : 0;
                 const nwToLoan    = totalLoanAmount > 0 ? weightedNW  / totalLoanAmount : 0;
