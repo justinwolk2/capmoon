@@ -40,6 +40,9 @@ type AssetData = {
   desiredNewLoanAmount?: string;
   useOfProceedsItems?: { id: number; label: string; amount: string }[];
   sourceOfFundsItems?: { id: number; label: string; amount: string }[];
+  // CAPMOON_PREMIER_V48_6A5_PERM_RT_2026_05_17 — perm-rt fields
+  desiredLoanTermPermRT?: "3" | "5" | "7" | "10" | "15" | "20" | "25" | "30" | "35" | "other" | "";
+  customLoanTermPermRT?: string;
   id: number; ownershipStatus: string; dealType: string; refinanceType: string; assetType: string;
   loanAmount: string; seniorLoanAmount: string; subordinateAmount: string;
   propertyValue: string; purchasePrice: string; currentLoanAmount: string;
@@ -977,7 +980,7 @@ const APARTMENT_REFI_DEAL_TYPES = [
   { code: "refi-va-light",          label: "Value-Add (Light)",                                    active: true  },
   { code: "refi-va-new-construct",  label: "Value-Add Ground-Up",                                  active: true  },
   { code: "refi-short-term",        label: "Short Term Refinance",                                 active: true  },
-  { code: "refi-perm-rt",           label: "Permanent Refinance - Rate and Term",                  active: false },
+  { code: "refi-perm-rt",           label: "Permanent Refinance - Rate and Term",                  active: true  },
   { code: "refi-perm-cashout",      label: "Permanent Refinance - Cash Out / Other Acquisition",   active: false },
   { code: "refi-other",             label: "Other",                                                active: false },
 ];
@@ -1065,7 +1068,7 @@ function normalizeRecourse(v: string) { return v === "SELECTIVE" || !v ? "CASE B
 function blankAddress(): AssetAddress { return { street: "", unit: "", city: "", state: "", zip: "" }; }
 function blankAsset(id: number): AssetData {
   // CAPMOON_PREMIER_V43_CLEAR_DEFAULTS_2026_05_11 — assetType default cleared so v4.2 gate actually gates
-  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "", borrowerName: "", landAcquisitionInvolved: "", hardCostsGroundup: "", softCostsGroundup: "", totalBudgetGroundup: "", buildingsAfterConstruction: "", unitsAfterConstruction: "", valueAfterConstruction: "", noiAfterConstruction: "", loanAmountGroundup: "", desiredLoanTerm: "", desiredNewLoanAmount: "", useOfProceedsItems: [], sourceOfFundsItems: [], loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dy: "", currentRate: "", arvValue: "", stabilizedNoi: "", constructionBudget: "", purchaseYear: String(new Date().getFullYear()), fullyEntitled: undefined, currentPropertyValue: "", additionalEquity: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
+  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "", borrowerName: "", landAcquisitionInvolved: "", hardCostsGroundup: "", softCostsGroundup: "", totalBudgetGroundup: "", buildingsAfterConstruction: "", unitsAfterConstruction: "", valueAfterConstruction: "", noiAfterConstruction: "", loanAmountGroundup: "", desiredLoanTerm: "", desiredNewLoanAmount: "", useOfProceedsItems: [], sourceOfFundsItems: [], desiredLoanTermPermRT: "", customLoanTermPermRT: "", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dy: "", currentRate: "", arvValue: "", stabilizedNoi: "", constructionBudget: "", purchaseYear: String(new Date().getFullYear()), fullyEntitled: undefined, currentPropertyValue: "", additionalEquity: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
 }
 function blankLenderForm(): NewLenderForm {
   return { programName: "", contactPerson: "", email: "", phone: "", website: "", typeOfLenders: [], typeOfLoans: [], programTypes: [], propertyTypes: [], loanTerms: [], notes: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalTypes: [], capitalTypePrograms: [], contacts: [], status: "Active" };
@@ -1566,6 +1569,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                               const tooltipMap: Record<string, string> = {
                                 "refi-va-new-construct": "For existing properties that will either be knocked down or add new buildings",
                                 "refi-short-term": "For existing properties that need a shorter term bridge loan",
+                                "refi-perm-rt": "For existing properties that need permanent financing with no cash out component",
                               };
                               const tip = tooltipMap[opt.code];
                               return (
@@ -2021,6 +2025,157 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                   );
                 })()}
 
+                {/* CAPMOON_PREMIER_V48_6A5_PERM_RT_2026_05_17 — 6-a-5 form: Refinance + Permanent Rate and Term */}
+                {asset.ownershipStatus === "Refinance" && asset.apartmentDealType === "refi-perm-rt" && (() => {
+                  const curVal     = parseCurrency(asset.propertyValue || "");
+                  const curLoan    = parseCurrency(asset.currentLoanAmount || "");
+                  const curNOI     = parseCurrency(asset.currentNetIncome || "");
+                  // Auto-compute new loan = current * 1.025 (covers 2.5% closing costs)
+                  const autoNewLoan = curLoan * 1.025;
+                  const displayNewLoan = asset.desiredNewLoanAmount || (autoNewLoan > 0 ? formatCurrencyInput(String(Math.round(autoNewLoan))) : "");
+                  const newLoan = parseCurrency(displayNewLoan);
+                  const currentLTV    = curVal > 0 && curLoan > 0 ? (curLoan / curVal) * 100 : 0;
+                  const currentDY     = curLoan > 0 && curNOI > 0 ? (curNOI / curLoan) * 100 : 0;
+                  const currentEquity = Math.max(0, curVal - curLoan);
+                  const currentCap    = curVal > 0 && curNOI > 0 ? (curNOI / curVal) * 100 : 0;
+                  const newLTV        = curVal > 0 && newLoan > 0 ? (newLoan / curVal) * 100 : 0;
+                  const newEquity     = Math.max(0, curVal - newLoan);
+                  const newDY         = newLoan > 0 && curNOI > 0 ? (curNOI / newLoan) * 100 : 0;
+                  const excess = newLoan - curLoan;  // always positive when curLoan > 0 (102.5% rule)
+                  const showProceeds = excess > 0 && curLoan > 0;
+                  const proceedsTarget = newLoan;
+                  // Two-row auto-seed: payoff + closing costs (2.5% of current loan)
+                  const closingCosts = curLoan * 0.025;
+                  const seedProceeds = showProceeds
+                    ? [
+                        { id: -1, label: "Payoff of existing loan", amount: formatCurrencyInput(String(Math.round(curLoan))) },
+                        { id: -2, label: "Closing costs and fees", amount: formatCurrencyInput(String(Math.round(closingCosts))) },
+                      ]
+                    : [];
+                  const rawProceeds  = asset.useOfProceedsItems || [];
+                  const proceedsItems = rawProceeds.length > 0 ? rawProceeds : seedProceeds;
+                  const proceedsSum  = proceedsItems.reduce((s, x) => s + parseCurrency(x.amount), 0);
+                  const proceedsOver = showProceeds && proceedsSum > proceedsTarget;
+                  const addItem = () => {
+                    let cur = (asset.useOfProceedsItems || []) as { id: number; label: string; amount: string }[];
+                    if (cur.length === 0) {
+                      cur = seedProceeds.map((it, idx) => ({ ...it, id: Date.now() + idx }));
+                    }
+                    upd("useOfProceedsItems" as any, [...cur, { id: Date.now() + Math.floor(Math.random() * 1000), label: "", amount: "" }]);
+                  };
+                  const removeItem = (id: number) => {
+                    let cur = (asset.useOfProceedsItems || []) as { id: number; label: string; amount: string }[];
+                    if (cur.length === 0) {
+                      cur = seedProceeds.map((it, idx) => ({ ...it, id: Date.now() + idx }));
+                    }
+                    upd("useOfProceedsItems" as any, cur.filter(x => x.id !== id));
+                  };
+                  const updateItem = (id: number, prop: "label" | "amount", value: string) => {
+                    let cur = (asset.useOfProceedsItems || []) as { id: number; label: string; amount: string }[];
+                    if (cur.length === 0) {
+                      cur = seedProceeds.map((it, idx) => ({ ...it, id: Date.now() + idx }));
+                      const targetSeedIndex = id === -1 ? 0 : id === -2 ? 1 : -1;
+                      if (targetSeedIndex >= 0) {
+                        cur[targetSeedIndex] = { ...cur[targetSeedIndex], [prop]: value };
+                        upd("useOfProceedsItems" as any, cur);
+                        return;
+                      }
+                    }
+                    upd("useOfProceedsItems" as any, cur.map(x => x.id === id ? { ...x, [prop]: value } : x));
+                  };
+                  return (
+                    <div className="md:col-span-2 rounded-xl border border-[#c9a84c]/40 bg-[#c9a84c]/5 p-4 space-y-4 mt-2">
+                      <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Apartment Details</div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Current Units</label><Input value={asset.numUnits} onChange={(e) => upd("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Current Buildings</label><Input value={asset.numBuildings} onChange={(e) => upd("numBuildings", e.target.value)} placeholder="e.g. 4" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Property Appraised Value (As-Is)</label><Input value={asset.propertyValue} onChange={(e) => upd("propertyValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current NOI (Annual)</label><Input value={asset.currentNetIncome || ""} onChange={(e) => upd("currentNetIncome", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                      </div>
+
+                      {/* Desired Loan Term — pulldown with 9 options + Other */}
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Desired Loan Term</label>
+                          <Select value={asset.desiredLoanTermPermRT || ""} onValueChange={(v) => upd("desiredLoanTermPermRT", v)}>
+                            <SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Pick a term..." /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="3">3 Years</SelectItem>
+                              <SelectItem value="5">5 Years</SelectItem>
+                              <SelectItem value="7">7 Years</SelectItem>
+                              <SelectItem value="10">10 Years</SelectItem>
+                              <SelectItem value="15">15 Years</SelectItem>
+                              <SelectItem value="20">20 Years</SelectItem>
+                              <SelectItem value="25">25 Years</SelectItem>
+                              <SelectItem value="30">30 Years</SelectItem>
+                              <SelectItem value="35">35 Years</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {asset.desiredLoanTermPermRT === "other" && (
+                          <div>
+                            <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Specify Custom Term</label>
+                            <Input value={asset.customLoanTermPermRT || ""} onChange={(e) => upd("customLoanTermPermRT", e.target.value)} placeholder="e.g. 12 years" className={inputClass} />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Current Loan Amount (if any)</label><Input value={asset.currentLoanAmount || ""} onChange={(e) => upd("currentLoanAmount", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Desired New Loan Amount</label>
+                          <Input value={displayNewLoan} onChange={(e) => upd("desiredNewLoanAmount", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} />
+                          <div className="text-xs text-gray-400 mt-1">Auto-fills to Current Loan × 1.025 (covers 2.5% closing costs). Edit as needed.</div>
+                        </div>
+                      </div>
+
+                      {/* Use of Proceeds — 2 auto-seeded rows */}
+                      {showProceeds && (
+                        <div className={`rounded-xl border-2 p-4 space-y-3 ${proceedsOver ? "border-red-400 bg-red-50" : "border-[#c9a84c]/30 bg-white"}`}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Use of Proceeds</div>
+                              <div className="text-xs text-gray-500 mt-0.5">Pre-filled with loan payoff + 2.5% closing costs — total should equal {formatCurrencyInput(String(Math.round(proceedsTarget)))}</div>
+                            </div>
+                            <div className={`text-sm font-bold ${proceedsOver ? "text-red-600" : "text-[#0a1f44]"}`}>
+                              {formatCurrencyInput(String(Math.round(proceedsSum)))} / {formatCurrencyInput(String(Math.round(proceedsTarget)))}
+                            </div>
+                          </div>
+                          {proceedsOver && (
+                            <div className="text-xs font-bold text-red-600 bg-red-100 border border-red-300 rounded-lg p-2">
+                              ⚠️ Itemized total exceeds the new loan amount. Please adjust.
+                            </div>
+                          )}
+                          {proceedsItems.map((item, idx) => (
+                            <div key={item.id} className="grid grid-cols-[1fr_180px_auto] gap-2 items-center">
+                              <Input value={item.label} onChange={(e) => updateItem(item.id, "label", e.target.value)} placeholder={`Item ${idx + 1}`} className={inputClass} />
+                              <Input value={item.amount} onChange={(e) => updateItem(item.id, "amount", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} />
+                              <button type="button" onClick={() => removeItem(item.id)} className="px-3 py-2 text-xs border border-red-200 text-red-500 rounded-lg hover:bg-red-50">−</button>
+                            </div>
+                          ))}
+                          <button type="button" onClick={addItem} className="text-xs font-semibold text-[#0a1f44] hover:underline">+ Add Item</button>
+                        </div>
+                      )}
+
+                      {/* Gold tile row — 7 boxes */}
+                      {(curVal > 0 || curLoan > 0 || curNOI > 0 || newLoan > 0) && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-4 border-t border-[#c9a84c]/20">
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current LTV</div><div className="text-sm font-bold text-[#0a1f44]">{currentLTV > 0 ? currentLTV.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current DY</div><div className="text-sm font-bold text-[#0a1f44]">{currentDY > 0 ? currentDY.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current Equity</div><div className="text-sm font-bold text-[#0a1f44]">{currentEquity > 0 ? "$" + (currentEquity / 1000000).toFixed(2) + "M" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Current Cap Rate</div><div className="text-sm font-bold text-[#0a1f44]">{currentCap > 0 ? currentCap.toFixed(2) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New LTV</div><div className="text-sm font-bold text-[#0a1f44]">{newLTV > 0 ? newLTV.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New Equity</div><div className="text-sm font-bold text-[#0a1f44]">{newEquity > 0 ? "$" + (newEquity / 1000000).toFixed(2) + "M" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New DY</div><div className="text-sm font-bold text-[#0a1f44]">{newDY > 0 ? newDY.toFixed(1) + "%" : "—"}</div></div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+
 
               </>
             )}
@@ -2152,7 +2307,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
         );
       })()}
       {/* CAPMOON_PREMIER_V46_DEAL_TYPE_GATE_2026_05_11 — gate ALL generic fields behind Deal Type being picked + bespoke suppression */}
-      {asset.assetType && ((asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance") ? !!asset.apartmentDealType : !!asset.dealType) && !(asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" && (asset.apartmentDealType === "refi-va-light" || asset.apartmentDealType === "refi-va-new-construct" || asset.apartmentDealType === "refi-short-term")) && (<>
+      {asset.assetType && ((asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance") ? !!asset.apartmentDealType : !!asset.dealType) && !(asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" && (asset.apartmentDealType === "refi-va-light" || asset.apartmentDealType === "refi-va-new-construct" || asset.apartmentDealType === "refi-short-term" || asset.apartmentDealType === "refi-perm-rt")) && (<>
       {showUnits && (<><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Units</label><Input value={asset.numUnits} onChange={(e) => upd("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div><div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Buildings</label><Input value={asset.numBuildings} onChange={(e) => upd("numBuildings", e.target.value)} placeholder="e.g. 4" className={inputClass} /></div></>)}
       {showAcres && (<div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Acres</label><Input value={asset.numAcres} onChange={(e) => upd("numAcres", e.target.value)} placeholder="e.g. 12.5" className={inputClass} /></div>)}
       {showRetail && (
@@ -4362,10 +4517,13 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                         {(() => {
                           // CAPMOON_PREMIER_V48_6A3_GROUND_UP_V4_2026_05_17 — ground-up reads from valueAfterConstruction + loanAmountGroundup
                           // CAPMOON_PREMIER_V48_6A4_SHORT_TERM_2026_05_17 — short-term refi reads from desiredNewLoanAmount + propertyValue (current)
+                          // CAPMOON_PREMIER_V48_6A5_PERM_RT_2026_05_17 — perm-rt reads same shape as short-term (desiredNewLoanAmount + propertyValue)
                           const isGroundup  = asset.apartmentDealType === "refi-va-new-construct";
                           const isShortTerm = asset.apartmentDealType === "refi-short-term";
-                          const loanAmtRaw = isShortTerm ? (asset.desiredNewLoanAmount || "") : isGroundup ? (asset.loanAmountGroundup || "") : (asset.loanAmount || "");
-                          const arvRaw     = isShortTerm ? (asset.propertyValue || "") : isGroundup ? (asset.valueAfterConstruction || "") : (asset.arvValue || "");
+                          const isPermRT    = asset.apartmentDealType === "refi-perm-rt";
+                          const usesNewLoan = isShortTerm || isPermRT;
+                          const loanAmtRaw = usesNewLoan ? (asset.desiredNewLoanAmount || "") : isGroundup ? (asset.loanAmountGroundup || "") : (asset.loanAmount || "");
+                          const arvRaw     = usesNewLoan ? (asset.propertyValue || "") : isGroundup ? (asset.valueAfterConstruction || "") : (asset.arvValue || "");
                           const loanAmt = parseCurrency(loanAmtRaw);
                           const arv = parseCurrency(arvRaw);
                           const arLtv = arv > 0 && loanAmt > 0 ? (loanAmt / arv) * 100 : 0;
@@ -4509,6 +4667,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   const code = a.apartmentDealType;
                   const loanRaw = code === "refi-va-new-construct" ? (a.loanAmountGroundup || "")
                               : code === "refi-short-term"       ? (a.desiredNewLoanAmount || "")
+                              : code === "refi-perm-rt"          ? (a.desiredNewLoanAmount || "")
                               : (a.loanAmount || "");
                   return sum + parseCurrency(loanRaw);
                 }, 0);
