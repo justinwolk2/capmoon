@@ -1556,8 +1556,38 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                         <Select
                           value={asset.apartmentDealType || ""}
                           onValueChange={(v) => {
+                            // CAPMOON_PREMIER_V48_DEALTYPE_RESET_2026_05_17 — clear deal-type-specific fields on a real change
                             const opt = APARTMENT_REFI_DEAL_TYPES.find((o) => o.code === v);
-                            if (opt && opt.active) upd("apartmentDealType" as any, v);
+                            if (!opt || !opt.active) return;
+                            const prev = asset.apartmentDealType;
+                            // Always set the new code; if a different code was previously selected, also reset bespoke fields
+                            if (prev && prev !== v) {
+                              const resets: Record<string, any> = {
+                                apartmentDealType: v,
+                                // 6-a-3 fields
+                                landAcquisitionInvolved: "",
+                                hardCostsGroundup: "",
+                                softCostsGroundup: "",
+                                totalBudgetGroundup: "",
+                                buildingsAfterConstruction: "",
+                                unitsAfterConstruction: "",
+                                valueAfterConstruction: "",
+                                noiAfterConstruction: "",
+                                loanAmountGroundup: "",
+                                // 6-a-4 fields
+                                desiredLoanTerm: "",
+                                // 6-a-5 fields
+                                desiredLoanTermPermRT: "",
+                                customLoanTermPermRT: "",
+                                // shared cross-bespoke fields (proceeds + new loan)
+                                desiredNewLoanAmount: "",
+                                useOfProceedsItems: [],
+                                sourceOfFundsItems: [],
+                              };
+                              Object.entries(resets).forEach(([k, val]) => upd(k as any, val));
+                            } else {
+                              upd("apartmentDealType" as any, v);
+                            }
                           }}
                         >
                           <SelectTrigger className={selectTriggerClass}>
