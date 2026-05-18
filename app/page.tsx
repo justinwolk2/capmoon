@@ -2034,6 +2034,11 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                   const autoNewLoan = curLoan * 1.025;
                   const displayNewLoan = asset.desiredNewLoanAmount || (autoNewLoan > 0 ? formatCurrencyInput(String(Math.round(autoNewLoan))) : "");
                   const newLoan = parseCurrency(displayNewLoan);
+                  // CAPMOON_PREMIER_V48_6A5_STEP4_FIXES_2026_05_17 — eagerly persist the auto-computed value so Step 4 + guarantor rollup tiles see it
+                  if (!asset.desiredNewLoanAmount && autoNewLoan > 0) {
+                    // queue an update for after render — avoids the render-write antipattern that React catches
+                    Promise.resolve().then(() => upd("desiredNewLoanAmount", formatCurrencyInput(String(Math.round(autoNewLoan)))));
+                  }
                   const currentLTV    = curVal > 0 && curLoan > 0 ? (curLoan / curVal) * 100 : 0;
                   const currentDY     = curLoan > 0 && curNOI > 0 ? (curNOI / curLoan) * 100 : 0;
                   const currentEquity = Math.max(0, curVal - curLoan);
@@ -4518,6 +4523,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                           // CAPMOON_PREMIER_V48_6A3_GROUND_UP_V4_2026_05_17 — ground-up reads from valueAfterConstruction + loanAmountGroundup
                           // CAPMOON_PREMIER_V48_6A4_SHORT_TERM_2026_05_17 — short-term refi reads from desiredNewLoanAmount + propertyValue (current)
                           // CAPMOON_PREMIER_V48_6A5_PERM_RT_2026_05_17 — perm-rt reads same shape as short-term (desiredNewLoanAmount + propertyValue)
+                          // CAPMOON_PREMIER_V48_6A5_STEP4_FIXES_2026_05_17 — short-term + perm-rt use "LTV" + "Current Property Value", ground-up uses "AR LTV" + "AR Property Value"
                           const isGroundup  = asset.apartmentDealType === "refi-va-new-construct";
                           const isShortTerm = asset.apartmentDealType === "refi-short-term";
                           const isPermRT    = asset.apartmentDealType === "refi-perm-rt";
@@ -4527,10 +4533,12 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                           const loanAmt = parseCurrency(loanAmtRaw);
                           const arv = parseCurrency(arvRaw);
                           const arLtv = arv > 0 && loanAmt > 0 ? (loanAmt / arv) * 100 : 0;
+                          const valueLabel = usesNewLoan ? "Current Property Value" : "AR Property Value";
+                          const ltvLabel   = usesNewLoan ? "LTV" : "AR LTV";
                           return [
                             ["New Requested Loan Amount", loanAmtRaw || "—"],
-                            ["AR Property Value", arvRaw || "—"],
-                            ["AR LTV", arLtv > 0 ? arLtv.toFixed(1) + "%" : "—"],
+                            [valueLabel, arvRaw || "—"],
+                            [ltvLabel, arLtv > 0 ? arLtv.toFixed(1) + "%" : "—"],
                           ].map(([label, val]) => (
                             <div key={String(label)} className="rounded-lg bg-gray-50 p-2"><div className="text-xs text-gray-400 mb-0.5">{label}</div><div className="text-xs font-bold text-[#0a1f44]">{val}</div></div>
                           ));
