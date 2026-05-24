@@ -6446,6 +6446,58 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     setReviewModalLenderId(lenderId);
     setReviewModalNote("");
   }
+  // CAPMOON_UNDO_RESOLVED_V2_2026_05_24 — Undo a resolved lender change request
+  function handleUndoLcr(reqId: number) {
+    const req = lenderChangeRequests.find((r) => r.id === reqId);
+    if (!req) return;
+    if (req.status === "pending") return; // nothing to undo
+    if (!req.resolvedAt) return; // shouldn't happen but be safe
+    const elapsedMs = Date.now() - new Date(req.resolvedAt).getTime();
+    if (elapsedMs > TWENTY_FOUR_HOURS_MS) {
+      window.alert("Undo window expired (>24 hours since resolution).");
+      return;
+    }
+    const action = req.status === "approved" ? "approval" : "denial";
+    const confirmMsg = req.status === "approved" && req.changeType === "edit"
+      ? `Undo approval of "${req.lenderName}"? This will revert the lender to its prior state and move the request back to pending.`
+      : req.status === "approved" && req.changeType === "add"
+      ? `Undo approval of new lender "${req.lenderName}"? This will REMOVE the added lender from your database and move the request back to pending.`
+      : `Undo ${action} for "${req.lenderName}"? This will move the request back to pending.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    // 1. Restore lender data if needed
+    if (req.status === "approved") {
+      if (req.changeType === "edit" && req.priorData) {
+        // Restore lender from priorData snapshot
+        setLenderRecords((prev) => {
+          const next = prev.map((l) => l.id === req.lenderId ? (req.priorData as any) : l);
+          saveLendersToDb(next);
+          return next;
+        });
+      } else if (req.changeType === "add") {
+        // Remove the added lender (find by id from proposedData)
+        const addedId = (req.proposedData as any)?.id;
+        if (addedId !== undefined) {
+          setLenderRecords((prev) => {
+            const next = prev.filter((l) => l.id !== addedId);
+            saveLendersToDb(next);
+            return next;
+          });
+        }
+      }
+    }
+    // 2. Flip request back to pending — call setter directly + persist via fetch
+    const updatedReqs = lenderChangeRequests.map((r) => r.id === reqId ? {
+      ...r,
+      status: "pending" as const,
+      resolvedAt: undefined,
+      resolvedBy: undefined,
+    } : r);
+    setLenderChangeRequests(updatedReqs);
+    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: updatedReqs }) }).catch(console.error);
+    setExpandedReqId(null);
+  }
+
   function handleSubmitReview() {
     if (reviewModalLenderId === null) return;
     const nowIso = new Date().toISOString();
@@ -7950,6 +8002,22 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                             <button onClick={() => setExpandedReqId(isExpanded ? null : req.id)} className="px-3 py-1.5 text-xs font-semibold border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">
                                               {isExpanded ? "Hide Changes" : (req.changeType === "add" ? "View Details" : `View Changes${diffs.length > 0 ? ` (${diffs.length})` : ""}`)}
                                             </button>
+                                            {/* CAPMOON_UNDO_RESOLVED_V2_2026_05_24 — 24hr Undo */}
+                                            {(() => {
+                                              if (!req.resolvedAt) return null;
+                                              const elapsedMs = Date.now() - new Date(req.resolvedAt).getTime();
+                                              if (elapsedMs > TWENTY_FOUR_HOURS_MS) return null;
+                                              const hoursLeft = Math.max(0, Math.floor((TWENTY_FOUR_HOURS_MS - elapsedMs) / (60 * 60 * 1000)));
+                                              return (
+                                                <button
+                                                  onClick={() => handleUndoLcr(req.id)}
+                                                  title={`Undo this ${req.status}. ${hoursLeft}h remaining in undo window.`}
+                                                  className="px-3 py-1.5 text-xs font-semibold border border-amber-300 text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100"
+                                                >
+                                                  ↶ Undo
+                                                </button>
+                                              );
+                                            })()}
                                           </div>
                                         </div>
                                         {isExpanded && (
