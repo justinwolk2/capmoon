@@ -6506,7 +6506,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     ...(isAdmin ? [["deal-memos", "Deal Memos", FileText] as [string, string, any]] : []),
 
     ...(isAdmin && pendingDeleteCount > 0 ? [["delete-queue", `Delete Requests (${pendingDeleteCount})`, Bell] as [string, string, any]] : []),
-    ...(isAdmin && pendingLenderChangeCount > 0 ? [["lender-changes", `Lender Changes (${pendingLenderChangeCount})`, Bell] as [string, string, any]] : []),
+    // CAPMOON_LCR_STANDALONE_KILL_V2_2026_05_24 — standalone Lender Changes tab removed; pending requests live in Admin Portal
   ].filter((item) => {
     // CAPMOON_INTERN_ACCESS_PATCH — interns only see lender database tabs
     if (!isIntern) return true;
@@ -7876,90 +7876,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                 </div>
               )}
 
-              {/* Lender Change Requests (admin only) */}
-              {activeTab === "lender-changes" && isAdmin && (
-                <div className={cardClass + " p-6"}>
-                  <div className="mb-1 text-xs uppercase tracking-[0.22em] text-[#c9a84c] font-bold">Admin Approval</div>
-                  <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-5">Lender Change Requests</h2>
-                  <p className="text-sm text-gray-500 mb-5">Review and approve or deny lender additions and edits submitted by advisors.</p>
-                  {lenderChangeRequests.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center text-sm text-gray-400">No lender change requests pending.</div>
-                  ) : (
-                    <div className="space-y-4">
-                      {lenderChangeRequests.map((req) => (
-                        <div key={req.id} className="rounded-xl border border-gray-200 bg-white p-5">
-                          <div className="flex items-start justify-between mb-4">
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${req.changeType === "add" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-blue-50 text-blue-600 border-blue-200"}`}>
-                                  {req.changeType === "add" ? "New Lender" : "Edit"}
-                                </span>
-                                <span className="text-sm font-bold text-[#0a1f44]">{req.lenderName}</span>
-                              </div>
-                              <div className="text-xs text-gray-500">Requested by <span className="font-medium">{req.requestedBy}</span> · {req.requestedAt}</div>
-                            </div>
-                            {req.status === "pending" ? (
-                              <div className="flex gap-2">
-                                {/* CAPMOON_ADMIN_APPROVALS_MINITAB — uses extracted handler */}
-                                <button
-                                  onClick={() => handleLenderChangeApprove(req.id)}
-                                  className="px-4 py-2 text-xs font-semibold bg-emerald-500 text-white rounded-xl hover:bg-emerald-600"
-                                >
-                                  Approve
-                                </button>
-                                <button
-                                  onClick={() => handleLenderChangeDeny(req.id)}
-                                  className="px-4 py-2 text-xs border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50"
-                                >
-                                  Deny
-                                </button>
-                              </div>
-                            ) : (
-                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${req.status === "approved" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-gray-100 text-gray-500 border border-gray-200"}`}>
-                                {req.status === "approved" ? "✓ Approved" : "✕ Denied"}
-                              </span>
-                            )}
-                          </div>
-                          {/* Show proposed changes */}
-                          <div className="rounded-xl bg-gray-50 border border-gray-100 p-4">
-                            <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-3">Proposed Data</div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                              {[
-                                ["Lender", req.proposedData.lender],
-                                ["Capital Type", req.proposedData.type],
-                                ["Min Loan", req.proposedData.minLoan || "—"],
-                                ["Max Loan", req.proposedData.maxLoan || "—"],
-                                ["Max LTV", req.proposedData.maxLtv || "—"],
-                                ["Recourse", req.proposedData.recourse || "—"],
-                                ["Contact", req.proposedData.contactPerson || "—"],
-                                ["Email", req.proposedData.email || "—"],
-                              ].map(([label, val]) => (
-                                <div key={String(label)} className="rounded-lg bg-white border border-gray-100 p-2">
-                                  <div className="text-xs text-gray-400 mb-0.5">{label}</div>
-                                  <div className="text-xs font-semibold text-[#0a1f44] break-all">{val}</div>
-                                </div>
-                              ))}
-                            </div>
-                            {req.proposedData.assets && req.proposedData.assets.length > 0 && (
-                              <div className="mt-3">
-                                <div className="text-xs text-gray-400 mb-1.5">Property Types</div>
-                                <div className="flex flex-wrap gap-1">{req.proposedData.assets.map(t => <span key={t} className="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600 border border-gray-200">{t}</span>)}</div>
-                              </div>
-                            )}
-                            {req.proposedData.notes && (
-                              <div className="mt-3 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2">
-                                <div className="text-xs font-bold text-amber-700 mb-0.5">Notes</div>
-                                <div className="text-xs text-gray-700">{req.proposedData.notes}</div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
+              {/* CAPMOON_LCR_STANDALONE_KILL_V2_2026_05_24 — standalone Lender Changes tab JSX removed; pending requests visible in Admin Portal */}
 
               {/* Deal Memos */}
               {activeTab === "deal-memos" && isAdmin && (
