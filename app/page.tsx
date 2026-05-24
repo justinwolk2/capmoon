@@ -6437,6 +6437,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     }
   }
 
+  // CAPMOON_ADMIN_SUBTABS_V1_NAV_2026_05_24 — Admin Portal sub-tab state (Approvals/Users/Inactive/Tools)
+  const [adminSubTab, setAdminSubTab] = React.useState<"approvals" | "users" | "inactive" | "tools">("approvals");
   // CAPMOON_LCR_DEDUPE_DETAIL_V1_2026_05_24 — expandable detail state + dedupe helpers
   const [expandedReqId, setExpandedReqId] = React.useState<number | null>(null);
   const [dedupeStatus, setDedupeStatus] = React.useState<{ running: boolean; result: string | null }>({ running: false, result: null });
@@ -7628,6 +7630,36 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                     <h2 className="font-display text-2xl font-bold text-[#0a1f44] mb-1">Admin Portal</h2>
                     <p className="text-sm text-gray-500 mb-5">Manage users, roles, permissions and email notifications.</p>
 
+                    {/* CAPMOON_ADMIN_SUBTABS_V1_NAV_2026_05_24 — sub-tab nav */}
+                    <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-200 pb-3">
+                      {([
+                        ["approvals", "Approvals", (pendingLenderChangeCount + pendingDeleteCount)],
+                        ["users", "Users", 0],
+                        ["inactive", "Inactive Lenders", 0],
+                        ["tools", "Tools", 0],
+                      ] as const).map(([key, label, count]) => (
+                        <button
+                          key={key}
+                          onClick={() => setAdminSubTab(key as any)}
+                          className={
+                            "px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all " +
+                            (adminSubTab === key
+                              ? "bg-[#0a1f44] text-white"
+                              : "bg-white border border-gray-200 text-gray-500 hover:border-[#0a1f44]/40 hover:text-[#0a1f44]")
+                          }
+                        >
+                          {label}
+                          {(count as number) > 0 && (
+                            <span className={"ml-2 px-1.5 py-0.5 rounded-full text-[10px] " + (adminSubTab === key ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700")}>
+                              {count as number}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* CAPMOON_ADMIN_SUBTABS_V1_NAV_2026_05_24 — wrap users content */}
+                    {adminSubTab === "users" && (<>
                     {/* Add New User */}
                     <div className="rounded-xl border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-5 mb-6">
                       <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold mb-4">Add New User</div>
@@ -7648,6 +7680,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                           </Select>
                         </div>
                       </div>
+                      {/* CAPMOON_ADMIN_SUBTABS_V1_NAV_2026_05_24 — show migration card under both users (for back-compat during transition) and tools */}
+                      {(adminSubTab === "users" || adminSubTab === "tools") && (
                       <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
                         <div className="text-xs font-bold uppercase tracking-wide text-amber-700 mb-1">⚠ One-Time Migration</div>
                         <div className="text-sm text-gray-700 mb-2">Move 719 hardcoded seed lenders into Postgres so future edits persist correctly.</div>
@@ -7673,9 +7707,14 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                           <div className="mt-2 text-xs p-2 rounded bg-white border border-gray-200 text-gray-700">{dedupeStatus.result}</div>
                         )}
                       </div>
+                      )}{/* CAPMOON_ADMIN_SUBTABS_V1_NAV_2026_05_24 — end migration card conditional */}
                       <button onClick={addUser} className="mt-4 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Add User</button>
                     </div>
 
+                    </>)}{/* CAPMOON_ADMIN_SUBTABS_V1_NAV_2026_05_24 — end users wrapper */}
+
+                    {/* CAPMOON_ADMIN_SUBTABS_V1_NAV_2026_05_24 — wrap approvals content */}
+                    {adminSubTab === "approvals" && (<>
                     {/* CAPMOON_ADMIN_APPROVALS_MINITAB — start: Pending Approvals card */}
                     {(() => {
                       const now = Date.now();
@@ -7837,6 +7876,24 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                       );
                     })()}
                     {/* CAPMOON_ADMIN_APPROVALS_MINITAB — end */}
+                    </>)}{/* CAPMOON_ADMIN_SUBTABS_V1_NAV_2026_05_24 — end approvals wrapper */}
+
+                    {/* CAPMOON_ADMIN_SUBTABS_V1_NAV_2026_05_24 — Inactive Lenders placeholder */}
+                    {adminSubTab === "inactive" && (
+                      <div className="rounded-xl border border-gray-200 bg-gray-50 p-8 text-center">
+                        <div className="text-sm font-semibold text-[#0a1f44] mb-2">Inactive Lenders</div>
+                        <div className="text-xs text-gray-500">Coming soon — lenders marked as inactive will appear here. Active/inactive toggle ships in Patch 11.</div>
+                      </div>
+                    )}
+
+                    {/* CAPMOON_ADMIN_SUBTABS_V1_NAV_2026_05_24 — Tools placeholder */}
+                    {adminSubTab === "tools" && (
+                      <div className="rounded-xl border border-gray-200 bg-gray-50 p-6">
+                        <div className="text-sm font-semibold text-[#0a1f44] mb-2">Admin Tools</div>
+                        <div className="text-xs text-gray-500 mb-4">One-time maintenance operations. The migration buttons appear above (see Add New User section while Tools is selected).</div>
+                        <div className="text-xs text-gray-400 italic">Additional admin tools will be added in future patches (data export, audit log, etc.)</div>
+                      </div>
+                    )}
 
                     {/* Search */}
                     <div className="mb-4 relative">
