@@ -6244,7 +6244,6 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
   // Reusable approve handler for lender change requests
   function handleLenderChangeApprove(reqId: number) {
-    console.log("[CAPMOON_LCR_DEBUG] handleLenderChangeApprove ENTRY reqId=" + reqId + " ts=" + new Date().toISOString()); // CAPMOON_LCR_DEBUG_V1_DIAG_2026_05_24
     const req = lenderChangeRequests.find((r) => r.id === reqId);
     if (!req) return;
     // CAPMOON_LCR_RESOLVED_V2_TIMESTAMPS_2026_05_24 — capture priorData snapshot before applying change (enables Undo in Patch 10)
@@ -6265,7 +6264,6 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
   // Reusable deny handler for lender change requests
   function handleLenderChangeDeny(reqId: number) {
-    console.log("[CAPMOON_LCR_DEBUG] handleLenderChangeDeny ENTRY reqId=" + reqId + " ts=" + new Date().toISOString()); // CAPMOON_LCR_DEBUG_V1_DIAG_2026_05_24
     const req = lenderChangeRequests.find((r) => r.id === reqId);
     if (!req) return;
     if (req.changeType === "edit" && req.lenderId) {
@@ -6517,6 +6515,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     setReviewModalLenderId(null);
     setReviewModalNote("");
   }
+  // CAPMOON_DEBUG_CLEANUP_V1_2026_05_24 — Patch 12 cleanup: all [CAPMOON_LCR_DEBUG] logs removed
   // CAPMOON_LCR_DEDUPE_DETAIL_V1_2026_05_24 — expandable detail state + dedupe helpers
   const [expandedReqId, setExpandedReqId] = React.useState<number | null>(null);
   const [dedupeStatus, setDedupeStatus] = React.useState<{ running: boolean; result: string | null }>({ running: false, result: null });
@@ -8595,7 +8594,6 @@ export default function Home() {
     if (newReqs.length > 0) saveToDb("deletes", newReqs);
   }
   function handleSetLenderChangeRequests(newReqs: LenderChangeRequest[]) {
-    console.log("[CAPMOON_LCR_DEBUG] handleSetLenderChangeRequests ENTRY count=" + newReqs.length + " ts=" + new Date().toISOString()); // CAPMOON_LCR_DEBUG_V1_DIAG_2026_05_24
     // CAPMOON_LCR_DEDUPE_DETAIL_V1_2026_05_24 — dedupe by id before persisting (defense in depth, server also dedupes)
     const seenIds = new Set<number>();
     const dedupedReqs = newReqs.filter((r) => {
@@ -8604,7 +8602,7 @@ export default function Home() {
       return true;
     });
     setLenderChangeRequests(dedupedReqs);
-    if (dedupedReqs.length > 0) { console.log("[CAPMOON_LCR_DEBUG] handleSetLenderChangeRequests CALLING saveToDb lender-changes count=" + dedupedReqs.length); saveToDb("lender-changes", dedupedReqs); }
+    if (dedupedReqs.length > 0) { saveToDb("lender-changes", dedupedReqs); }
   }
 
   if (!dbLoaded) return (

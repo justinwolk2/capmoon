@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
         }
         return NextResponse.json({ success: true });
       }
-      case "lender-changes": { console.log("[CAPMOON_LCR_DEBUG] /api/data POST lender-changes ENTRY count=" + (Array.isArray(data) ? data.length : "n/a") + " ts=" + new Date().toISOString()); /* CAPMOON_LCR_DEBUG_V1_DIAG_2026_05_24 */ /* CAPMOON_LCR_DEDUPE_DETAIL_V1_2026_05_24 — dedupe by id before write */ const lcrSeen = new Set(); const lcrDeduped = (Array.isArray(data) ? data : []).filter((item: any) => { const k = String(item?.id ?? ""); if (!k || lcrSeen.has(k)) return false; lcrSeen.add(k); return true; }); await sql`DELETE FROM lender_change_requests`; for (const item of lcrDeduped) { await sql`INSERT INTO lender_change_requests (data) VALUES (${JSON.stringify(item)})`; } return NextResponse.json({ success: true, deduped: data.length - lcrDeduped.length }); }
+      case "lender-changes": { /* CAPMOON_LCR_DEDUPE_DETAIL_V1_2026_05_24 — dedupe by id before write */ const lcrSeen = new Set(); const lcrDeduped = (Array.isArray(data) ? data : []).filter((item: any) => { const k = String(item?.id ?? ""); if (!k || lcrSeen.has(k)) return false; lcrSeen.add(k); return true; }); await sql`DELETE FROM lender_change_requests`; for (const item of lcrDeduped) { await sql`INSERT INTO lender_change_requests (data) VALUES (${JSON.stringify(item)})`; } return NextResponse.json({ success: true, deduped: data.length - lcrDeduped.length }); }
       default: return NextResponse.json({ error: "Unknown type" }, { status: 400 });
     }
   } catch (err: any) {
