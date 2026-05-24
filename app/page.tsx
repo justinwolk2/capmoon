@@ -6059,7 +6059,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   // Save all non-seed lenders to DB (dashboard-added AND edited seed lenders)
   // CAPMOON_LENDER_TYPE_V2_FIELDS_2026_05_24 — patch 3 sentinel marker (types extended; backfill installed)
   async function saveLendersToDb(records: LenderRecord[]) {
-    const toSave = records.filter(l => l.source === "Dashboard");
+    const toSave = records.filter(l => l.source === "Dashboard" || l.source === "Imported"); // CAPMOON_SEED_MIGRATION_V3_2026_05_24 — include migrated seed lenders
     if (toSave.length === 0) return;
     try {
       await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: toSave }) });
@@ -6166,8 +6166,10 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000; // CAPMOON_LENDER_TYPE_V2_FIELDS_2026_05_24 — staleness threshold (~180 days)
 
   // CAPMOON_LENDER_TYPE_V2_FIELDS_2026_05_24 — one-time backfill: ensure every lender has lastUpdated and active
-  // Runs whenever lenderRecords changes, but only does a save if any record is missing fields (idempotent)
+  // CAPMOON_SEED_MIGRATION_V3_2026_05_24 — now ref-guarded so it fires at most once per app load
+  const backfillRanRef = React.useRef(false);
   React.useEffect(() => {
+    if (backfillRanRef.current) return; // already ran this session, never fire again
     if (!lenderRecords || lenderRecords.length === 0) return;
     const nowIso = new Date().toISOString();
     let needsBackfill = false;
@@ -6184,6 +6186,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
         lastReviewNote: l.lastReviewNote ?? null,
       };
     });
+    backfillRanRef.current = true; // CAPMOON_SEED_MIGRATION_V3_2026_05_24 — mark ran before any save
     if (needsBackfill) {
       console.log("[CAPMOON_LENDER_BACKFILL] Backfilling lastUpdated/active on " + patched.filter((p,i) => p !== lenderRecords[i]).length + " lenders");
       setLenderRecords(patched);
@@ -6388,6 +6391,38 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
       setActiveTab("lenders");
     }
   }
+  // CAPMOON_SEED_MIGRATION_V3_2026_05_24 — one-time seed lender migration handler (lives in MainPortal scope alongside the UI card)
+  const [migrationStatus, setMigrationStatus] = React.useState<{ running: boolean; result: string | null }>({ running: false, result: null });
+  async function handleMigrateSeedLenders() {
+    if (migrationStatus.running) return;
+    const seedsToMigrate = seedLenders.filter(l => l.source === "Spreadsheet");
+    if (seedsToMigrate.length === 0) {
+      setMigrationStatus({ running: false, result: "Nothing to migrate — seedLenders array contains no Spreadsheet-source records." });
+      return;
+    }
+    if (!window.confirm(`Migrate ${seedsToMigrate.length} seed lenders into Postgres? This is a one-time operation. After migration succeeds, future edits to these lenders will persist correctly.`)) return;
+    setMigrationStatus({ running: true, result: null });
+    try {
+      const res = await fetch("/api/admin/migrate-seeds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lenders: seedsToMigrate }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMigrationStatus({ running: false, result: `❌ Migration failed: ${data?.error || res.statusText}` });
+        return;
+      }
+      const msg = `✓ Migrated ${data.inserted}/${data.total} lenders to Postgres. ${data.errors?.length > 0 ? `(${data.errors.length} errors — check console)` : ""}`;
+      if (data.errors?.length > 0) console.error("[Migration errors]", data.errors);
+      setMigrationStatus({ running: false, result: msg });
+      // Force a reload of dashboard lenders from DB so the in-memory state matches
+      window.location.reload();
+    } catch (e: any) {
+      setMigrationStatus({ running: false, result: `❌ Migration error: ${e?.message || String(e)}` });
+    }
+  }
+
   function addUser() {
     if (!newUserForm.name.trim() || !newUserForm.username.trim() || !newUserForm.password.trim()) return;
     setUsers([...users, { id: users.length + 1, ...newUserForm, blockedLenderIds: [] }]);
@@ -7561,6 +7596,20 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                             </SelectContent>
                           </Select>
                         </div>
+                      </div>
+                      <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+                        <div className="text-xs font-bold uppercase tracking-wide text-amber-700 mb-1">⚠ One-Time Migration</div>
+                        <div className="text-sm text-gray-700 mb-2">Move 719 hardcoded seed lenders into Postgres so future edits persist correctly.</div>
+                        {migrationStatus.result && (
+                          <div className="text-xs mb-2 p-2 rounded bg-white border border-gray-200 text-gray-700">{migrationStatus.result}</div>
+                        )}
+                        <button
+                          onClick={handleMigrateSeedLenders}
+                          disabled={migrationStatus.running}
+                          className="px-4 py-2 text-xs font-semibold bg-amber-500 text-white rounded-xl hover:bg-amber-600 disabled:opacity-50"
+                        >
+                          {migrationStatus.running ? "Migrating..." : "Migrate Seed Lenders to DB"}
+                        </button>
                       </div>
                       <button onClick={addUser} className="mt-4 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Add User</button>
                     </div>
