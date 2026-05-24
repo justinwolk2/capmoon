@@ -19,6 +19,11 @@ type LenderRecord = {
   states: string[]; assets: string[]; status: string; email: string; phone: string; recourse: string;
   contactPerson?: string; website?: string; sponsorStates?: string[]; loanTerms?: string;
   typeOfLoans?: string[]; programTypes?: string[]; typeOfLenders?: string[]; contacts?: LenderContact[]; notes?: string; capitalTypePrograms?: CapitalTypeProgram[]; originalId?: number;
+  lastUpdated?: string; // CAPMOON_LENDER_TYPE_V2_FIELDS_2026_05_24 — ISO timestamp of last edit; optional for backwards compat, backfilled on load
+  lastReviewedAt?: string | null; // CAPMOON_LENDER_TYPE_V2_FIELDS_2026_05_24 — set via Mark as Reviewed
+  lastReviewedBy?: string | null; // CAPMOON_LENDER_TYPE_V2_FIELDS_2026_05_24
+  lastReviewNote?: string | null; // CAPMOON_LENDER_TYPE_V2_FIELDS_2026_05_24
+  active?: boolean; // CAPMOON_LENDER_TYPE_V2_FIELDS_2026_05_24 — defaults true; false=archived (no staleness check)
 };
 type RetailUnit = { id: number; tenant: string; rent: string; sqft: string; };
 type AssetAddress = { street: string; unit: string; city: string; state: string; zip: string; };
@@ -112,6 +117,9 @@ type LenderChangeRequest = {
   requestedById: number;
   requestedAt: string;
   status: "pending" | "approved" | "denied";
+  resolvedAt?: string | null; // CAPMOON_LENDER_TYPE_V2_FIELDS_2026_05_24 — set when status moves off pending
+  resolvedBy?: string | null; // CAPMOON_LENDER_TYPE_V2_FIELDS_2026_05_24 — admin name who approved/denied
+  priorData?: LenderRecord | null; // CAPMOON_LENDER_TYPE_V2_FIELDS_2026_05_24 — snapshot for Undo support
 };
 type EmailPrefs = {
   dealSubmitted: boolean; lenderResponded: boolean; documentRequested: boolean;
@@ -6049,6 +6057,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   }, []);
 
   // Save all non-seed lenders to DB (dashboard-added AND edited seed lenders)
+  // CAPMOON_LENDER_TYPE_V2_FIELDS_2026_05_24 — patch 3 sentinel marker (types extended; backfill installed)
   async function saveLendersToDb(records: LenderRecord[]) {
     const toSave = records.filter(l => l.source === "Dashboard");
     if (toSave.length === 0) return;
@@ -6152,6 +6161,40 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     return isNaN(t) ? 0 : t;
   }
   const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000; // CAPMOON_LENDER_TYPE_V2_FIELDS_2026_05_24 — retention for Recently Resolved
+  const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000; // CAPMOON_LENDER_TYPE_V2_FIELDS_2026_05_24 — Undo grace window
+  const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000; // CAPMOON_LENDER_TYPE_V2_FIELDS_2026_05_24 — staleness threshold (~180 days)
+
+  // CAPMOON_LENDER_TYPE_V2_FIELDS_2026_05_24 — one-time backfill: ensure every lender has lastUpdated and active
+  // Runs whenever lenderRecords changes, but only does a save if any record is missing fields (idempotent)
+  React.useEffect(() => {
+    if (!lenderRecords || lenderRecords.length === 0) return;
+    const nowIso = new Date().toISOString();
+    let needsBackfill = false;
+    const patched = lenderRecords.map((l) => {
+      const missing = (l.lastUpdated === undefined) || (l.active === undefined);
+      if (!missing) return l;
+      needsBackfill = true;
+      return {
+        ...l,
+        lastUpdated: l.lastUpdated || nowIso,
+        active: (l.active === undefined ? true : l.active),
+        lastReviewedAt: l.lastReviewedAt ?? null,
+        lastReviewedBy: l.lastReviewedBy ?? null,
+        lastReviewNote: l.lastReviewNote ?? null,
+      };
+    });
+    if (needsBackfill) {
+      console.log("[CAPMOON_LENDER_BACKFILL] Backfilling lastUpdated/active on " + patched.filter((p,i) => p !== lenderRecords[i]).length + " lenders");
+      setLenderRecords(patched);
+      // Only persist non-seed records (source !== 'Spreadsheet') so we don't bloat the DB with seed data
+      const toSave = patched.filter(l => l.source !== 'Spreadsheet');
+      if (toSave.length > 0) {
+        fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lenders", data: toSave }) }).catch(console.error);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lenderRecords.length]);
 
   // Lazy cleanup: on mount (admin only), remove non-pending items > 7 days old
   // from BOTH queues, then persist the cleaned arrays back to the DB.
