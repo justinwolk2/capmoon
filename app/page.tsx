@@ -6439,6 +6439,32 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
   // CAPMOON_ADMIN_SUBTABS_V1_NAV_2026_05_24 — Admin Portal sub-tab state (Approvals/Users/Inactive/Tools)
   const [adminSubTab, setAdminSubTab] = React.useState<"approvals" | "users" | "inactive" | "tools">("approvals");
+  // CAPMOON_STALE_LENDERS_V1_SECTION_2026_05_24 — Mark as Reviewed modal state + handler
+  const [reviewModalLenderId, setReviewModalLenderId] = React.useState<number | null>(null);
+  const [reviewModalNote, setReviewModalNote] = React.useState<string>("");
+  function handleOpenReviewModal(lenderId: number) {
+    setReviewModalLenderId(lenderId);
+    setReviewModalNote("");
+  }
+  function handleSubmitReview() {
+    if (reviewModalLenderId === null) return;
+    const nowIso = new Date().toISOString();
+    const reviewedBy = ((session as any)?.user?.name || "Admin");
+    const noteVal = reviewModalNote.trim() || null;
+    setLenderRecords((prev) => {
+      const next = prev.map((l) => l.id === reviewModalLenderId ? {
+        ...l,
+        lastUpdated: nowIso,
+        lastReviewedAt: nowIso,
+        lastReviewedBy: reviewedBy,
+        lastReviewNote: noteVal,
+      } : l);
+      saveLendersToDb(next);
+      return next;
+    });
+    setReviewModalLenderId(null);
+    setReviewModalNote("");
+  }
   // CAPMOON_LCR_DEDUPE_DETAIL_V1_2026_05_24 — expandable detail state + dedupe helpers
   const [expandedReqId, setExpandedReqId] = React.useState<number | null>(null);
   const [dedupeStatus, setDedupeStatus] = React.useState<{ running: boolean; result: string | null }>({ running: false, result: null });
@@ -7715,6 +7741,55 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
                     {/* CAPMOON_ADMIN_SUBTABS_V1_NAV_2026_05_24 — wrap approvals content */}
                     {adminSubTab === "approvals" && (<>
+                    {/* CAPMOON_STALE_LENDERS_V1_SECTION_2026_05_24 — Stale Lenders section */}
+                    {(() => {
+                      const nowMs = Date.now();
+                      const staleLenders = lenderRecords.filter((l) => {
+                        if (l.active === false) return false; // skip inactive
+                        if (!l.lastUpdated) return false; // backfill should have set it; skip if missing
+                        const updatedMs = new Date(l.lastUpdated).getTime();
+                        if (isNaN(updatedMs)) return false;
+                        return (nowMs - updatedMs) > SIX_MONTHS_MS;
+                      }).sort((a, b) => {
+                        const aMs = a.lastUpdated ? new Date(a.lastUpdated).getTime() : 0;
+                        const bMs = b.lastUpdated ? new Date(b.lastUpdated).getTime() : 0;
+                        return aMs - bMs; // oldest first
+                      });
+                      if (staleLenders.length === 0) return null;
+                      return (
+                        <div className="rounded-xl border border-amber-300 bg-amber-50/40 p-5 mb-6">
+                          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                            <div>
+                              <div className="text-xs uppercase tracking-[0.2em] text-amber-700 font-bold">⚠ Stale Lenders — Needs Refresh</div>
+                              <div className="text-xs text-amber-700/70 mt-0.5">{staleLenders.length} lender{staleLenders.length === 1 ? "" : "s"} not updated in over 6 months</div>
+                            </div>
+                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">{staleLenders.length} stale</span>
+                          </div>
+                          <div className="space-y-2 max-h-80 overflow-y-auto">
+                            {staleLenders.slice(0, 20).map((l) => {
+                              const updatedMs = l.lastUpdated ? new Date(l.lastUpdated).getTime() : 0;
+                              const daysOld = Math.floor((nowMs - updatedMs) / (24 * 60 * 60 * 1000));
+                              const reviewedMs = l.lastReviewedAt ? new Date(l.lastReviewedAt).getTime() : 0;
+                              const reviewedDaysAgo = reviewedMs > 0 ? Math.floor((nowMs - reviewedMs) / (24 * 60 * 60 * 1000)) : null;
+                              return (
+                                <div key={l.id} className="rounded-lg border border-amber-200 bg-white p-3 flex items-center justify-between gap-3 flex-wrap">
+                                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                    <span className="text-sm font-semibold text-[#0a1f44]">{l.lender}</span>
+                                    <span className="text-xs text-gray-500">Last updated {daysOld} days ago{reviewedDaysAgo !== null ? ` · Reviewed ${reviewedDaysAgo}d ago by ${l.lastReviewedBy || "?"}` : ""}</span>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button onClick={() => handleOpenReviewModal(l.id)} className="px-3 py-1.5 text-xs font-semibold bg-amber-500 text-white rounded-lg hover:bg-amber-600">Mark as Reviewed</button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {staleLenders.length > 20 && (
+                              <div className="text-xs text-amber-700/60 italic pt-2">Showing 20 of {staleLenders.length}. Mark some as reviewed to see more.</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {/* CAPMOON_ADMIN_APPROVALS_MINITAB — start: Pending Approvals card */}
                     {(() => {
                       const now = Date.now();
@@ -7894,6 +7969,34 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                         <div className="text-xs text-gray-400 italic">Additional admin tools will be added in future patches (data export, audit log, etc.)</div>
                       </div>
                     )}
+
+                    {/* CAPMOON_STALE_LENDERS_V1_SECTION_2026_05_24 — Mark as Reviewed modal */}
+                    {reviewModalLenderId !== null && (() => {
+                      const lender = lenderRecords.find((l) => l.id === reviewModalLenderId);
+                      if (!lender) return null;
+                      return (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setReviewModalLenderId(null)}>
+                          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+                            <div className="text-xs uppercase tracking-[0.2em] text-[#c9a84c] font-bold mb-1">Lender Review</div>
+                            <h3 className="font-display text-xl font-bold text-[#0a1f44] mb-1">Mark as Reviewed</h3>
+                            <p className="text-sm text-gray-600 mb-1"><span className="font-semibold">{lender.lender}</span></p>
+                            <p className="text-xs text-gray-500 mb-4">This will reset the lender's last-updated timestamp to now without changing any data. Use when you've confirmed the lender info is still accurate.</p>
+                            <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Optional note (e.g. "Called Sarah, confirmed criteria unchanged")</label>
+                            <textarea
+                              value={reviewModalNote}
+                              onChange={(e) => setReviewModalNote(e.target.value)}
+                              placeholder="What did you verify?"
+                              rows={3}
+                              className="w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-[#0a1f44] mb-4"
+                            />
+                            <div className="flex gap-2 justify-end">
+                              <button onClick={() => setReviewModalLenderId(null)} className="px-4 py-2 text-sm border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50">Cancel</button>
+                              <button onClick={handleSubmitReview} className="px-4 py-2 text-sm font-semibold bg-amber-500 text-white rounded-xl hover:bg-amber-600">Confirm Review</button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Search */}
                     <div className="mb-4 relative">
