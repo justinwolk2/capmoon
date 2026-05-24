@@ -7797,7 +7797,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                     {(() => {
                       const nowMs = Date.now();
                       const staleLenders = lenderRecords.filter((l) => {
-                        if (l.active === false) return false; // skip inactive
+                        if (l.status === "Inactive") return false; // CAPMOON_INACTIVE_TAB_V1_2026_05_24 — use canonical status field
                         if (!l.lastUpdated) return false; // backfill should have set it; skip if missing
                         const updatedMs = new Date(l.lastUpdated).getTime();
                         if (isNaN(updatedMs)) return false;
@@ -8086,13 +8086,48 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                     {/* CAPMOON_ADMIN_APPROVALS_MINITAB — end */}
                     </>)}{/* CAPMOON_ADMIN_SUBTABS_V1_NAV_2026_05_24 — end approvals wrapper */}
 
-                    {/* CAPMOON_ADMIN_SUBTABS_V1_NAV_2026_05_24 — Inactive Lenders placeholder */}
-                    {adminSubTab === "inactive" && (
-                      <div className="rounded-xl border border-gray-200 bg-gray-50 p-8 text-center">
-                        <div className="text-sm font-semibold text-[#0a1f44] mb-2">Inactive Lenders</div>
-                        <div className="text-xs text-gray-500">Coming soon — lenders marked as inactive will appear here. Active/inactive toggle ships in Patch 11.</div>
-                      </div>
-                    )}
+                    {/* CAPMOON_INACTIVE_TAB_V1_2026_05_24 — Inactive Lenders real listing */}
+                    {adminSubTab === "inactive" && (() => {
+                      const inactiveLenders = lenderRecords.filter((l) => l.status === "Inactive").sort((a, b) => (a.lender || "").localeCompare(b.lender || ""));
+                      return (
+                        <div className="rounded-xl border border-gray-200 bg-white p-5">
+                          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                            <div>
+                              <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold">Inactive Lenders</div>
+                              <div className="text-xs text-gray-500 mt-0.5">Lenders no longer actively quoting. They are hidden from deal matching and stale tracking, but their data is preserved.</div>
+                            </div>
+                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-500 border border-gray-200">{inactiveLenders.length} inactive</span>
+                          </div>
+                          {inactiveLenders.length === 0 ? (
+                            <div className="rounded-xl border border-dashed border-gray-200 p-8 text-center">
+                              <div className="text-sm text-gray-500">No inactive lenders.</div>
+                              <div className="text-xs text-gray-400 mt-1">To mark a lender inactive, find them in Lender Programs and click "Deactivate".</div>
+                            </div>
+                          ) : (
+                            <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                              {inactiveLenders.map((l) => (
+                                <div key={l.id} className="rounded-lg border border-gray-200 bg-gray-50 p-3 flex items-center justify-between gap-3 flex-wrap">
+                                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                    <span className="text-sm font-semibold text-[#0a1f44]">{l.lender}</span>
+                                    {l.contactPerson && <span className="text-xs text-gray-500">· {l.contactPerson}</span>}
+                                    {l.email && <span className="text-xs text-gray-400">· {l.email}</span>}
+                                  </div>
+                                  <div className="flex gap-2 items-center">
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-gray-100 text-gray-500 border-gray-200">Inactive</span>
+                                    <button
+                                      onClick={() => toggleLenderStatus(l.id)}
+                                      className="px-3 py-1.5 text-xs font-semibold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600"
+                                    >
+                                      Reactivate
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* CAPMOON_ADMIN_SUBTABS_V1_NAV_2026_05_24 — Tools placeholder */}
                     {adminSubTab === "tools" && (
