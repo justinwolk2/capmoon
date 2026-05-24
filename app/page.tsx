@@ -6198,6 +6198,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
   // Reusable approve handler for lender change requests
   function handleLenderChangeApprove(reqId: number) {
+    console.log("[CAPMOON_LCR_DEBUG] handleLenderChangeApprove ENTRY reqId=" + reqId + " ts=" + new Date().toISOString()); // CAPMOON_LCR_DEBUG_V1_DIAG_2026_05_24
     const req = lenderChangeRequests.find((r) => r.id === reqId);
     if (!req) return;
     if (req.changeType === "add") {
@@ -6212,6 +6213,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
   // Reusable deny handler for lender change requests
   function handleLenderChangeDeny(reqId: number) {
+    console.log("[CAPMOON_LCR_DEBUG] handleLenderChangeDeny ENTRY reqId=" + reqId + " ts=" + new Date().toISOString()); // CAPMOON_LCR_DEBUG_V1_DIAG_2026_05_24
     const req = lenderChangeRequests.find((r) => r.id === reqId);
     if (!req) return;
     if (req.changeType === "edit" && req.lenderId) {
@@ -8145,8 +8147,9 @@ export default function Home() {
     if (newReqs.length > 0) saveToDb("deletes", newReqs);
   }
   function handleSetLenderChangeRequests(newReqs: LenderChangeRequest[]) {
+    console.log("[CAPMOON_LCR_DEBUG] handleSetLenderChangeRequests ENTRY count=" + newReqs.length + " ts=" + new Date().toISOString()); // CAPMOON_LCR_DEBUG_V1_DIAG_2026_05_24
     setLenderChangeRequests(newReqs);
-    if (newReqs.length > 0) saveToDb("lender-changes", newReqs);
+    if (newReqs.length > 0) { console.log("[CAPMOON_LCR_DEBUG] handleSetLenderChangeRequests CALLING saveToDb lender-changes count=" + newReqs.length); saveToDb("lender-changes", newReqs); }
   }
 
   if (!dbLoaded) return (

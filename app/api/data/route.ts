@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
         }
         return NextResponse.json({ success: true });
       }
-      case "lender-changes": { await sql`DELETE FROM lender_change_requests`; for (const item of data) { await sql`INSERT INTO lender_change_requests (data) VALUES (${JSON.stringify(item)})`; } return NextResponse.json({ success: true }); }
+      case "lender-changes": { console.log("[CAPMOON_LCR_DEBUG] /api/data POST lender-changes ENTRY count=" + (Array.isArray(data) ? data.length : "n/a") + " ts=" + new Date().toISOString()); /* CAPMOON_LCR_DEBUG_V1_DIAG_2026_05_24 */ await sql`DELETE FROM lender_change_requests`; for (const item of data) { await sql`INSERT INTO lender_change_requests (data) VALUES (${JSON.stringify(item)})`; } return NextResponse.json({ success: true }); }
       default: return NextResponse.json({ error: "Unknown type" }, { status: 400 });
     }
   } catch (err: any) {
