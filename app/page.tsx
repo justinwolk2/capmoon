@@ -6247,12 +6247,18 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     console.log("[CAPMOON_LCR_DEBUG] handleLenderChangeApprove ENTRY reqId=" + reqId + " ts=" + new Date().toISOString()); // CAPMOON_LCR_DEBUG_V1_DIAG_2026_05_24
     const req = lenderChangeRequests.find((r) => r.id === reqId);
     if (!req) return;
+    // CAPMOON_LCR_RESOLVED_V2_TIMESTAMPS_2026_05_24 — capture priorData snapshot before applying change (enables Undo in Patch 10)
+    const nowIso = new Date().toISOString();
+    const resolvedBy = ((session as any)?.user?.name || "Admin");
+    const priorData = req.changeType === "edit" ? (lenderRecords.find((l) => l.id === req.lenderId) || null) : null;
+    // Stamp proposedData with lastUpdated=now so future staleness checks work for this lender
+    const stampedProposed = { ...req.proposedData, lastUpdated: nowIso, active: (req.proposedData.active === undefined ? true : req.proposedData.active) };
     if (req.changeType === "add") {
-      setLenderRecords((prev) => { const next = [...prev, req.proposedData]; saveLendersToDb(next); return next; });
+      setLenderRecords((prev) => { const next = [...prev, stampedProposed]; saveLendersToDb(next); return next; });
     } else {
-      setLenderRecords((prev) => { const next = prev.map((l) => l.id === req.lenderId ? req.proposedData : l); saveLendersToDb(next); return next; });
+      setLenderRecords((prev) => { const next = prev.map((l) => l.id === req.lenderId ? stampedProposed : l); saveLendersToDb(next); return next; });
     }
-    const updated = lenderChangeRequests.map((r) => r.id === reqId ? { ...r, status: "approved" as const } : r);
+    const updated = lenderChangeRequests.map((r) => r.id === reqId ? { ...r, status: "approved" as const, resolvedAt: nowIso, resolvedBy, priorData } : r);
     setLenderChangeRequests(updated);
     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: updated }) }).catch(e => console.error(e));
   }
@@ -6271,7 +6277,10 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
         }
       });
     }
-    const updated = lenderChangeRequests.map((r) => r.id === reqId ? { ...r, status: "denied" as const } : r);
+    // CAPMOON_LCR_RESOLVED_V2_TIMESTAMPS_2026_05_24 — record who denied and when (priorData stays null — denial doesn't change the lender)
+    const nowIso = new Date().toISOString();
+    const resolvedBy = ((session as any)?.user?.name || "Admin");
+    const updated = lenderChangeRequests.map((r) => r.id === reqId ? { ...r, status: "denied" as const, resolvedAt: nowIso, resolvedBy, priorData: null } : r);
     setLenderChangeRequests(updated);
     fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: updated }) }).catch(e => console.error(e));
   }
@@ -6280,6 +6289,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   const [showPastApprovals, setShowPastApprovals] = React.useState(false);
   // CAPMOON_ADMIN_APPROVALS_MINITAB — end
 
+  // CAPMOON_LCR_RESOLVED_V2_TIMESTAMPS_2026_05_24 — patch 4 marker: approve/deny handlers now capture priorData + resolvedAt/resolvedBy
   function handleDeleteLender(id: number) {
     const lender = lenderRecords.find((l) => l.id === id);
     if (!lender) return;
@@ -6304,8 +6314,12 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
   function handleDeleteRequestAction(reqId: number, action: "approved" | "denied") {
     const req = deleteRequests.find((r) => r.id === reqId);
     if (!req) return;
+    // CAPMOON_LCR_RESOLVED_V2_TIMESTAMPS_2026_05_24 — snapshot lender for Undo support before any mutation
+    const nowIso = new Date().toISOString();
+    const resolvedBy = ((session as any)?.user?.name || "Admin");
+    const priorData = action === "approved" ? (lenderRecords.find((l) => l.id === req.lenderId) || null) : null;
     if (action === "approved") setLenderRecords((prev) => { const next = prev.filter((l) => l.id !== req.lenderId); saveLendersToDb(next); fetch("/api/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"delete-lender",data:{id:req.lenderId}})}).catch(console.error); return next; });
-    setDeleteRequests(deleteRequests.map((r) => r.id === reqId ? { ...r, status: action } : r));
+    setDeleteRequests(deleteRequests.map((r) => r.id === reqId ? { ...r, status: action, resolvedAt: nowIso, resolvedBy, priorData } as any : r));
   }
 
   function updateLenderField(id: number, field: keyof LenderRecord, value: string) {
