@@ -6437,6 +6437,43 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     }
   }
 
+  // CAPMOON_LCR_DEDUPE_DETAIL_V1_2026_05_24 — expandable detail state + dedupe helpers
+  const [expandedReqId, setExpandedReqId] = React.useState<number | null>(null);
+  const [dedupeStatus, setDedupeStatus] = React.useState<{ running: boolean; result: string | null }>({ running: false, result: null });
+  async function handleDedupeLcr() {
+    if (dedupeStatus.running) return;
+    if (!window.confirm("Run one-time deduplication of lender change requests in Postgres? This is safe to run multiple times.")) return;
+    setDedupeStatus({ running: true, result: null });
+    try {
+      const res = await fetch("/api/admin/dedupe-lcr", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setDedupeStatus({ running: false, result: `❌ Dedupe failed: ${data?.error || res.statusText}` });
+        return;
+      }
+      setDedupeStatus({ running: false, result: `✓ Deduped: ${data.before} → ${data.after} records (${data.droppedDupes} duplicates removed)` });
+      // Refresh the page so client state reloads from cleaned DB
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (e: any) {
+      setDedupeStatus({ running: false, result: `❌ Error: ${e?.message || String(e)}` });
+    }
+  }
+  // Helper to compute changed fields between two LenderRecord-like objects
+  function lcrDiffFields(prior: any, proposed: any): Array<{ field: string; before: any; after: any }> {
+    const out: Array<{ field: string; before: any; after: any }> = [];
+    if (!proposed) return out;
+    const keys = new Set<string>([...Object.keys(prior || {}), ...Object.keys(proposed || {})]);
+    for (const k of Array.from(keys)) {
+      if (k === "lastUpdated" || k === "lastReviewedAt" || k === "lastReviewedBy" || k === "lastReviewNote") continue;
+      const a = prior ? (prior as any)[k] : undefined;
+      const b = (proposed as any)[k];
+      const aStr = JSON.stringify(a);
+      const bStr = JSON.stringify(b);
+      if (aStr !== bStr) out.push({ field: k, before: a, after: b });
+    }
+    return out;
+  }
+
   function addUser() {
     if (!newUserForm.name.trim() || !newUserForm.username.trim() || !newUserForm.password.trim()) return;
     setUsers([...users, { id: users.length + 1, ...newUserForm, blockedLenderIds: [] }]);
@@ -7624,6 +7661,17 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                         >
                           {migrationStatus.running ? "Migrating..." : "Migrate Seed Lenders to DB"}
                         </button>
+                        {/* CAPMOON_LCR_DEDUPE_DETAIL_V1_2026_05_24 — one-time dedupe button */}
+                        <button
+                          onClick={handleDedupeLcr}
+                          disabled={dedupeStatus.running}
+                          className="ml-2 px-4 py-2 text-xs font-semibold bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50"
+                        >
+                          {dedupeStatus.running ? "Deduping..." : "Dedupe Lender Change Requests"}
+                        </button>
+                        {dedupeStatus.result && (
+                          <div className="mt-2 text-xs p-2 rounded bg-white border border-gray-200 text-gray-700">{dedupeStatus.result}</div>
+                        )}
                       </div>
                       <button onClick={addUser} className="mt-4 px-4 py-2 text-sm font-semibold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Add User</button>
                     </div>
@@ -7664,21 +7712,70 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                             </div>
                           ) : (
                             <div className="space-y-2">
-                              {pendingLcr.map((req) => (
-                                <div key={"lcr-" + req.id} className="rounded-lg border border-gray-200 bg-gray-50 p-3 flex items-center justify-between gap-3 flex-wrap">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className={"px-2 py-0.5 rounded-full text-[10px] font-bold border " + (req.changeType === "add" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-blue-50 text-blue-600 border-blue-200")}>
-                                      {req.changeType === "add" ? "New Lender" : "Edit Lender"}
-                                    </span>
-                                    <span className="text-sm font-semibold text-[#0a1f44]">{req.lenderName}</span>
-                                    <span className="text-xs text-gray-500">by {req.requestedBy} · {req.requestedAt}</span>
+                              {/* CAPMOON_LCR_DEDUPE_DETAIL_V1_2026_05_24 — rows with expandable diff view */}
+                              {pendingLcr.map((req) => {
+                                const isExpanded = expandedReqId === req.id;
+                                const currentLender = req.changeType === "edit" ? lenderRecords.find((l) => l.id === req.lenderId) : null;
+                                const diffs = lcrDiffFields(currentLender, req.proposedData);
+                                return (
+                                  <div key={"lcr-" + req.id} className="rounded-lg border border-gray-200 bg-gray-50 overflow-hidden">
+                                    <div className="p-3 flex items-center justify-between gap-3 flex-wrap">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={"px-2 py-0.5 rounded-full text-[10px] font-bold border " + (req.changeType === "add" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-blue-50 text-blue-600 border-blue-200")}>
+                                          {req.changeType === "add" ? "New Lender" : "Edit Lender"}
+                                        </span>
+                                        <span className="text-sm font-semibold text-[#0a1f44]">{req.lenderName}</span>
+                                        <span className="text-xs text-gray-500">by {req.requestedBy} · {req.requestedAt}</span>
+                                      </div>
+                                      <div className="flex gap-2 items-center">
+                                        <button onClick={() => setExpandedReqId(isExpanded ? null : req.id)} className="px-3 py-1.5 text-xs font-semibold border border-[#0a1f44]/20 text-[#0a1f44] rounded-lg hover:bg-white">
+                                          {isExpanded ? "Hide Changes" : (req.changeType === "add" ? "View Details" : `View Changes${diffs.length > 0 ? ` (${diffs.length})` : ""}`)}
+                                        </button>
+                                        <button onClick={() => handleLenderChangeApprove(req.id)} className="px-3 py-1.5 text-xs font-semibold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600">Approve</button>
+                                        <button onClick={() => handleLenderChangeDeny(req.id)} className="px-3 py-1.5 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-white">Deny</button>
+                                      </div>
+                                    </div>
+                                    {isExpanded && (
+                                      <div className="border-t border-gray-200 bg-white p-4">
+                                        {req.changeType === "add" ? (
+                                          <div>
+                                            <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-3">New Lender Details</div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                                              {Object.entries(req.proposedData || {}).filter(([k]) => !["id","lastUpdated","lastReviewedAt","lastReviewedBy","lastReviewNote"].includes(k)).map(([k, v]) => (
+                                                <div key={k} className="flex gap-2">
+                                                  <span className="text-gray-500 font-medium min-w-[110px]">{k}:</span>
+                                                  <span className="text-[#0a1f44] break-words">{typeof v === "string" ? v : JSON.stringify(v)}</span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ) : diffs.length === 0 ? (
+                                          <div className="text-xs text-gray-500 italic">No field-level changes detected (data may be identical).</div>
+                                        ) : (
+                                          <div>
+                                            <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-3">{diffs.length} Field{diffs.length === 1 ? "" : "s"} Changing</div>
+                                            <div className="space-y-2">
+                                              {diffs.map((d) => (
+                                                <div key={d.field} className="grid grid-cols-1 md:grid-cols-[140px_1fr_1fr] gap-2 text-xs items-start border-b border-gray-100 pb-2 last:border-b-0">
+                                                  <div className="font-semibold text-[#0a1f44]">{d.field}</div>
+                                                  <div className="rounded bg-red-50 border border-red-100 px-2 py-1 text-red-700">
+                                                    <div className="text-[10px] font-bold uppercase text-red-500 mb-0.5">Before</div>
+                                                    <div className="break-words">{d.before === undefined || d.before === null || d.before === "" ? <span className="italic text-red-400">(empty)</span> : (typeof d.before === "string" ? d.before : JSON.stringify(d.before))}</div>
+                                                  </div>
+                                                  <div className="rounded bg-emerald-50 border border-emerald-100 px-2 py-1 text-emerald-700">
+                                                    <div className="text-[10px] font-bold uppercase text-emerald-500 mb-0.5">After</div>
+                                                    <div className="break-words">{d.after === undefined || d.after === null || d.after === "" ? <span className="italic text-emerald-400">(empty)</span> : (typeof d.after === "string" ? d.after : JSON.stringify(d.after))}</div>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
-                                  <div className="flex gap-2">
-                                    <button onClick={() => handleLenderChangeApprove(req.id)} className="px-3 py-1.5 text-xs font-semibold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600">Approve</button>
-                                    <button onClick={() => handleLenderChangeDeny(req.id)} className="px-3 py-1.5 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-white">Deny</button>
-                                  </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                               {pendingDr.map((req) => (
                                 <div key={"dr-" + req.id} className="rounded-lg border border-red-200 bg-red-50/50 p-3 flex items-center justify-between gap-3 flex-wrap">
                                   <div className="flex items-center gap-2 flex-wrap">
@@ -8171,8 +8268,15 @@ export default function Home() {
   }
   function handleSetLenderChangeRequests(newReqs: LenderChangeRequest[]) {
     console.log("[CAPMOON_LCR_DEBUG] handleSetLenderChangeRequests ENTRY count=" + newReqs.length + " ts=" + new Date().toISOString()); // CAPMOON_LCR_DEBUG_V1_DIAG_2026_05_24
-    setLenderChangeRequests(newReqs);
-    if (newReqs.length > 0) { console.log("[CAPMOON_LCR_DEBUG] handleSetLenderChangeRequests CALLING saveToDb lender-changes count=" + newReqs.length); saveToDb("lender-changes", newReqs); }
+    // CAPMOON_LCR_DEDUPE_DETAIL_V1_2026_05_24 — dedupe by id before persisting (defense in depth, server also dedupes)
+    const seenIds = new Set<number>();
+    const dedupedReqs = newReqs.filter((r) => {
+      if (seenIds.has(r.id)) return false;
+      seenIds.add(r.id);
+      return true;
+    });
+    setLenderChangeRequests(dedupedReqs);
+    if (dedupedReqs.length > 0) { console.log("[CAPMOON_LCR_DEBUG] handleSetLenderChangeRequests CALLING saveToDb lender-changes count=" + dedupedReqs.length); saveToDb("lender-changes", dedupedReqs); }
   }
 
   if (!dbLoaded) return (
