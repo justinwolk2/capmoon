@@ -7796,9 +7796,18 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                       // Build unified pending list
                       const pendingLcr = lenderChangeRequests.filter((r) => r.status === "pending");
                       const pendingDr = deleteRequests.filter((r) => r.status === "pending");
-                      // Build past list (<=7 days, non-pending)
-                      const pastLcr = lenderChangeRequests.filter((r) => r.status !== "pending" && (now - parseRequestedAt((r as any).requestedAt)) <= SEVEN_DAYS_MS);
-                      const pastDr = deleteRequests.filter((r) => r.status !== "pending" && (now - parseRequestedAt((r as any).requestedAt)) <= SEVEN_DAYS_MS);
+                      // CAPMOON_RECENTLY_RESOLVED_V2_2026_05_24 — Recently Resolved: 3-day window, sorted by resolvedAt desc
+                      const resolvedWindow = (r: any) => {
+                        const tMs = r.resolvedAt ? new Date(r.resolvedAt).getTime() : parseRequestedAt(r.requestedAt);
+                        return (now - tMs) <= THREE_DAYS_MS;
+                      };
+                      const resolvedSort = (a: any, b: any) => {
+                        const aMs = a.resolvedAt ? new Date(a.resolvedAt).getTime() : parseRequestedAt(a.requestedAt);
+                        const bMs = b.resolvedAt ? new Date(b.resolvedAt).getTime() : parseRequestedAt(b.requestedAt);
+                        return bMs - aMs; // most recent first
+                      };
+                      const pastLcr = lenderChangeRequests.filter((r) => r.status !== "pending" && resolvedWindow(r)).sort(resolvedSort);
+                      const pastDr = deleteRequests.filter((r) => r.status !== "pending" && resolvedWindow(r)).sort(resolvedSort);
                       const totalPending = pendingLcr.length + pendingDr.length;
                       const totalPast = pastLcr.length + pastDr.length;
                       return (
@@ -7806,7 +7815,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                             <div>
                               <div className="text-xs uppercase tracking-[0.2em] text-[#0a1f44] font-bold">Pending Approvals</div>
-                              <div className="text-xs text-gray-500 mt-0.5">{totalPending} awaiting review · past requests auto-delete after 7 days</div>
+                              <div className="text-xs text-gray-500 mt-0.5">{totalPending} awaiting review · resolved items auto-hide after 3 days{/* CAPMOON_RECENTLY_RESOLVED_V2_2026_05_24 */}</div>
                             </div>
                             {/* CAPMOON_ADMIN_APPROVALS_POLISH — pill toggles green/amber */}
                             {totalPending > 0 ? (
@@ -7907,6 +7916,7 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                           )}
 
                           {/* Past Requests collapsible */}
+                          {/* CAPMOON_RECENTLY_RESOLVED_V2_2026_05_24 — Recently Resolved collapsible with diff expansion */}
                           {totalPast > 0 && (
                             <div className="mt-4 pt-4 border-t border-gray-100">
                               <button
@@ -7915,34 +7925,89 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
                                 className="flex items-center gap-2 text-xs font-semibold text-gray-500 hover:text-[#0a1f44] transition-colors"
                               >
                                 <span>{showPastApprovals ? "▼" : "▶"}</span>
-                                <span>Past requests ({totalPast}) · last 7 days</span>
+                                <span>Recently Resolved ({totalPast}) · last 3 days</span>
                               </button>
                               {showPastApprovals && (
                                 <div className="space-y-2 mt-3">
-                                  {pastLcr.map((req) => (
-                                    <div key={"past-lcr-" + req.id} className="rounded-lg border border-gray-200 bg-white p-3 flex items-center justify-between gap-3 flex-wrap opacity-75">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-gray-100 text-gray-500 border-gray-200">{req.changeType === "add" ? "New Lender" : "Edit Lender"}</span>
-                                        <span className="text-sm text-[#0a1f44]">{req.lenderName}</span>
-                                        <span className="text-xs text-gray-400">by {req.requestedBy} · {req.requestedAt}</span>
+                                  {pastLcr.map((req) => {
+                                    const isExpanded = expandedReqId === req.id;
+                                    const currentLender = req.changeType === "edit" ? lenderRecords.find((l) => l.id === req.lenderId) : null;
+                                    // For edits, diff prior vs proposed. For adds, just list proposed fields.
+                                    const diffs = req.changeType === "edit" ? lcrDiffFields(req.priorData || currentLender, req.proposedData) : [];
+                                    const resolvedTimeStr = req.resolvedAt ? new Date(req.resolvedAt).toLocaleString() : "—";
+                                    return (
+                                      <div key={"past-lcr-" + req.id} className="rounded-lg border border-gray-200 bg-white overflow-hidden opacity-90">
+                                        <div className="p-3 flex items-center justify-between gap-3 flex-wrap">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span className={"px-2 py-0.5 rounded-full text-[10px] font-bold border " + (req.status === "approved" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-red-50 text-red-500 border-red-200")}>
+                                              {req.status === "approved" ? "✓ APPROVED" : "✗ DENIED"}
+                                            </span>
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-gray-50 text-gray-500 border-gray-200">{req.changeType === "add" ? "New Lender" : "Edit Lender"}</span>
+                                            <span className="text-sm font-semibold text-[#0a1f44]">{req.lenderName}</span>
+                                            <span className="text-xs text-gray-400">by {req.requestedBy} · resolved {resolvedTimeStr}{req.resolvedBy ? ` by ${req.resolvedBy}` : ""}</span>
+                                          </div>
+                                          <div className="flex gap-2 items-center">
+                                            <button onClick={() => setExpandedReqId(isExpanded ? null : req.id)} className="px-3 py-1.5 text-xs font-semibold border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">
+                                              {isExpanded ? "Hide Changes" : (req.changeType === "add" ? "View Details" : `View Changes${diffs.length > 0 ? ` (${diffs.length})` : ""}`)}
+                                            </button>
+                                          </div>
+                                        </div>
+                                        {isExpanded && (
+                                          <div className="border-t border-gray-200 bg-gray-50 p-4">
+                                            {req.changeType === "add" ? (
+                                              <div>
+                                                <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-3">{req.status === "approved" ? "Lender Added With:" : "Was Going To Add:"}</div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                                                  {Object.entries(req.proposedData || {}).filter(([k]) => !["id","lastUpdated","lastReviewedAt","lastReviewedBy","lastReviewNote"].includes(k)).map(([k, v]) => (
+                                                    <div key={k} className="flex gap-2">
+                                                      <span className="text-gray-500 font-medium min-w-[110px]">{k}:</span>
+                                                      <span className="text-[#0a1f44] break-words">{typeof v === "string" ? v : JSON.stringify(v)}</span>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            ) : diffs.length === 0 ? (
+                                              <div className="text-xs text-gray-500 italic">No field-level changes recorded.</div>
+                                            ) : (
+                                              <div>
+                                                <div className="text-xs font-bold text-[#0a1f44] uppercase tracking-wide mb-3">{diffs.length} Field{diffs.length === 1 ? "" : "s"} {req.status === "approved" ? "Changed" : "Would Have Changed"}</div>
+                                                <div className="space-y-2">
+                                                  {diffs.map((d) => (
+                                                    <div key={d.field} className="grid grid-cols-1 md:grid-cols-[140px_1fr_1fr] gap-2 text-xs items-start border-b border-gray-100 pb-2 last:border-b-0">
+                                                      <div className="font-semibold text-[#0a1f44]">{d.field}</div>
+                                                      <div className="rounded bg-red-50 border border-red-100 px-2 py-1 text-red-700">
+                                                        <div className="text-[10px] font-bold uppercase text-red-500 mb-0.5">Before</div>
+                                                        <div className="break-words">{d.before === undefined || d.before === null || d.before === "" ? <span className="italic text-red-400">(empty)</span> : (typeof d.before === "string" ? d.before : JSON.stringify(d.before))}</div>
+                                                      </div>
+                                                      <div className="rounded bg-emerald-50 border border-emerald-100 px-2 py-1 text-emerald-700">
+                                                        <div className="text-[10px] font-bold uppercase text-emerald-500 mb-0.5">After</div>
+                                                        <div className="break-words">{d.after === undefined || d.after === null || d.after === "" ? <span className="italic text-emerald-400">(empty)</span> : (typeof d.after === "string" ? d.after : JSON.stringify(d.after))}</div>
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
-                                      <span className={"px-2 py-0.5 rounded-full text-[10px] font-semibold " + (req.status === "approved" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-gray-100 text-gray-500 border border-gray-200")}>
-                                        {req.status === "approved" ? "✓ Approved" : "✕ Denied"}
-                                      </span>
-                                    </div>
-                                  ))}
-                                  {pastDr.map((req) => (
-                                    <div key={"past-dr-" + req.id} className="rounded-lg border border-gray-200 bg-white p-3 flex items-center justify-between gap-3 flex-wrap opacity-75">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-gray-100 text-gray-500 border-gray-200">Delete Lender</span>
-                                        <span className="text-sm text-[#0a1f44]">{req.lenderName}</span>
-                                        <span className="text-xs text-gray-400">by {req.requestedBy} · {req.requestedAt}</span>
+                                    );
+                                  })}
+                                  {pastDr.map((req) => {
+                                    const resolvedTimeStr = (req as any).resolvedAt ? new Date((req as any).resolvedAt).toLocaleString() : "—";
+                                    return (
+                                      <div key={"past-dr-" + req.id} className="rounded-lg border border-gray-200 bg-white p-3 flex items-center justify-between gap-3 flex-wrap opacity-90">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className={"px-2 py-0.5 rounded-full text-[10px] font-bold border " + (req.status === "approved" ? "bg-red-50 text-red-500 border-red-200" : "bg-gray-100 text-gray-500 border-gray-200")}>
+                                            {req.status === "approved" ? "✓ DELETED" : "✗ DENIED"}
+                                          </span>
+                                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-gray-50 text-gray-500 border-gray-200">Delete Lender</span>
+                                          <span className="text-sm font-semibold text-[#0a1f44]">{req.lenderName}</span>
+                                          <span className="text-xs text-gray-400">by {req.requestedBy} · resolved {resolvedTimeStr}{(req as any).resolvedBy ? ` by ${(req as any).resolvedBy}` : ""}</span>
+                                        </div>
                                       </div>
-                                      <span className={"px-2 py-0.5 rounded-full text-[10px] font-semibold " + (req.status === "approved" ? "bg-red-50 text-red-500 border border-red-200" : "bg-gray-100 text-gray-500 border border-gray-200")}>
-                                        {req.status === "approved" ? "Approved & Deleted" : "✕ Denied"}
-                                      </span>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
