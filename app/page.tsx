@@ -994,6 +994,15 @@ const APARTMENT_REFI_DEAL_TYPES = [
   { code: "refi-other",             label: "Other",                                                active: false },
 ];
 
+// CAPMOON_APT_ACQ_STUBS_V2_2026_05_25 — Apartments + Acquisition pulldown (5 Coming Soon stubs, 6-b-1 through 6-b-5)
+const APARTMENT_ACQ_DEAL_TYPES = [
+  { code: "acq-va-light",       label: "Value-Add (Light)",                  active: false },
+  { code: "acq-new-construct",  label: "New Ground-Up Construction Project", active: false },
+  { code: "acq-bridge",         label: "Bridge / Short Term Acquisition",    active: false },
+  { code: "acq-perm",           label: "Permanent Acquisition",              active: false },
+  { code: "acq-other",          label: "Other",                              active: false },
+];
+
 // CAPMOON_PREMIER_PHOTOS_4_PATCH_2026_05_10 — combined photo accessor (max 4)
 function getAssetPhotos(a: any): string[] {
   const arr: string[] = [];
@@ -1558,7 +1567,8 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                 {asset.ownershipStatus && asset.assetType && (
                   <>
                     {/* CAPMOON_PREMIER_V4_APARTMENT_BESPOKE_2026_05_11 — Apartments+Refinance gets pulldown; everything else gets normal Deal Type */}
-                    {asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" ? (
+                    {/* CAPMOON_APT_ACQ_STUBS_V2_2026_05_25 — pulldown now covers both Refinance + Acquisition */}
+                    {asset.assetType === "Apartments" && (asset.ownershipStatus === "Refinance" || asset.ownershipStatus === "Acquisition") ? (
                       <div className="md:col-span-2">
                         {/* CAPMOON_PREMIER_V42_DEAL_TYPE_LABEL_2026_05_11 — dynamic per-asset-type label (apartments branch) */}
                         <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">{assetShortLabel(asset.assetType)} Deal Type</label>
@@ -1566,7 +1576,9 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                           value={asset.apartmentDealType || ""}
                           onValueChange={(v) => {
                             // CAPMOON_PREMIER_V48_DEALTYPE_RESET_2026_05_17 — clear deal-type-specific fields on a real change
-                            const opt = APARTMENT_REFI_DEAL_TYPES.find((o) => o.code === v);
+                            // CAPMOON_APT_ACQ_STUBS_V2_2026_05_25 — pick array based on ownership
+                            const aptDealTypeList = asset.ownershipStatus === "Acquisition" ? APARTMENT_ACQ_DEAL_TYPES : APARTMENT_REFI_DEAL_TYPES;
+                            const opt = aptDealTypeList.find((o) => o.code === v);
                             if (!opt || !opt.active) return;
                             const prev = asset.apartmentDealType;
                             // Always set the new code; if a different code was previously selected, also reset bespoke fields
@@ -1603,7 +1615,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                             <SelectValue placeholder="Choose deal type…" />
                           </SelectTrigger>
                           <SelectContent>
-                            {APARTMENT_REFI_DEAL_TYPES.map((opt) => {
+                            {(asset.ownershipStatus === "Acquisition" ? APARTMENT_ACQ_DEAL_TYPES : APARTMENT_REFI_DEAL_TYPES).map((opt) => {
                               // CAPMOON_PREMIER_V48_6A4_FIXES_2026_05_17 — option tooltips, rebuilt with stronger styles
                               const tooltipMap: Record<string, string> = {
                                 "refi-va-new-construct": "For existing properties that will either be knocked down or add new buildings",
