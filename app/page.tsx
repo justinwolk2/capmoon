@@ -6261,7 +6261,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     }
     const updated = lenderChangeRequests.map((r) => r.id === reqId ? { ...r, status: "approved" as const, resolvedAt: nowIso, resolvedBy, priorData } : r);
     setLenderChangeRequests(updated);
-    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: updated }) }).catch(e => console.error(e));
+    // CAPMOON_LCR_DOUBLE_WRITE_FIX_V1_2026_05_24 — dedupe before raw fetch to prevent race-condition duplicates
+    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: ((arr: any[]) => { const s = new Set(); return arr.filter((r: any) => { if (s.has(r.id)) return false; s.add(r.id); return true; }); })(updated) }) }).catch(e => console.error(e));
   }
 
   // Reusable deny handler for lender change requests
@@ -6282,7 +6283,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     const resolvedBy = ((session as any)?.user?.name || "Admin");
     const updated = lenderChangeRequests.map((r) => r.id === reqId ? { ...r, status: "denied" as const, resolvedAt: nowIso, resolvedBy, priorData: null } : r);
     setLenderChangeRequests(updated);
-    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: updated }) }).catch(e => console.error(e));
+    // CAPMOON_LCR_DOUBLE_WRITE_FIX_V1_2026_05_24 — dedupe before raw fetch to prevent race-condition duplicates
+    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: ((arr: any[]) => { const s = new Set(); return arr.filter((r: any) => { if (s.has(r.id)) return false; s.add(r.id); return true; }); })(updated) }) }).catch(e => console.error(e));
   }
 
   // Mini-tab: collapsible state for "Past Requests"
@@ -6337,7 +6339,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     };
     const next = [...lenderChangeRequests, req];
     setLenderChangeRequests(next);
-    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: next }) }).catch(e => console.error("Save failed:", e));
+    // CAPMOON_LCR_DOUBLE_WRITE_FIX_V1_2026_05_24 — dedupe before raw fetch to prevent race-condition duplicates
+    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: ((arr: any[]) => { const s = new Set(); return arr.filter((r: any) => { if (s.has(r.id)) return false; s.add(r.id); return true; }); })(next) }) }).catch(e => console.error("Save failed:", e));
     alert(`Your edit request for "${lender.lender}" has been submitted for admin approval.`);
     setEditingLenderId(null);
   }
@@ -6400,7 +6403,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
       };
       const next = [...lenderChangeRequests, req];
       setLenderChangeRequests(next);
-      fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: next }) }).catch(e => console.error(e));
+      // CAPMOON_LCR_DOUBLE_WRITE_FIX_V1_2026_05_24 — dedupe before raw fetch to prevent race-condition duplicates (submit path)
+      fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: ((arr: any[]) => { const s = new Set(); return arr.filter((r: any) => { if (s.has(r.id)) return false; s.add(r.id); return true; }); })(next) }) }).catch(e => console.error(e));
       alert(`Your request to add "${newLender.lender}" has been submitted for admin approval.`);
       setActiveTab("lenders");
     }
@@ -6494,7 +6498,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
       resolvedBy: undefined,
     } : r);
     setLenderChangeRequests(updatedReqs);
-    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: updatedReqs }) }).catch(console.error);
+    // CAPMOON_LCR_DOUBLE_WRITE_FIX_V1_2026_05_24 — dedupe before raw fetch to prevent race-condition duplicates (undo path)
+    fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "lender-changes", data: ((arr: any[]) => { const s = new Set(); return arr.filter((r: any) => { if (s.has(r.id)) return false; s.add(r.id); return true; }); })(updatedReqs) }) }).catch(console.error);
     setExpandedReqId(null);
   }
 
@@ -8788,7 +8793,7 @@ export default function Home() {
       if (dbDeals.length > 0) setSubmittedDeals(dbDeals);
       if (dbTeam.length > 0) setTeamMembers(dbTeam); else setTeamMembers(initialTeamMembers);
       if (dbDeletes.length > 0) setDeleteRequests(dbDeletes);
-      if (dbLcr.length > 0) setLenderChangeRequests(dbLcr);
+      if (dbLcr.length > 0) setLenderChangeRequests(((arr: any[]) => { const s = new Set(); return arr.filter((r: any) => { if (s.has(r.id)) return false; s.add(r.id); return true; }); })(dbLcr)); // CAPMOON_LCR_DOUBLE_WRITE_FIX_V1_2026_05_24
       setDbLoaded(true);
     }
     loadData();
