@@ -51,6 +51,9 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
   const [docFile, setDocFile] = React.useState<File | null>(null);
   const [docUploading, setDocUploading] = React.useState(false);
   const [requestDocs, setRequestDocs] = React.useState<string[]>([]);
+  // CAPMOON_CUSTOM_DOC_REQUEST_V2_2026_05_25 — write-in custom doc names alongside standard pills
+  const [customDocOpen, setCustomDocOpen] = React.useState(false);
+  const [customDocInput, setCustomDocInput] = React.useState("");
   const [requestEmail, setRequestEmail] = React.useState(deal.seekerEmail || "");
   const [requestSending, setRequestSending] = React.useState(false);
   const [requestSent, setRequestSent] = React.useState(false);
@@ -547,10 +550,21 @@ export function DealCard({ deal, session, isAdmin, teamMembers, users, submitted
             <div><label className="text-xs text-gray-500 mb-1 block font-bold">Borrower Email</label>
               <input value={requestEmail} onChange={e => setRequestEmail(e.target.value)} placeholder="borrower@email.com" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl" /></div>
             <div><label className="text-xs text-gray-500 mb-2 block font-bold">Documents Needed</label>
+              {/* CAPMOON_CUSTOM_DOC_REQUEST_V2_2026_05_25 — standard pills (no Other) + custom-tag pills + Other+ toggle */}
               <div className="flex flex-wrap gap-1.5">
-                {docTypes.map(t => <button key={t} type="button" onClick={() => setRequestDocs(p => p.includes(t)?p.filter(x=>x!==t):[...p,t])}
+                {docTypes.filter(t => t !== "Other").map(t => <button key={t} type="button" onClick={() => setRequestDocs(p => p.includes(t)?p.filter(x=>x!==t):[...p,t])}
                   className={"px-2.5 py-1 text-xs rounded-full border font-medium transition-all "+(requestDocs.includes(t)?"bg-[#0a1f44] text-white border-[#0a1f44]":"bg-white text-gray-500 border-gray-200 hover:border-[#0a1f44]/30")}>{t}</button>)}
-              </div></div>
+                {requestDocs.filter(d => !docTypes.includes(d)).map(d => <span key={d} className="px-2.5 py-1 text-xs rounded-full border font-medium bg-[#0a1f44]/10 text-[#0a1f44] border-[#0a1f44]/30 inline-flex items-center gap-1.5">{d}<button type="button" onClick={() => setRequestDocs(p => p.filter(x => x !== d))} className="text-[#0a1f44]/60 hover:text-[#0a1f44] font-bold leading-none">×</button></span>)}
+                <button type="button" onClick={() => setCustomDocOpen(o => !o)}
+                  className={"px-2.5 py-1 text-xs rounded-full border font-medium transition-all "+(customDocOpen?"bg-[#0a1f44] text-white border-[#0a1f44]":"bg-white text-gray-500 border-gray-200 hover:border-[#0a1f44]/30")}>Other +</button>
+              </div>
+              {customDocOpen && (
+                <div className="flex gap-2 mt-2">
+                  <input value={customDocInput} onChange={e => setCustomDocInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); const v = customDocInput.trim(); if (v && !requestDocs.includes(v)) { setRequestDocs(p => [...p, v]); setCustomDocInput(""); } } }} placeholder="Type a document name and press Add..." className="flex-1 px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]" />
+                  <button type="button" onClick={() => { const v = customDocInput.trim(); if (v && !requestDocs.includes(v)) { setRequestDocs(p => [...p, v]); setCustomDocInput(""); } }} className="px-4 py-2 text-sm font-bold bg-[#0a1f44] text-white rounded-xl hover:bg-[#0a1f44]/80">Add</button>
+                </div>
+              )}
+              </div>
             {requestDocs.length > 0 && <button type="button" onClick={sendDocRequest} disabled={requestSending||requestSent}
               className={"w-full py-2.5 text-sm font-bold rounded-xl "+(requestSent?"bg-green-500 text-white":"bg-[#c9a84c] text-[#0a1f44] hover:bg-[#c9a84c]/80")}>
               {requestSent?"✓ Sent!":requestSending?"Sending...":`Send Request (${requestDocs.length} docs)`}</button>}
