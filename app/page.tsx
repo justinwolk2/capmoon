@@ -6634,8 +6634,9 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
     // CAPMOON_LCR_STANDALONE_KILL_V2_2026_05_24 — standalone Lender Changes tab removed; pending requests live in Admin Portal
   ].filter((item) => {
     // CAPMOON_INTERN_ACCESS_PATCH — interns only see lender database tabs
+    // CAPMOON_MY_REQUESTS_INTERN_FIX_V1_2026_05_24 — also allow my-requests tab for interns
     if (!isIntern) return true;
-    return ["overview", "lenders", "add-lender", "pipeline"].includes(item[0] as string); // CAPMOON_PIPELINE_SIDEBAR_PATCH
+    return ["overview", "lenders", "add-lender", "pipeline", "my-requests"].includes(item[0] as string); // CAPMOON_PIPELINE_SIDEBAR_PATCH + CAPMOON_MY_REQUESTS_INTERN_FIX_V1_2026_05_24
   }) as [string, string, any, string?][];
 
   // ── SectionHeader component (extracted for React hooks compliance) ──
