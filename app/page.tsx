@@ -1628,7 +1628,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                                 <SelectItem
                                   key={opt.code}
                                   value={opt.code}
-                                  disabled={!opt.active}
+                                  style={!opt.active ? {opacity:0.5, cursor:"not-allowed"} : undefined}
                                 >
                                   <span style={{display:"inline-flex",alignItems:"center",gap:"6px"}}>
                                     <span>{opt.label}{!opt.active ? " — Coming Soon" : ""}</span>
