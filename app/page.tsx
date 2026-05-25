@@ -8841,7 +8841,7 @@ export default function Home() {
       return true;
     });
     setLenderChangeRequests(dedupedReqs);
-    if (dedupedReqs.length > 0) { saveToDb("lender-changes", dedupedReqs); }
+    // CAPMOON_LCR_DOUBLE_WRITE_FIX_V4_2026_05_25 — saveToDb removed; MainPortal direct fetch is the single write path. Was racing MainPortal's fetch causing dupes via server wipe-and-rewrite.
   }
 
   if (!dbLoaded) return (
