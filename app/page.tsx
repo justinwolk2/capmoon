@@ -1,3 +1,4 @@
+// CAPMOON_FORCE_REBUILD_V1_2026_05_25 — epoch=1779716529 — forces Turbopack to rebundle this module, no functional change
 "use client";
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
