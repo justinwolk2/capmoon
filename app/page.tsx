@@ -6010,7 +6010,8 @@ function MainPortal({ session, onLogout, submittedDeals, setSubmittedDeals, user
 
   // CAPMOON_INTERN_ACCESS_PATCH — runtime guard: redirect interns away from non-allowed tabs
   useEffect(() => {
-    if (isIntern && activeTab && !["overview", "lenders", "add-lender"].includes(activeTab)) {
+    // CAPMOON_MY_REQUESTS_USEEFFECT_FIX_V1_2026_05_24 — add pipeline (was missing) + my-requests to allowlist
+    if (isIntern && activeTab && !["overview", "lenders", "add-lender", "pipeline", "my-requests"].includes(activeTab)) {
       setActiveTab("overview");
     }
   }, [isIntern, activeTab]);
