@@ -1311,6 +1311,25 @@ function AddressFields({ address, onChange, inputClass }: { address: AssetAddres
 function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, inputClass, selectTriggerClass }: { asset: AssetData; capitalType: string; onUpdate: (updated: AssetData) => void; tenantDatabase: string[]; onTenantAdd: (name: string) => void; inputClass: string; selectTriggerClass: string }) {
   const m = calcMetrics(asset, capitalType);
   function upd(field: keyof AssetData, value: any) { onUpdate({ ...asset, [field]: value }); }
+
+  // CAPMOON_GROUNDUP_LOAN_AUTOPERSIST_V1_2026_05_25 — write calculated Total Loan Amount to state
+  // for ground-up paths so Step 4 + rollup tiles can read it. Pre-pop in the UI is purely visual;
+  // state stays empty unless user types. This effect persists the default value.
+  React.useEffect(() => {
+    const code = asset.apartmentDealType;
+    if (code !== "refi-va-new-construct" && code !== "acq-new-construct") return;
+    if (asset.loanAmountGroundup && asset.loanAmountGroundup.trim() !== "") return; // user-set, leave alone
+    const land = parseCurrency(asset.landCost || "");
+    const hard = parseCurrency(asset.hardCostsGroundup || "");
+    const soft = parseCurrency(asset.softCostsGroundup || "");
+    const total = land + hard + soft;
+    if (total <= 0) return; // not enough data
+    const subBE = code === "acq-new-construct" ? parseCurrency(asset.borrowerEquity || "") : 0;
+    const calc = Math.max(0, total - subBE);
+    upd("loanAmountGroundup", formatCurrencyInput(String(Math.round(calc))));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asset.apartmentDealType, asset.landCost, asset.hardCostsGroundup, asset.softCostsGroundup, asset.borrowerEquity, asset.loanAmountGroundup]);
+
   const showUnits = unitAssets.includes(asset.assetType);
   const showRetail = retailAssets.includes(asset.assetType);
   const showAcres = asset.assetType === "Land";
