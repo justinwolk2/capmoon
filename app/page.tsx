@@ -65,6 +65,8 @@ type AssetData = {
   apartmentDealType?: string;
   // CAPMOON_6B1_PLUMBING_V2_2026_05_25 — 6-b-1 acquisition expected close date
   expectedCloseDate?: string;
+  // CAPMOON_6B2_PLUMBING_V1_2026_05_25 — 6-b-2 acquisition loan (for the land/property purchase, distinct from construction loan)
+  acquisitionLoanAmount?: string;
   // CAPMOON_PREMIER_V3_GATING_PATCH_2026_05_10 — skip-photos flag for progressive disclosure
   propertySkipPhotos?: boolean;
   // CAPMOON_PREMIER_V4_APARTMENT_BESPOKE_2026_05_11 — prior renovation history
@@ -999,7 +1001,7 @@ const APARTMENT_REFI_DEAL_TYPES = [
 // CAPMOON_APT_ACQ_STUBS_V2_2026_05_25 — Apartments + Acquisition pulldown (5 Coming Soon stubs, 6-b-1 through 6-b-5)
 const APARTMENT_ACQ_DEAL_TYPES = [
   { code: "acq-va-light",       label: "Value-Add (Light)",                  active: true  },  // CAPMOON_6B1_PLUMBING_V2_2026_05_25 — 6-b-1 active
-  { code: "acq-new-construct",  label: "New Ground-Up Construction Project", active: false },
+  { code: "acq-new-construct",  label: "New Ground-Up Construction Project", active: true  },  // CAPMOON_6B2_PLUMBING_V1_2026_05_25 — 6-b-2 active
   { code: "acq-bridge",         label: "Bridge / Short Term Acquisition",    active: false },
   { code: "acq-perm",           label: "Permanent Acquisition",              active: false },
   { code: "acq-other",          label: "Other",                              active: false },
@@ -1088,7 +1090,7 @@ function normalizeRecourse(v: string) { return v === "SELECTIVE" || !v ? "CASE B
 function blankAddress(): AssetAddress { return { street: "", unit: "", city: "", state: "", zip: "" }; }
 function blankAsset(id: number): AssetData {
   // CAPMOON_PREMIER_V43_CLEAR_DEFAULTS_2026_05_11 — assetType default cleared so v4.2 gate actually gates
-  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "", borrowerName: "", landAcquisitionInvolved: "", hardCostsGroundup: "", softCostsGroundup: "", totalBudgetGroundup: "", buildingsAfterConstruction: "", unitsAfterConstruction: "", valueAfterConstruction: "", noiAfterConstruction: "", loanAmountGroundup: "", desiredLoanTerm: "", desiredNewLoanAmount: "", useOfProceedsItems: [], sourceOfFundsItems: [], desiredLoanTermPermRT: "", customLoanTermPermRT: "", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dy: "", currentRate: "", arvValue: "", stabilizedNoi: "", constructionBudget: "", purchaseYear: String(new Date().getFullYear()), expectedCloseDate: "", fullyEntitled: undefined, currentPropertyValue: "", additionalEquity: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
+  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "", borrowerName: "", landAcquisitionInvolved: "", hardCostsGroundup: "", softCostsGroundup: "", totalBudgetGroundup: "", buildingsAfterConstruction: "", unitsAfterConstruction: "", valueAfterConstruction: "", noiAfterConstruction: "", loanAmountGroundup: "", desiredLoanTerm: "", desiredNewLoanAmount: "", useOfProceedsItems: [], sourceOfFundsItems: [], desiredLoanTermPermRT: "", customLoanTermPermRT: "", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dy: "", currentRate: "", arvValue: "", stabilizedNoi: "", constructionBudget: "", purchaseYear: String(new Date().getFullYear()), expectedCloseDate: "", acquisitionLoanAmount: "", fullyEntitled: undefined, currentPropertyValue: "", additionalEquity: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
 }
 function blankLenderForm(): NewLenderForm {
   return { programName: "", contactPerson: "", email: "", phone: "", website: "", typeOfLenders: [], typeOfLoans: [], programTypes: [], propertyTypes: [], loanTerms: [], notes: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalTypes: [], capitalTypePrograms: [], contacts: [], status: "Active" };
