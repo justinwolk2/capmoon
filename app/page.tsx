@@ -1315,30 +1315,26 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
   // CAPMOON_GROUNDUP_LOAN_AUTOPERSIST_V1_2026_05_25 — write calculated Total Loan Amount to state
   // for ground-up paths so Step 4 + rollup tiles can read it. Pre-pop in the UI is purely visual;
   // state stays empty unless user types. This effect persists the default value.
+  // CAPMOON_GROUNDUP_AUTOPERSIST_V2_2026_05_25 — ref-tracked auto-persist (v1 stuck at first char due to non-empty guard)
+  const lastAutoPersistedRef = React.useRef<string>("");
   React.useEffect(() => {
-    // CAPMOON_GROUNDUP_AUTOPERSIST_DEBUG_V1_2026_05_25 — diagnostic logs
     const code = asset.apartmentDealType;
-    console.log("[AUTOPERSIST] effect fired, code =", code, "currentLoan =", asset.loanAmountGroundup);
     if (code !== "refi-va-new-construct" && code !== "acq-new-construct") return;
-    if (asset.loanAmountGroundup && asset.loanAmountGroundup.trim() !== "") {
-      console.log("[AUTOPERSIST] user-set, leaving alone:", asset.loanAmountGroundup);
-      return;
-    }
-    console.log("[AUTOPERSIST] raw fields:", { landCost: asset.landCost, hard: asset.hardCostsGroundup, soft: asset.softCostsGroundup, BE: asset.borrowerEquity });
+    const currentVal = (asset.loanAmountGroundup || "").trim();
+    // If current state differs from what WE last wrote, user typed a custom value — leave alone
+    if (currentVal !== "" && currentVal !== lastAutoPersistedRef.current) return;
     const land = parseCurrency(asset.landCost || "");
     const hard = parseCurrency(asset.hardCostsGroundup || "");
     const soft = parseCurrency(asset.softCostsGroundup || "");
     const total = land + hard + soft;
-    console.log("[AUTOPERSIST] parsed:", { land, hard, soft, total });
-    if (total <= 0) {
-      console.log("[AUTOPERSIST] total <= 0, skipping");
-      return;
-    }
+    if (total <= 0) return;
     const subBE = code === "acq-new-construct" ? parseCurrency(asset.borrowerEquity || "") : 0;
     const calc = Math.max(0, total - subBE);
     const formatted = formatCurrencyInput(String(Math.round(calc)));
-    console.log("[AUTOPERSIST] WRITING:", { subBE, calc, formatted });
-    upd("loanAmountGroundup", formatted);
+    if (formatted !== currentVal) {
+      lastAutoPersistedRef.current = formatted;
+      upd("loanAmountGroundup", formatted);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asset.apartmentDealType, asset.landCost, asset.hardCostsGroundup, asset.softCostsGroundup, asset.borrowerEquity, asset.loanAmountGroundup]);
 
