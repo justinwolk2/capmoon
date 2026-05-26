@@ -2437,6 +2437,88 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                   );
                 })()}
 
+                {/* CAPMOON_6B2_FORM_V3_2026_05_25 — 6-b-2 Apartments + Acquisition + New Ground-Up Construction */}
+                {asset.ownershipStatus === "Acquisition" && asset.assetType === "Apartments" && asset.apartmentDealType === "acq-new-construct" && (() => {
+                  const landPP        = parseCurrency(asset.landCost || "");
+                  const acqLoan       = parseCurrency(asset.acquisitionLoanAmount || "");
+                  const borrowerEq    = parseCurrency(asset.borrowerEquity || "");
+                  const hardC         = parseCurrency(asset.hardCostsGroundup || "");
+                  const softC         = parseCurrency(asset.softCostsGroundup || "");
+                  const totalProjCost = landPP + hardC + softC;
+                  const valAfter      = parseCurrency(asset.valueAfterConstruction || "");
+                  const newNOI        = parseCurrency(asset.noiAfterConstruction || "");
+                  const newLoan       = parseCurrency(asset.loanAmountGroundup || (totalProjCost > 0 ? String(Math.round(totalProjCost)) : ""));
+                  const entryLTC      = landPP > 0 && acqLoan > 0 ? (acqLoan / landPP) * 100 : 0;
+                  const newCap        = valAfter > 0 && newNOI > 0 ? (newNOI / valAfter) * 100 : 0;
+                  const arltv         = valAfter > 0 && newLoan > 0 ? (newLoan / valAfter) * 100 : 0;
+                  const newEquity     = Math.max(0, valAfter - newLoan);
+                  const newDY         = newLoan > 0 && newNOI > 0 ? (newNOI / newLoan) * 100 : 0;
+                  return (
+                    <div className="md:col-span-2 rounded-xl border border-[#c9a84c]/40 bg-[#c9a84c]/5 p-4 space-y-4 mt-2">
+                      <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Project Details</div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Proposed Units</label><Input value={asset.unitsAfterConstruction || ""} onChange={(e) => upd("unitsAfterConstruction", e.target.value)} placeholder="e.g. 250" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Proposed Buildings</label><Input value={asset.buildingsAfterConstruction || ""} onChange={(e) => upd("buildingsAfterConstruction", e.target.value)} placeholder="e.g. 6" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Land Purchase Price</label><Input value={asset.landCost || ""} onChange={(e) => upd("landCost", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Loan Amount Requested for Acquisition</label><Input value={asset.acquisitionLoanAmount || ""} onChange={(e) => upd("acquisitionLoanAmount" as any, formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Total Borrower Equity</label><Input value={asset.borrowerEquity || ""} onChange={(e) => upd("borrowerEquity", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                      </div>
+
+                      <div className="border-t border-[#c9a84c]/20 pt-4 space-y-3">
+                        <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Construction Plan</div>
+
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Total Hard Costs of Construction</label><Input value={asset.hardCostsGroundup || ""} onChange={(e) => upd("hardCostsGroundup", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Total Soft / Other Costs (incl. interest)</label><Input value={asset.softCostsGroundup || ""} onChange={(e) => upd("softCostsGroundup", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        </div>
+
+                        {totalProjCost > 0 && (
+                          <div className="rounded-xl border-2 border-[#0a1f44] bg-[#0a1f44] p-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-[#c9a84c] uppercase tracking-wide">Total Project Costs</span>
+                              <span className="text-lg font-bold text-white">{formatCurrencyInput(String(Math.round(totalProjCost)))}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Time to Completion</label><Input value={asset.timeToCompletion || ""} onChange={(e) => upd("timeToCompletion" as any, e.target.value)} placeholder="e.g. 24 months" className={inputClass} /></div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Estimated Value After Construction</label><Input value={asset.valueAfterConstruction || ""} onChange={(e) => upd("valueAfterConstruction", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                          <div>
+                            <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Total Loan Amount</label>
+                            <Input
+                              value={asset.loanAmountGroundup || (totalProjCost > 0 ? formatCurrencyInput(String(Math.round(totalProjCost))) : "")}
+                              onChange={(e) => upd("loanAmountGroundup", formatCurrencyInput(e.target.value))}
+                              placeholder="$0"
+                              className={inputClass}
+                            />
+                            <div className="text-xs text-gray-400 mt-1">Pre-populates to Land + Hard + Soft Costs; edit as needed.</div>
+                          </div>
+                          <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Estimated New NOI After Construction</label><Input value={asset.noiAfterConstruction || ""} onChange={(e) => upd("noiAfterConstruction", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-[#c9a84c]/20 pt-4">
+                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label>
+                        <Select value={asset.recourseType} onValueChange={(v) => upd("recourseType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
+                      </div>
+
+                      {(landPP > 0 || acqLoan > 0 || borrowerEq > 0 || valAfter > 0 || newNOI > 0 || newLoan > 0) && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-4 border-t border-[#c9a84c]/20">
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Entry LTC</div><div className="text-sm font-bold text-[#0a1f44]">{entryLTC > 0 ? entryLTC.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Total Project Costs</div><div className="text-sm font-bold text-[#0a1f44]">{totalProjCost > 0 ? "$" + (totalProjCost / 1000000).toFixed(2) + "M" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Borrower Equity</div><div className="text-sm font-bold text-[#0a1f44]">{borrowerEq > 0 ? "$" + (borrowerEq / 1000000).toFixed(2) + "M" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New Cap Rate</div><div className="text-sm font-bold text-[#0a1f44]">{newCap > 0 ? newCap.toFixed(2) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">AR LTV</div><div className="text-sm font-bold text-[#0a1f44]">{arltv > 0 ? arltv.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New Equity</div><div className="text-sm font-bold text-[#0a1f44]">{newEquity > 0 ? "$" + (newEquity / 1000000).toFixed(2) + "M" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New DY</div><div className="text-sm font-bold text-[#0a1f44]">{newDY > 0 ? newDY.toFixed(1) + "%" : "—"}</div></div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
               </>
             )}
           </>
