@@ -2447,7 +2447,8 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                   const totalProjCost = landPP + hardC + softC;
                   const valAfter      = parseCurrency(asset.valueAfterConstruction || "");
                   const newNOI        = parseCurrency(asset.noiAfterConstruction || "");
-                  const newLoan       = parseCurrency(asset.loanAmountGroundup || (totalProjCost > 0 ? String(Math.round(totalProjCost)) : ""));
+                  // CAPMOON_6B2_STEP4_V1_2026_05_25 — pre-pop loan = Total Project Costs minus Borrower Equity
+                  const newLoan       = parseCurrency(asset.loanAmountGroundup || (totalProjCost > 0 ? String(Math.round(Math.max(0, totalProjCost - borrowerEq))) : ""));
                   const entryLTC      = landPP > 0 && acqLoan > 0 ? (acqLoan / landPP) * 100 : 0;
                   const newCap        = valAfter > 0 && newNOI > 0 ? (newNOI / valAfter) * 100 : 0;
                   const arltv         = valAfter > 0 && newLoan > 0 ? (newLoan / valAfter) * 100 : 0;
@@ -2488,7 +2489,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                           <div>
                             <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Total Loan Amount</label>
                             <Input
-                              value={asset.loanAmountGroundup || (totalProjCost > 0 ? formatCurrencyInput(String(Math.round(totalProjCost))) : "")}
+                              value={asset.loanAmountGroundup || (totalProjCost > 0 ? formatCurrencyInput(String(Math.round(Math.max(0, totalProjCost - borrowerEq)))) : "")}
                               onChange={(e) => upd("loanAmountGroundup", formatCurrencyInput(e.target.value))}
                               placeholder="$0"
                               className={inputClass}
@@ -4863,7 +4864,8 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                           // CAPMOON_PREMIER_V48_6A5_PERM_RT_2026_05_17 — perm-rt reads same shape as short-term (desiredNewLoanAmount + propertyValue)
                           // CAPMOON_PREMIER_V48_6A5_STEP4_FIXES_2026_05_17 — short-term + perm-rt use "LTV" + "Current Property Value", ground-up uses "AR LTV" + "AR Property Value"
                           // CAPMOON_PREMIER_V48_6A6_PERM_CASHOUT_V2_2026_05_17 — perm-cashout reads same shape as short-term/perm-rt
-                          const isGroundup    = asset.apartmentDealType === "refi-va-new-construct";
+                          // CAPMOON_6B2_STEP4_V1_2026_05_25 — include acq-new-construct in ground-up branch
+                          const isGroundup    = asset.apartmentDealType === "refi-va-new-construct" || asset.apartmentDealType === "acq-new-construct";
                           const isShortTerm   = asset.apartmentDealType === "refi-short-term";
                           const isPermRT      = asset.apartmentDealType === "refi-perm-rt";
                           const isPermCashout = asset.apartmentDealType === "refi-perm-cashout";
@@ -5013,7 +5015,8 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                 // CAPMOON_PREMIER_V48_STEP4_GUARANTOR_DENOM_2026_05_17 — pick the right loan field per asset based on dealType
                 const totalLoanAmount = assets.reduce((sum, a) => {
                   const code = a.apartmentDealType;
-                  const loanRaw = code === "refi-va-new-construct" ? (a.loanAmountGroundup || "")
+                  // CAPMOON_6B2_STEP4_V1_2026_05_25 — acq-new-construct also uses loanAmountGroundup
+                  const loanRaw = (code === "refi-va-new-construct" || code === "acq-new-construct") ? (a.loanAmountGroundup || "")
                               : code === "refi-short-term"       ? (a.desiredNewLoanAmount || "")
                               : code === "refi-perm-rt"          ? (a.desiredNewLoanAmount || "")
                               : code === "refi-perm-cashout"     ? (a.desiredNewLoanAmount || "")
