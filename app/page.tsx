@@ -67,6 +67,7 @@ type AssetData = {
   expectedCloseDate?: string;
   // CAPMOON_6B2_PLUMBING_V1_2026_05_25 — 6-b-2 acquisition loan (for the land/property purchase, distinct from construction loan)
   acquisitionLoanAmount?: string;
+  estimatedAppraisedValue?: string; // CAPMOON_6B34_APPRVALUE_PLUMBING_V1_2026_06_21 — 6-b-3/6-b-4 appraised value (drives LTV tile; auto-defaults to purchase price)
   // CAPMOON_PREMIER_V3_GATING_PATCH_2026_05_10 — skip-photos flag for progressive disclosure
   propertySkipPhotos?: boolean;
   // CAPMOON_PREMIER_V4_APARTMENT_BESPOKE_2026_05_11 — prior renovation history
@@ -1101,7 +1102,7 @@ function normalizeRecourse(v: string) { return v === "SELECTIVE" || !v ? "CASE B
 function blankAddress(): AssetAddress { return { street: "", unit: "", city: "", state: "", zip: "" }; }
 function blankAsset(id: number): AssetData {
   // CAPMOON_PREMIER_V43_CLEAR_DEFAULTS_2026_05_11 — assetType default cleared so v4.2 gate actually gates
-  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "", borrowerName: "", landAcquisitionInvolved: "", hardCostsGroundup: "", softCostsGroundup: "", totalBudgetGroundup: "", buildingsAfterConstruction: "", unitsAfterConstruction: "", valueAfterConstruction: "", noiAfterConstruction: "", loanAmountGroundup: "", desiredLoanTerm: "", desiredNewLoanAmount: "", useOfProceedsItems: [], sourceOfFundsItems: [], desiredLoanTermPermRT: "", customLoanTermPermRT: "", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dy: "", currentRate: "", arvValue: "", stabilizedNoi: "", constructionBudget: "", purchaseYear: String(new Date().getFullYear()), expectedCloseDate: "", acquisitionLoanAmount: "", fullyEntitled: undefined, currentPropertyValue: "", additionalEquity: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
+  return { id, ownershipStatus: "Acquisition", dealType: "Value add", refinanceType: "Cash Out to Borrower", assetType: "", borrowerName: "", landAcquisitionInvolved: "", hardCostsGroundup: "", softCostsGroundup: "", totalBudgetGroundup: "", buildingsAfterConstruction: "", unitsAfterConstruction: "", valueAfterConstruction: "", noiAfterConstruction: "", loanAmountGroundup: "", desiredLoanTerm: "", desiredNewLoanAmount: "", useOfProceedsItems: [], sourceOfFundsItems: [], desiredLoanTermPermRT: "", customLoanTermPermRT: "", loanAmount: "", seniorLoanAmount: "", subordinateAmount: "", propertyValue: "", purchasePrice: "", currentLoanAmount: "", landCost: "", softCosts: "", originationClosingCosts: "", hardCosts: "", carryingCosts: "", borrowerEquity: "", ltvMode: "AUTO", currentNetIncome: "", manualLtv: "", dy: "", currentRate: "", arvValue: "", stabilizedNoi: "", constructionBudget: "", purchaseYear: String(new Date().getFullYear()), expectedCloseDate: "", acquisitionLoanAmount: "", estimatedAppraisedValue: "", fullyEntitled: undefined, currentPropertyValue: "", additionalEquity: "", selectedStates: [], recourseType: "CASE BY CASE", numUnits: "", numBuildings: "", numAcres: "", retailUnits: [{ id: 1, tenant: "", rent: "", sqft: "" }], address: blankAddress() };
 }
 function blankLenderForm(): NewLenderForm {
   return { programName: "", contactPerson: "", email: "", phone: "", website: "", typeOfLenders: [], typeOfLoans: [], programTypes: [], propertyTypes: [], loanTerms: [], notes: "", minLoan: "", maxLoan: "", maxLtv: "", targetStates: [], sponsorStates: [], recourse: "CASE BY CASE", capitalTypes: [], capitalTypePrograms: [], contacts: [], status: "Active" };
@@ -1322,6 +1323,19 @@ function AddressFields({ address, onChange, inputClass }: { address: AssetAddres
 function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, inputClass, selectTriggerClass }: { asset: AssetData; capitalType: string; onUpdate: (updated: AssetData) => void; tenantDatabase: string[]; onTenantAdd: (name: string) => void; inputClass: string; selectTriggerClass: string }) {
   const m = calcMetrics(asset, capitalType);
   function upd(field: keyof AssetData, value: any) { onUpdate({ ...asset, [field]: value }); }
+
+  // CAPMOON_6B34_APPRVALUE_PLUMBING_V1_2026_06_21 — for acq-bridge/acq-perm, default estimatedAppraisedValue to purchase price (editable; persisted so LTV tile + deal memo read real state, not a visual prefill)
+  const lastAppraisedAutoRef = React.useRef<string>("");
+  React.useEffect(() => {
+    const code = asset.apartmentDealType;
+    if (code !== "acq-bridge" && code !== "acq-perm") return;
+    const currentVal = (asset.estimatedAppraisedValue || "").trim();
+    if (currentVal !== "" && currentVal !== lastAppraisedAutoRef.current) return; // user overrode — leave alone
+    const pp = (asset.purchasePrice || "").trim();
+    if (!pp || pp === currentVal) return;
+    lastAppraisedAutoRef.current = pp;
+    upd("estimatedAppraisedValue", pp);
+  }, [asset.apartmentDealType, asset.purchasePrice, asset.estimatedAppraisedValue]);
 
   // CAPMOON_GROUNDUP_LOAN_AUTOPERSIST_V1_2026_05_25 — write calculated Total Loan Amount to state
   // for ground-up paths so Step 4 + rollup tiles can read it. Pre-pop in the UI is purely visual;
