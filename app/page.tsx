@@ -935,6 +935,17 @@ const capitalTypes = ["Senior", "Mezzanine", "Preferred Equity", "JV Equity", "L
 const dealTypes = ["Construction", "Value add", "New Development", "Bridge", "Takeout - Rate and Term", "Takeout - Cash Out", "Investment", "Permanent Loan"];
 // CAPMOON_PREMIER_ASSET_EXPANSION_PATCH_2026_05_10 — Permanent Loan removed
 const ownershipStatuses = ["Acquisition", "Refinance"];
+// CAPMOON_APT_DEALTYPE_FREEZE_FIX_V1_2026_06_21 — when apartment deal-type context (ownership/asset type) changes, clear the stale deal type + bespoke fields so the gate can't lock and a re-pick doesn't inherit old data
+function aptDealResets(): Record<string, any> {
+  return {
+    apartmentDealType: "",
+    landAcquisitionInvolved: "", hardCostsGroundup: "", softCostsGroundup: "", totalBudgetGroundup: "",
+    buildingsAfterConstruction: "", unitsAfterConstruction: "", valueAfterConstruction: "", noiAfterConstruction: "",
+    loanAmountGroundup: "", desiredLoanTerm: "", desiredLoanTermPermRT: "", customLoanTermPermRT: "",
+    desiredNewLoanAmount: "", expectedCloseDate: "", acquisitionLoanAmount: "",
+    useOfProceedsItems: [], sourceOfFundsItems: [],
+  };
+}
 const refinanceTypes = ["Cash Out to Borrower", "Cash Out-Value Add", "Rate and Term"];
 const recourseOptions = ["FULL", "NON RECOURSE", "CASE BY CASE"];
 const marketOptions = ["US", "INTERNATIONAL"];
@@ -1510,9 +1521,9 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
             {/* CAPMOON_PREMIER_V4_REORDER_2026_05_11 — Step 5+: Ownership Status → Asset Type → Deal Type */}
             {ticOK && (
               <>
-                <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Ownership Status</label><Select value={asset.ownershipStatus} onValueChange={(v) => upd("ownershipStatus", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+                <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Ownership Status</label><Select value={asset.ownershipStatus} onValueChange={(v) => { /* CAPMOON_APT_DEALTYPE_FREEZE_FIX_V1_2026_06_21 */ if (v !== asset.ownershipStatus && asset.assetType === "Apartments") { Object.entries(aptDealResets()).forEach(([k, val]) => upd(k as any, val)); } upd("ownershipStatus", v); }}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
                 {asset.ownershipStatus && (
-                  <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Asset Type</label><AssetTypeSelect value={asset.assetType} onChange={(v) => upd("assetType", v)} inputClass={inputClass} selectTriggerClass={selectTriggerClass} /></div>
+                  <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Asset Type</label><AssetTypeSelect value={asset.assetType} onChange={(v) => { /* CAPMOON_APT_DEALTYPE_FREEZE_FIX_V1_2026_06_21 */ if (v !== asset.assetType && asset.assetType === "Apartments") { Object.entries(aptDealResets()).forEach(([k, val]) => upd(k as any, val)); } upd("assetType", v); }} inputClass={inputClass} selectTriggerClass={selectTriggerClass} /></div>
                 )}
                 {/* CAPMOON_PREMIER_V44_PULLDOWN_ORDER_2026_05_11 — bespoke form suppressed here, moved to AFTER pulldown ternary */}
                 {false && asset.ownershipStatus && asset.assetType && asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" && asset.apartmentDealType === "refi-va-light" && (() => {
