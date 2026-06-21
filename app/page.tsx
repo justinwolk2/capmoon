@@ -1521,9 +1521,9 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
             {/* CAPMOON_PREMIER_V4_REORDER_2026_05_11 — Step 5+: Ownership Status → Asset Type → Deal Type */}
             {ticOK && (
               <>
-                <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Ownership Status</label><Select value={asset.ownershipStatus} onValueChange={(v) => { /* CAPMOON_APT_DEALTYPE_FREEZE_FIX_V1_2026_06_21 */ if (v !== asset.ownershipStatus && asset.assetType === "Apartments") { Object.entries(aptDealResets()).forEach(([k, val]) => upd(k as any, val)); } upd("ownershipStatus", v); }}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+                <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Ownership Status</label><Select value={asset.ownershipStatus} onValueChange={(v) => { /* CAPMOON_APT_DEALTYPE_SWITCH_FIX_V2_2026_06_21 */ if (v !== asset.ownershipStatus && asset.assetType === "Apartments") { onUpdate({ ...asset, ...aptDealResets(), ownershipStatus: v }); } else { upd("ownershipStatus", v); } }}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{ownershipStatuses.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
                 {asset.ownershipStatus && (
-                  <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Asset Type</label><AssetTypeSelect value={asset.assetType} onChange={(v) => { /* CAPMOON_APT_DEALTYPE_FREEZE_FIX_V1_2026_06_21 */ if (v !== asset.assetType && asset.assetType === "Apartments") { Object.entries(aptDealResets()).forEach(([k, val]) => upd(k as any, val)); } upd("assetType", v); }} inputClass={inputClass} selectTriggerClass={selectTriggerClass} /></div>
+                  <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Asset Type</label><AssetTypeSelect value={asset.assetType} onChange={(v) => { /* CAPMOON_APT_DEALTYPE_SWITCH_FIX_V2_2026_06_21 */ if (v !== asset.assetType && asset.assetType === "Apartments") { onUpdate({ ...asset, ...aptDealResets(), assetType: v }); } else { upd("assetType", v); } }} inputClass={inputClass} selectTriggerClass={selectTriggerClass} /></div>
                 )}
                 {/* CAPMOON_PREMIER_V44_PULLDOWN_ORDER_2026_05_11 — bespoke form suppressed here, moved to AFTER pulldown ternary */}
                 {false && asset.ownershipStatus && asset.assetType && asset.assetType === "Apartments" && asset.ownershipStatus === "Refinance" && asset.apartmentDealType === "refi-va-light" && (() => {
@@ -1647,7 +1647,7 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                                 useOfProceedsItems: [],
                                 sourceOfFundsItems: [],
                               };
-                              Object.entries(resets).forEach(([k, val]) => upd(k as any, val));
+                              onUpdate({ ...asset, ...resets }); /* CAPMOON_APT_DEALTYPE_SWITCH_FIX_V2_2026_06_21 — atomic update; per-key upd() loop was last-write-wins and dropped every field but the last */
                             } else {
                               upd("apartmentDealType" as any, v);
                             }
