@@ -4049,15 +4049,16 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
     creditScore: string;
     netWorth: string;
     liquidNetWorth: string;
+    recourse: string;
     guarantyPct: string;
     guaranteesAll: boolean;
     assetIds: number[]; // populated only when guaranteesAll === false
   };
   const [guarantors, setGuarantors] = useState<GuarantorEntry[]>([
-    { id: 1, name: "", address: blankAddress(), creditScore: "", netWorth: "", liquidNetWorth: "", guarantyPct: "100", guaranteesAll: true, assetIds: [] },
+    { id: 1, name: "", address: blankAddress(), creditScore: "", netWorth: "", liquidNetWorth: "", recourse: "CASE BY CASE", guarantyPct: "100", guaranteesAll: true, assetIds: [] },
   ]);
   const addGuarantor = () => {
-    setGuarantors(prev => [...prev, { id: Date.now(), name: "", address: blankAddress(), creditScore: "", netWorth: "", liquidNetWorth: "", guarantyPct: "100", guaranteesAll: true, assetIds: [] }]);
+    setGuarantors(prev => [...prev, { id: Date.now(), name: "", address: blankAddress(), creditScore: "", netWorth: "", liquidNetWorth: "", recourse: prev[0]?.recourse || "CASE BY CASE", guarantyPct: "100", guaranteesAll: true, assetIds: [] }]);
   };
   const removeGuarantor = (id: number) => {
     setGuarantors(prev => prev.length <= 1 ? prev : prev.filter(g => g.id !== id));
@@ -5109,6 +5110,13 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   <button type="button" onClick={addGuarantor} className="text-xs font-semibold text-[#0a1f44] hover:underline">+ Add Guarantor</button>
                 </div>
 
+                {/* CAPMOON_GUARANTOR_RECOURSE_DEAL_LEVEL_V1B_2026_06_22 — single deal-level recourse, applies to all guarantors */}
+                <div className="mb-3">
+                  <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse (applies to all guarantors)</label>
+                  <select value={guarantors[0]?.recourse || "CASE BY CASE"} onChange={e => setGuarantors(prev => prev.map(g => ({ ...g, recourse: e.target.value })))} className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0a1f44]">
+                    {recourseOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
                 {guarantors.map((g, gi) => (
                   <div key={g.id} className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
                     <div className="flex items-center justify-between">
