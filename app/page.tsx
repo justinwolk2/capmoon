@@ -1014,7 +1014,7 @@ const APARTMENT_REFI_DEAL_TYPES = [
 const APARTMENT_ACQ_DEAL_TYPES = [
   { code: "acq-va-light",       label: "Value-Add (Light)",                  active: true  },  // CAPMOON_6B1_PLUMBING_V2_2026_05_25 — 6-b-1 active
   { code: "acq-new-construct",  label: "New Ground-Up Construction Project", active: true  },  // CAPMOON_6B2_PLUMBING_V1_2026_05_25 — 6-b-2 active
-  { code: "acq-bridge",         label: "Bridge / Short Term Acquisition",    active: false },
+  { code: "acq-bridge",         label: "Bridge / Short Term Acquisition",    active: true  },  // CAPMOON_6B3_FORM_V1_2026_06_21 — 6-b-3 active
   { code: "acq-perm",           label: "Permanent Acquisition",              active: false },
   { code: "acq-other",          label: "Other",                              active: false },
 ];
@@ -2127,6 +2127,68 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                           <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New LTV</div><div className="text-sm font-bold text-[#0a1f44]">{newLTV > 0 ? newLTV.toFixed(1) + "%" : "—"}</div></div>
                           <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New Equity</div><div className="text-sm font-bold text-[#0a1f44]">{newEquity > 0 ? "$" + (newEquity / 1000000).toFixed(2) + "M" : "—"}</div></div>
                           <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">New DY</div><div className="text-sm font-bold text-[#0a1f44]">{newDY > 0 ? newDY.toFixed(1) + "%" : "—"}</div></div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* CAPMOON_6B3_FORM_V1_2026_06_21 — 6-b-3 form: Acquisition + Bridge / Short Term */}
+                {asset.ownershipStatus === "Acquisition" && asset.assetType === "Apartments" && asset.apartmentDealType === "acq-bridge" && (() => {
+                  const pp      = parseCurrency(asset.purchasePrice || "");
+                  const appr    = parseCurrency(asset.estimatedAppraisedValue || asset.purchasePrice || "");
+                  const noi     = parseCurrency(asset.currentNetIncome || "");
+                  const newLoan = parseCurrency(asset.desiredNewLoanAmount || "");
+                  const ltc     = pp > 0 && newLoan > 0 ? (newLoan / pp) * 100 : 0;
+                  const ltv     = appr > 0 && newLoan > 0 ? (newLoan / appr) * 100 : 0;
+                  const equity  = Math.max(0, pp - newLoan);
+                  const dy      = newLoan > 0 && noi > 0 ? (noi / newLoan) * 100 : 0;
+                  const capRate = pp > 0 && noi > 0 ? (noi / pp) * 100 : 0;
+                  return (
+                    <div className="md:col-span-2 rounded-xl border border-[#c9a84c]/40 bg-[#c9a84c]/5 p-4 space-y-4 mt-2">
+                      <div className="text-xs font-bold uppercase tracking-[0.15em] text-[#0a1f44]">Apartment Details</div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Units</label><Input value={asset.numUnits} onChange={(e) => upd("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Buildings</label><Input value={asset.numBuildings} onChange={(e) => upd("numBuildings", e.target.value)} placeholder="e.g. 4" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Purchase Price</label><Input value={asset.purchasePrice} onChange={(e) => upd("purchasePrice", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Estimated Appraised Value</label><Input value={asset.estimatedAppraisedValue || ""} onChange={(e) => upd("estimatedAppraisedValue", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /><div className="text-xs text-gray-400 mt-1">Defaults to purchase price; edit if you have an appraisal.</div></div>
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">In-Place NOI (Annual)</label><Input value={asset.currentNetIncome || ""} onChange={(e) => upd("currentNetIncome", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                      </div>
+
+                      {/* Desired Loan Term — 3 button group */}
+                      <div>
+                        <label className="text-xs text-gray-500 mb-2 block font-medium uppercase">Desired Loan Term</label>
+                        <div className="grid grid-cols-3 gap-3 max-w-xl">
+                          {([
+                            ["1", "1 Year"],
+                            ["2", "2 Years"],
+                            [">2", "More Than 2 Years"],
+                          ] as const).map(([code, lbl]) => (
+                            <button
+                              key={code}
+                              type="button"
+                              onClick={() => upd("desiredLoanTerm", code)}
+                              className={`p-3 rounded-xl border-2 text-center font-bold text-sm transition-all ${asset.desiredLoanTerm === code ? "border-[#0a1f44] bg-[#0a1f44]/5 text-[#0a1f44]" : "border-gray-200 text-gray-500 hover:border-[#0a1f44]/30"}`}
+                            >
+                              {lbl}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Loan Amount Requested</label><Input value={asset.desiredNewLoanAmount || ""} onChange={(e) => upd("desiredNewLoanAmount", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
+                      </div>
+
+                      {/* Gold tile row — 5 boxes (LTC / LTV / Equity / DY / Cap Rate) */}
+                      {(pp > 0 || newLoan > 0 || noi > 0) && (
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 pt-4 border-t border-[#c9a84c]/20">
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">LTC</div><div className="text-sm font-bold text-[#0a1f44]">{ltc > 0 ? ltc.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">LTV</div><div className="text-sm font-bold text-[#0a1f44]">{ltv > 0 ? ltv.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Equity</div><div className="text-sm font-bold text-[#0a1f44]">{equity > 0 ? "$" + (equity / 1000000).toFixed(2) + "M" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">DY</div><div className="text-sm font-bold text-[#0a1f44]">{dy > 0 ? dy.toFixed(1) + "%" : "—"}</div></div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Cap Rate</div><div className="text-sm font-bold text-[#0a1f44]">{capRate > 0 ? capRate.toFixed(2) + "%" : "—"}</div></div>
                         </div>
                       )}
                     </div>
