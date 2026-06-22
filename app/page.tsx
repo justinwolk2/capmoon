@@ -4980,16 +4980,17 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                           // CAPMOON_PREMIER_V48_6A6_PERM_CASHOUT_V2_2026_05_17 — perm-cashout reads same shape as short-term/perm-rt
                           // CAPMOON_6B2_STEP4_V1_2026_05_25 — include acq-new-construct in ground-up branch
                           const isGroundup    = asset.apartmentDealType === "refi-va-new-construct" || asset.apartmentDealType === "acq-new-construct";
-                          const isShortTerm   = asset.apartmentDealType === "refi-short-term";
-                          const isPermRT      = asset.apartmentDealType === "refi-perm-rt";
+                          const isShortTerm   = asset.apartmentDealType === "refi-short-term" || asset.apartmentDealType === "acq-bridge"; // CAPMOON_6B34_STEP4_V1_2026_06_21
+                          const isPermRT      = asset.apartmentDealType === "refi-perm-rt" || asset.apartmentDealType === "acq-perm"; // CAPMOON_6B34_STEP4_V1_2026_06_21
                           const isPermCashout = asset.apartmentDealType === "refi-perm-cashout";
                           const usesNewLoan = isShortTerm || isPermRT || isPermCashout;
+                          const isAcqAppr = asset.apartmentDealType === "acq-bridge" || asset.apartmentDealType === "acq-perm"; // CAPMOON_6B34_STEP4_V1_2026_06_21 — acq value basis = appraised/purchase
                           const loanAmtRaw = usesNewLoan ? (asset.desiredNewLoanAmount || "") : isGroundup ? (asset.loanAmountGroundup || "") : (asset.loanAmount || "");
-                          const arvRaw     = usesNewLoan ? (asset.propertyValue || "") : isGroundup ? (asset.valueAfterConstruction || "") : (asset.arvValue || "");
+                          const arvRaw     = isAcqAppr ? (asset.estimatedAppraisedValue || asset.purchasePrice || "") : usesNewLoan ? (asset.propertyValue || "") : isGroundup ? (asset.valueAfterConstruction || "") : (asset.arvValue || "");
                           const loanAmt = parseCurrency(loanAmtRaw);
                           const arv = parseCurrency(arvRaw);
                           const arLtv = arv > 0 && loanAmt > 0 ? (loanAmt / arv) * 100 : 0;
-                          const valueLabel = usesNewLoan ? "Current Property Value" : "AR Property Value";
+                          const valueLabel = isAcqAppr ? "Appraised Value" : usesNewLoan ? "Current Property Value" : "AR Property Value";
                           const ltvLabel   = usesNewLoan ? "LTV" : "AR LTV";
                           return [
                             ["New Requested Loan Amount", loanAmtRaw || "—"],
@@ -5132,7 +5133,9 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   // CAPMOON_6B2_STEP4_V1_2026_05_25 — acq-new-construct also uses loanAmountGroundup
                   const loanRaw = (code === "refi-va-new-construct" || code === "acq-new-construct") ? (a.loanAmountGroundup || "")
                               : code === "refi-short-term"       ? (a.desiredNewLoanAmount || "")
+                              : code === "acq-bridge"            ? (a.desiredNewLoanAmount || "") // CAPMOON_6B34_STEP4_V1_2026_06_21
                               : code === "refi-perm-rt"          ? (a.desiredNewLoanAmount || "")
+                              : code === "acq-perm"              ? (a.desiredNewLoanAmount || "")
                               : code === "refi-perm-cashout"     ? (a.desiredNewLoanAmount || "")
                               : (a.loanAmount || "");
                   return sum + parseCurrency(loanRaw);
