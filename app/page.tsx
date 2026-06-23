@@ -1595,11 +1595,6 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                         </div>
                       </div>
 
-                      <div className="border-t border-[#c9a84c]/20 pt-4">
-                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label>
-                        <Select value={asset.recourseType} onValueChange={(v) => upd("recourseType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
-                      </div>
-
                       {/* CAPMOON_PREMIER_V45_NEW_METRICS_2026_05_11 — 8 tiles in 2x4 grid, with New Equity + New DY */}
                       {(curVal > 0 || curLoan > 0 || curNOI > 0 || newARV > 0 || newNOI > 0 || newLoan > 0) && (() => {
                         const newEquity = Math.max(0, newARV - newLoan);
@@ -1817,11 +1812,6 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                           <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Buildings After Stabilization</label><Input value={asset.numBuildingsAfterStab || ""} onChange={(e) => upd("numBuildingsAfterStab" as any, e.target.value)} placeholder="e.g. 4" className={inputClass} /></div>
                           <div className="md:col-span-2"><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">New Requested Loan Amount</label><Input value={asset.loanAmount || ""} onChange={(e) => upd("loanAmount", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
                         </div>
-                      </div>
-
-                      <div className="border-t border-[#c9a84c]/20 pt-4">
-                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label>
-                        <Select value={asset.recourseType} onValueChange={(v) => upd("recourseType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
                       </div>
 
                       {/* CAPMOON_PREMIER_V45_NEW_METRICS_2026_05_11 — 8 tiles in 2x4 grid, with New Equity + New DY */}
@@ -2599,11 +2589,6 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                         </div>
                       </div>
 
-                      <div className="border-t border-[#c9a84c]/20 pt-4">
-                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label>
-                        <Select value={asset.recourseType} onValueChange={(v) => upd("recourseType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
-                      </div>
-
                       {(purchasePrice > 0 || borrowerEq > 0 || curNOI > 0 || newARV > 0 || newNOI > 0 || newLoan > 0) && (
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-4 border-t border-[#c9a84c]/20">
                           <div className="rounded-xl border border-gray-200 bg-white p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">Entry LTC</div><div className="text-sm font-bold text-[#0a1f44]">{entryLTC > 0 ? entryLTC.toFixed(1) + "%" : "—"}</div></div>
@@ -2681,11 +2666,6 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
                           </div>
                           <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Estimated New NOI After Construction</label><Input value={asset.noiAfterConstruction || ""} onChange={(e) => upd("noiAfterConstruction", formatCurrencyInput(e.target.value))} placeholder="$0" className={inputClass} /></div>
                         </div>
-                      </div>
-
-                      <div className="border-t border-[#c9a84c]/20 pt-4">
-                        <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label>
-                        <Select value={asset.recourseType} onValueChange={(v) => upd("recourseType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
                       </div>
 
                       {(landPP > 0 || acqLoan > 0 || borrowerEq > 0 || valAfter > 0 || newNOI > 0 || newLoan > 0) && (
@@ -3276,7 +3256,6 @@ function AssetForm({ asset, capitalType, onUpdate, tenantDatabase, onTenantAdd, 
 
       {asset.ltvMode === "MANUAL" && <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Manual LTV</label><Input value={asset.manualLtv} onChange={(e) => upd("manualLtv", e.target.value)} className={inputClass} /></div>}
       {asset.ltvMode === "AUTO" && <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Calculated LTV</label><div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold text-[#0a1f44]">{formatPercent(m.autoLtv)}</div></div>}
-      <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label><Select value={asset.recourseType} onValueChange={(v) => upd("recourseType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
       <div className="md:col-span-2 grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(metricBoxes.length, 4)}, 1fr)` }}>
         {metricBoxes.map(([label, val]) => (<div key={label} className="rounded-xl border border-gray-200 bg-gray-50 p-3"><div className="text-xs uppercase tracking-[0.15em] text-[#c9a84c] font-bold mb-1">{label}</div><div className="text-sm font-bold text-[#0a1f44]">{val}</div></div>))}
       </div>
@@ -4815,12 +4794,7 @@ function DealMatcher({ lenderRecords, capitalSeekerMode = false, onSubmitDeal, s
                   <div className="space-y-4">
                     <AddressFields address={prop.address || blankAddress()} onChange={(a) => setHybridProperties(prev => prev.map((p, i) => i === hybridIndex ? { ...p, address: a } : p))} inputClass={inputClass} />
 
-                    {/* Recourse only — deal type already shown above */}
-                    <div>
-                      <label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Recourse</label>
-                      <Select value={prop.recourseType} onValueChange={(v) => updHybrid("recourseType", v)}><SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{recourseOptions.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select>
-                    </div>
-
+                    {/* CAPMOON_RECOURSE_FORMS_REMOVE_V1_2026_06_22 — asset-level recourse moved to Step 4 guarantors */}
                     {showUnits && (
                       <div className="grid gap-3 md:grid-cols-2">
                         <div><label className="text-xs text-gray-500 mb-1 block font-medium uppercase">Number of Units</label><Input value={prop.numUnits} onChange={(e) => updHybrid("numUnits", e.target.value)} placeholder="e.g. 120" className={inputClass} /></div>
